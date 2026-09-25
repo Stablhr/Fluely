@@ -60,7 +60,7 @@
   --color-info-text: #2f5c96;
   --color-danger-button: #c0392f;
 
-  --color-board-canvas: #f4f3e2;
+  --color-board-canvas: #fbfcee;
   --color-list-default: #ffffff;
 
   --color-base-bg: #f4f3e2;
@@ -95,9 +95,17 @@
   --radius-chip: 16px;
   --radius-pill: 999px;
 
-  /* ── Elevation: soft and low-opacity; flat by default ─────────────────── */
-  --shadow-card: 0 2px 10px rgba(52, 59, 27, 0.04);
-  --shadow-card-hover: 0 6px 20px rgba(52, 59, 27, 0.07);
+  /* ── Elevation: soft, layered, ink-tinted. Three stacked shadows — a
+       tight contact shadow, a mid spread, and a wide ambient lift — so
+       surfaces read as raised off the ivory page without a hard edge. ── */
+  --shadow-card:
+    0 1px 2px rgba(52, 59, 27, 0.05),
+    0 3px 6px rgba(52, 59, 27, 0.05),
+    0 12px 28px rgba(52, 59, 27, 0.07);
+  --shadow-card-hover:
+    0 2px 4px rgba(52, 59, 27, 0.06),
+    0 8px 16px rgba(52, 59, 27, 0.07),
+    0 20px 44px rgba(52, 59, 27, 0.1);
 
   --text-display: 28px;
   --text-display--line-height: 34px;
@@ -116,9 +124,9 @@
   --text-label--letter-spacing: 0.04em;
 
   --shadow-none: 0 0 #0000;
-  --shadow-subtle: 0 1px 3px rgba(52, 59, 27, 0.05);
-  --shadow-medium: 0 6px 20px rgba(52, 59, 27, 0.08);
-  --shadow-modal: 0 18px 50px rgba(52, 59, 27, 0.16);
+  --shadow-subtle: 0 1px 2px rgba(52, 59, 27, 0.05), 0 4px 10px rgba(52, 59, 27, 0.06);
+  --shadow-medium: 0 2px 4px rgba(52, 59, 27, 0.06), 0 10px 24px rgba(52, 59, 27, 0.1);
+  --shadow-modal: 0 4px 8px rgba(52, 59, 27, 0.06), 0 16px 40px rgba(52, 59, 27, 0.14), 0 40px 80px rgba(52, 59, 27, 0.16);
 }
 
 /* Restore the shadcn values for the tokens Kali shares, so the auth,
@@ -263,12 +271,12 @@
   --color-card-border-strong: #4a5033;
   --color-card-border-faint: rgba(143, 149, 115, 0.45);
 
-  --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.22);
-  --shadow-card-hover: 0 6px 20px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.26), 0 3px 6px rgba(0, 0, 0, 0.24), 0 12px 28px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 16px rgba(0, 0, 0, 0.32), 0 20px 44px rgba(0, 0, 0, 0.4);
 
-  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.28);
-  --shadow-medium: 0 6px 20px rgba(0, 0, 0, 0.38);
-  --shadow-modal: 0 18px 50px rgba(0, 0, 0, 0.5);
+  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 10px rgba(0, 0, 0, 0.32);
+  --shadow-medium: 0 2px 4px rgba(0, 0, 0, 0.32), 0 10px 24px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 4px 8px rgba(0, 0, 0, 0.34), 0 16px 40px rgba(0, 0, 0, 0.46), 0 40px 80px rgba(0, 0, 0, 0.54);
 }
 
 @utility scroll-slim {

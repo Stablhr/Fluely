@@ -71,7 +71,7 @@ export default function DocsPage() {
     <div className="mx-auto max-w-3xl px-6 py-16">
       <div className="mb-12">
         <h1 className="text-4xl font-bold tracking-tight">Documentation</h1>
-        <p className="mt-3 text-gray-500">
+        <p className="mt-3 text-muted-foreground">
           How this boilerplate works and how to get started.
         </p>
       </div>
@@ -82,8 +82,8 @@ export default function DocsPage() {
             <h2 className="text-xl font-semibold">{section.title}</h2>
             <ul className="mt-4 space-y-2">
               {section.items.map(item => (
-                <li key={item} className="flex gap-3 text-sm text-gray-600">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gray-300" />
+                <li key={item} className="flex gap-3 text-sm text-foreground">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
                   {item}
                 </li>
               ))}
@@ -92,17 +92,17 @@ export default function DocsPage() {
         ))}
       </div>
 
-      <div className="mt-16 rounded-xl border border-gray-100 bg-gray-50 p-6">
+      <div className="mt-16 rounded-xl border border-border bg-muted p-6">
         <h3 className="font-semibold">Full Guide</h3>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-sm text-muted-foreground">
           For detailed instructions on credentials, deployment, and customization, see
-          the files in the <code className="rounded bg-gray-200 px-1.5 py-0.5 font-mono text-xs">docs/</code> folder
+          the files in the <code className="rounded bg-accent px-1.5 py-0.5 font-mono text-xs">docs/</code> folder
           of the repository.
         </p>
         <div className="mt-4 flex gap-3">
           <Link
             href="/landing"
-            className="rounded-full border border-gray-300 px-4 py-2 text-xs font-medium text-black transition-colors hover:bg-gray-100"
+            className="rounded-full border border-border px-4 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent"
           >
             Back to Home
           </Link>
@@ -110,7 +110,7 @@ export default function DocsPage() {
             href="https://github.com/Tobikun11-Arch/express-next-auth-kit"
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-full bg-black px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-gray-800"
+            className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             View on GitHub
           </a>

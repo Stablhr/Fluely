@@ -12,7 +12,7 @@ const THEME_OPTIONS: { value: ThemeMode; icon: typeof Sun; label: string; hint: 
 
 function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-card border border-border bg-surface p-4 sm:p-5">
+    <section className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5">
       <h2 className="text-[15px] font-semibold text-text-primary">{title}</h2>
       <p className="mt-0.5 text-[13px] text-text-secondary">{description}</p>
       <div className="mt-4">{children}</div>

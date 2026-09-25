@@ -49,7 +49,7 @@ export default function BoardsHome() {
             <div
               key={board.id}
               onClick={() => router.push(`/boards/${board.id}`)}
-              className="group relative h-24 cursor-pointer overflow-hidden rounded-xl ring-1 ring-border transition-shadow duration-150 hover:shadow-subtle sm:h-28"
+              className="group relative h-24 cursor-pointer overflow-hidden rounded-xl shadow-card ring-1 ring-border transition-shadow duration-150 hover:shadow-card-hover sm:h-28"
               style={boardBgStyle(board.background)}
             >
               <button

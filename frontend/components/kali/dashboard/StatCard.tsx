@@ -26,7 +26,7 @@ export default function StatCard({ tone, label, value, icon, className = '' }: S
   const onBlue = tone === 'blue'
 
   return (
-    <div className={`rounded-card p-5 transition-shadow duration-150 ${TONES[tone]} ${className}`}>
+    <div className={`rounded-card p-5 shadow-card transition-shadow duration-150 hover:shadow-card-hover ${TONES[tone]} ${className}`}>
       <div className="flex items-center justify-between">
         <span className={`text-label uppercase ${onBlue ? 'text-brand-ivory/70' : 'text-brand-ink/60'}`}>{label}</span>
         {icon ?? <MoreHorizontal size={16} className={onBlue ? 'text-brand-ivory/70' : 'text-brand-ink/50'} />}

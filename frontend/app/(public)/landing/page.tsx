@@ -55,25 +55,25 @@ const STRUCTURE = [
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-white text-black">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Hero */}
       <section className="flex flex-col items-center justify-center px-6 pt-32 pb-20 text-center">
-        <div className="mb-6 inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-4 py-1.5 text-xs text-gray-600">
+        <div className="mb-6 inline-flex items-center rounded-full border border-border bg-muted px-4 py-1.5 text-xs text-foreground">
           Open source boilerplate
         </div>
         <h1 className="max-w-3xl text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl">
           Next.js + Express
           <br />
-          <span className="text-gray-400">Auth Kit</span>
+          <span className="text-muted-foreground">Auth Kit</span>
         </h1>
-        <p className="mt-6 max-w-xl text-lg text-gray-500">
+        <p className="mt-6 max-w-xl text-lg text-muted-foreground">
           A full-stack authentication boilerplate with JWT, role-based access, email
           verification, and a clean project structure. Skip the setup, start building.
         </p>
         <div className="mt-10 flex gap-4">
           <Link
             href="/sign-up"
-            className="rounded-full bg-black px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+            className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Get Started
           </Link>
@@ -81,7 +81,7 @@ export default function HomePage() {
             href="https://github.com/Tobikun11-Arch/express-next-auth-kit"
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-full border border-gray-300 px-6 py-3 text-sm font-medium text-black transition-colors hover:bg-gray-50"
+            className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
           >
             GitHub
           </a>
@@ -89,19 +89,19 @@ export default function HomePage() {
       </section>
 
       {/* Features */}
-      <section className="border-t border-gray-100 px-6 py-24">
+      <section className="border-t border-border px-6 py-24">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-center text-3xl font-bold tracking-tight">
             Everything you need
           </h2>
-          <p className="mt-3 text-center text-gray-500">
+          <p className="mt-3 text-center text-muted-foreground">
             A complete auth system so you can focus on your product.
           </p>
           <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map(f => (
-              <div key={f.title} className="rounded-xl border border-gray-100 p-6">
+              <div key={f.title} className="rounded-xl border border-border p-6">
                 <h3 className="text-base font-semibold">{f.title}</h3>
-                <p className="mt-2 text-sm text-gray-500">{f.description}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
               </div>
             ))}
           </div>
@@ -109,20 +109,20 @@ export default function HomePage() {
       </section>
 
       {/* Tech Stack */}
-      <section className="border-t border-gray-100 bg-gray-50 px-6 py-24">
+      <section className="border-t border-border bg-muted px-6 py-24">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-center text-3xl font-bold tracking-tight">Tech Stack</h2>
-          <p className="mt-3 text-center text-gray-500">
+          <p className="mt-3 text-center text-muted-foreground">
             Modern tools, battle-tested libraries.
           </p>
           <div className="mt-16 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {STACK.map(s => (
               <div
                 key={s.name}
-                className="rounded-lg border border-gray-200 bg-white px-4 py-3"
+                className="rounded-lg border border-border bg-card px-4 py-3"
               >
                 <span className="text-sm font-medium">{s.name}</span>
-                <span className="ml-2 text-xs text-gray-400">{s.role}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{s.role}</span>
               </div>
             ))}
           </div>
@@ -130,22 +130,22 @@ export default function HomePage() {
       </section>
 
       {/* Structure */}
-      <section className="border-t border-gray-100 px-6 py-24">
+      <section className="border-t border-border px-6 py-24">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-center text-3xl font-bold tracking-tight">
             Clean Structure
           </h2>
-          <p className="mt-3 text-center text-gray-500">
+          <p className="mt-3 text-center text-muted-foreground">
             Organized by concern. Easy to scale.
           </p>
           <div className="mt-16 space-y-3">
             {STRUCTURE.map(s => (
               <div
                 key={s.path}
-                className="flex flex-col gap-1 rounded-lg border border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:gap-4"
+                className="flex flex-col gap-1 rounded-lg border border-border px-5 py-4 sm:flex-row sm:items-center sm:gap-4"
               >
-                <code className="shrink-0 font-mono text-sm text-black">{s.path}</code>
-                <span className="text-sm text-gray-500">{s.desc}</span>
+                <code className="shrink-0 font-mono text-sm text-foreground">{s.path}</code>
+                <span className="text-sm text-muted-foreground">{s.desc}</span>
               </div>
             ))}
           </div>
@@ -153,32 +153,32 @@ export default function HomePage() {
       </section>
 
       {/* CI/CD */}
-      <section className="border-t border-gray-100 bg-gray-50 px-6 py-24">
+      <section className="border-t border-border bg-muted px-6 py-24">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-center text-3xl font-bold tracking-tight">
             CI/CD Ready
           </h2>
-          <p className="mt-3 text-center text-gray-500">
+          <p className="mt-3 text-center text-muted-foreground">
             GitHub Actions workflows included. Push and deploy.
           </p>
           <div className="mt-16 grid gap-6 sm:grid-cols-2">
-            <div className="rounded-xl border border-gray-200 bg-white p-6">
+            <div className="rounded-xl border border-border bg-card p-6">
               <h3 className="text-base font-semibold">Frontend</h3>
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Lint, type-check, and build on every push. Auto-deploy to Vercel on
                 merge to production.
               </p>
-              <code className="mt-4 inline-block rounded-md bg-gray-100 px-3 py-1.5 font-mono text-xs text-gray-600">
+              <code className="mt-4 inline-block rounded-md bg-accent px-3 py-1.5 font-mono text-xs text-foreground">
                 .github/workflows/frontend.yml
               </code>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-6">
+            <div className="rounded-xl border border-border bg-card p-6">
               <h3 className="text-base font-semibold">Backend</h3>
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Lint, type-check, build, and run tests on every push. Auto-deploy to
                 Vercel on merge to production.
               </p>
-              <code className="mt-4 inline-block rounded-md bg-gray-100 px-3 py-1.5 font-mono text-xs text-gray-600">
+              <code className="mt-4 inline-block rounded-md bg-accent px-3 py-1.5 font-mono text-xs text-foreground">
                 .github/workflows/backend.yml
               </code>
             </div>
@@ -187,23 +187,23 @@ export default function HomePage() {
       </section>
 
       {/* CTA */}
-      <section className="border-t border-gray-100 px-6 py-24">
+      <section className="border-t border-border px-6 py-24">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight">Ready to start?</h2>
-          <p className="mt-4 text-gray-500">
+          <p className="mt-4 text-muted-foreground">
             Clone the repo, fill in your env variables, seed an admin, and you&apos;re
             running in under 5 minutes.
           </p>
           <div className="mt-8 flex justify-center gap-4">
             <Link
               href="/sign-in"
-              className="rounded-full bg-black px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-gray-800"
+              className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Sign In
             </Link>
             <Link
               href="/sign-up"
-              className="rounded-full border border-gray-300 px-6 py-3 text-sm font-medium text-black transition-colors hover:bg-gray-50"
+              className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
               Create Account
             </Link>
@@ -212,9 +212,9 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-100 px-6 py-8">
+      <footer className="border-t border-border px-6 py-8">
         <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-muted-foreground">
             Express Next Auth Kit — MIT License
           </p>
           <div className="flex gap-6">
@@ -222,11 +222,11 @@ export default function HomePage() {
               href="https://github.com/Tobikun11-Arch/express-next-auth-kit"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-gray-400 hover:text-black"
+              className="text-sm text-muted-foreground hover:text-foreground"
             >
               GitHub
             </a>
-            <Link href="/sign-in" className="text-sm text-gray-400 hover:text-black">
+            <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground">
               Sign In
             </Link>
           </div>
