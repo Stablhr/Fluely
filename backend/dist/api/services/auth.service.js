@@ -12,6 +12,7 @@ const admin_repository_1 = require("../repositories/admin.repository");
 const error_1 = require("../utils/error");
 const email_service_1 = require("./email.service");
 const blocklist_service_1 = require("./blocklist.service");
+const errorCodes_1 = require("../constants/errorCodes");
 const verificationCodeEmail_1 = require("../templates/verificationCodeEmail");
 const resetPasswordEmail_1 = require("../templates/resetPasswordEmail");
 function generateVerificationCode() {
@@ -26,7 +27,7 @@ exports.authService = {
             user_repository_1.userRepository.findByEmail(data.email)
         ]);
         if (existingEmail) {
-            throw new error_1.ApiError(409, 'EMAIL_EXISTS', 'Email already exists');
+            throw new error_1.ApiError(409, errorCodes_1.ErrorCodes.EMAIL_EXISTS, 'Email already exists');
         }
         try {
             const passwordHash = await bcrypt_1.default.hash(data.password, 10);
@@ -61,12 +62,12 @@ exports.authService = {
                 err.code === 11000) {
                 const keyValue = err.keyValue;
                 if (keyValue?.username) {
-                    throw new error_1.ApiError(409, 'USERNAME_EXISTS', 'username already exists');
+                    throw new error_1.ApiError(409, errorCodes_1.ErrorCodes.USERNAME_EXISTS, 'username already exists');
                 }
                 if (keyValue?.email) {
-                    throw new error_1.ApiError(409, 'EMAIL_EXISTS', 'Email already exists');
+                    throw new error_1.ApiError(409, errorCodes_1.ErrorCodes.EMAIL_EXISTS, 'Email already exists');
                 }
-                throw new error_1.ApiError(409, 'ACCOUNT_EXISTS', 'Account already exists');
+                throw new error_1.ApiError(409, errorCodes_1.ErrorCodes.ACCOUNT_EXISTS, 'Account already exists');
             }
             throw err;
         }
@@ -74,12 +75,12 @@ exports.authService = {
     async verify(email, code) {
         const user = await user_repository_1.userRepository.findByEmail(email);
         if (!user || !user.verificationCode || !user.verificationExpiry) {
-            throw new error_1.ApiError(400, 'INVALID_CODE', 'Invalid verification code');
+            throw new error_1.ApiError(400, errorCodes_1.ErrorCodes.INVALID_CODE, 'Invalid verification code');
         }
         const codeMatches = user.verificationCode === code;
         const notExpired = user.verificationExpiry > new Date();
         if (!codeMatches || !notExpired) {
-            throw new error_1.ApiError(400, 'EXPIRED_CODE', 'Verification code expired or invalid');
+            throw new error_1.ApiError(400, errorCodes_1.ErrorCodes.EXPIRED_CODE, 'Verification code expired or invalid');
         }
         await user_repository_1.userRepository.markVerified(email);
     },
@@ -132,27 +133,40 @@ exports.authService = {
     async verifyResetCode(email, code) {
         const user = await user_repository_1.userRepository.findByEmail(email);
         if (!user || !user.resetCode || !user.resetExpiry) {
-            throw new error_1.ApiError(400, 'INVALID_CODE', 'Invalid or expired reset code');
+            throw new error_1.ApiError(400, errorCodes_1.ErrorCodes.INVALID_CODE, 'Invalid or expired reset code');
         }
         const codeMatches = user.resetCode === code;
         const notExpired = user.resetExpiry > new Date();
         if (!codeMatches || !notExpired) {
-            throw new error_1.ApiError(400, 'EXPIRED_CODE', 'Reset code expired or invalid');
+            throw new error_1.ApiError(400, errorCodes_1.ErrorCodes.EXPIRED_CODE, 'Reset code expired or invalid');
         }
     },
     async resetPassword(email, code, newPassword) {
         const user = await user_repository_1.userRepository.findByEmail(email);
         if (!user || !user.resetCode || !user.resetExpiry) {
-            throw new error_1.ApiError(400, 'INVALID_CODE', 'Invalid or expired reset code');
+            throw new error_1.ApiError(400, errorCodes_1.ErrorCodes.INVALID_CODE, 'Invalid or expired reset code');
         }
         const codeMatches = user.resetCode === code;
         const notExpired = user.resetExpiry > new Date();
         if (!codeMatches || !notExpired) {
-            throw new error_1.ApiError(400, 'EXPIRED_CODE', 'Reset code expired or invalid');
+            throw new error_1.ApiError(400, errorCodes_1.ErrorCodes.EXPIRED_CODE, 'Reset code expired or invalid');
         }
         const passwordHash = await bcrypt_1.default.hash(newPassword, 10);
         await user_repository_1.userRepository.updatePassword(user.id, passwordHash);
         await user_repository_1.userRepository.clearResetCode(email);
+    },
+    async changePassword(userId, type, currentPassword, newPassword) {
+        const repository = type === 'user' ? user_repository_1.userRepository : admin_repository_1.adminRepository;
+        const account = await repository.findById(userId);
+        if (!account) {
+            throw new error_1.ApiError(404, errorCodes_1.ErrorCodes.USER_NOT_FOUND, 'User not found');
+        }
+        const matches = await bcrypt_1.default.compare(currentPassword, account.passwordHash);
+        if (!matches) {
+            throw new error_1.ApiError(401, errorCodes_1.ErrorCodes.INVALID_CREDENTIALS, 'Current password is incorrect');
+        }
+        const passwordHash = await bcrypt_1.default.hash(newPassword, 10);
+        await repository.updatePassword(userId, passwordHash);
     },
     async login(email, password) {
         const identifier = email;
@@ -163,14 +177,14 @@ exports.authService = {
         const account = user || admin;
         const userType = user ? 'user' : admin ? 'admin' : null;
         if (!account || !userType) {
-            throw new error_1.ApiError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+            throw new error_1.ApiError(401, errorCodes_1.ErrorCodes.INVALID_CREDENTIALS, 'Invalid email or password');
         }
         if (!account.isVerified) {
-            throw new error_1.ApiError(403, 'NOT_VERIFIED', 'Email not verified');
+            throw new error_1.ApiError(403, errorCodes_1.ErrorCodes.NOT_VERIFIED, 'Email not verified');
         }
         const match = await bcrypt_1.default.compare(password, account.passwordHash);
         if (!match) {
-            throw new error_1.ApiError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+            throw new error_1.ApiError(401, errorCodes_1.ErrorCodes.INVALID_CREDENTIALS, 'Invalid email or password');
         }
         const accessToken = jsonwebtoken_1.default.sign({ userId: account.id, type: userType }, env_1.env.JWT_SECRET, { expiresIn: '15m' });
         const refreshToken = jsonwebtoken_1.default.sign({ userId: account.id, type: userType }, env_1.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
@@ -179,17 +193,17 @@ exports.authService = {
     async refreshAccessToken(refreshToken) {
         try {
             if (blocklist_service_1.blocklistService.isRevoked(refreshToken)) {
-                throw new error_1.ApiError(401, 'UNAUTHORIZED', 'Token revoked');
+                throw new error_1.ApiError(401, errorCodes_1.ErrorCodes.UNAUTHORIZED, 'Token revoked');
             }
             const payload = jsonwebtoken_1.default.verify(refreshToken, env_1.env.JWT_REFRESH_SECRET);
             const account = await (payload.type === 'user'
                 ? user_repository_1.userRepository.findById(payload.userId)
                 : admin_repository_1.adminRepository.findById(payload.userId));
             if (!account) {
-                throw new error_1.ApiError(401, 'UNAUTHORIZED', 'Invalid token');
+                throw new error_1.ApiError(401, errorCodes_1.ErrorCodes.UNAUTHORIZED, 'Invalid token');
             }
             if (!account.isVerified) {
-                throw new error_1.ApiError(403, 'NOT_VERIFIED', 'Email not verified');
+                throw new error_1.ApiError(403, errorCodes_1.ErrorCodes.NOT_VERIFIED, 'Email not verified');
             }
             blocklist_service_1.blocklistService.revoke(refreshToken);
             const accessToken = jsonwebtoken_1.default.sign({ userId: account.id, type: payload.type }, env_1.env.JWT_SECRET, { expiresIn: '15m' });
@@ -197,7 +211,7 @@ exports.authService = {
             return { accessToken, refreshToken: newRefreshToken };
         }
         catch {
-            throw new error_1.ApiError(401, 'UNAUTHORIZED', 'Invalid token');
+            throw new error_1.ApiError(401, errorCodes_1.ErrorCodes.UNAUTHORIZED, 'Invalid token');
         }
     },
     logout(refreshToken) {

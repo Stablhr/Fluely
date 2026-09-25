@@ -16,7 +16,12 @@ const envSchema = z.object({
   SMTP_FROM: z.string().optional(),
   COOKIE_SECURE: z.string().optional(),
   COOKIE_SAMESITE: z.enum(['strict', 'lax', 'none']).optional(),
-  CORS_ORIGINS: z.string().optional()
+  CORS_ORIGINS: z.string().optional(),
+  FRONTEND_URL: z.string().url().optional(),
+  MEDIA_MAX_FILE_SIZE_MB: z.coerce.number().positive().max(500).optional(),
+  MEDIA_QUOTA_MB: z.coerce.number().positive().max(100000).optional(),
+  MEDIA_ALLOWED_MIME_TYPES: z.string().optional(),
+  SOCIAL_SIMULATION_FAILURE_RATE: z.coerce.number().min(0).max(1).optional()
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -30,5 +35,21 @@ if (!parsed.success) {
 
 export const env = {
   ...parsed.data,
-  PORT: parsed.data.PORT ? Number(parsed.data.PORT) : 5000
+  PORT: parsed.data.PORT ? Number(parsed.data.PORT) : 5000,
+  FRONTEND_URL: parsed.data.FRONTEND_URL ?? 'http://localhost:3000',
+  MEDIA_MAX_FILE_SIZE_BYTES: Math.round(
+    (parsed.data.MEDIA_MAX_FILE_SIZE_MB ?? 50) * 1024 * 1024
+  ),
+  MEDIA_QUOTA_BYTES: Math.round(
+    (parsed.data.MEDIA_QUOTA_MB ?? 500) * 1024 * 1024
+  ),
+  MEDIA_ALLOWED_MIME_TYPES: (
+    parsed.data.MEDIA_ALLOWED_MIME_TYPES ??
+    'image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,audio/mpeg,audio/ogg,audio/wav,application/pdf,text/plain'
+  )
+    .split(',')
+    .map(value => value.trim().toLowerCase())
+    .filter(Boolean),
+  SOCIAL_SIMULATION_FAILURE_RATE:
+    parsed.data.SOCIAL_SIMULATION_FAILURE_RATE ?? 0
 };

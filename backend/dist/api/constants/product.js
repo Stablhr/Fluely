@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MediaKinds = exports.RepeatFrequencies = exports.SocialJobStatuses = exports.SocialPostStatuses = exports.SocialPlatforms = exports.BoardTemplates = exports.BoardVisibilities = exports.BoardRoles = exports.ActorTypes = void 0;
+exports.ActorTypes = ['user', 'admin'];
+exports.BoardRoles = ['owner', 'editor', 'viewer'];
+exports.BoardVisibilities = ['private', 'workspace', 'public'];
+exports.BoardTemplates = ['blank', 'simple', 'social_content'];
+exports.SocialPlatforms = ['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube'];
+exports.SocialPostStatuses = ['draft', 'scheduled', 'queued', 'published', 'failed', 'cancelled'];
+exports.SocialJobStatuses = ['queued', 'running', 'succeeded', 'failed', 'cancelled'];
+exports.RepeatFrequencies = ['daily', 'weekly', 'monthly'];
+exports.MediaKinds = ['image', 'video', 'audio', 'document'];
