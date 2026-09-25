@@ -1,93 +1,133 @@
-# Express Next Auth Kit
+# 🗂️ Fluely — Social Content Planner
 
-A production-ready full-stack boilerplate combining **Next.js 16** and **Express.js**, with a complete authentication system built in — so you can skip the setup and start building.
+## 📖 Project Overview
 
----
+Fluely is a social media content planning and scheduling app. It provides a weekly time-grid content
+planner where you can drag posts into time slots, manage boards with multiple views, keep track of
+your inbox, and get an at-a-glance dashboard of what's coming up.
 
-> **Quick Setup:** Want to customize everything in one shot? Open **[CUSTOMIZE.md](./docs/CUSTOMIZE.md)**, fill in your project values (database, secrets, branding, etc.), so your AI agent can update all files for you automatically.
+The app UI is ported from [Stablhr/Kali](https://github.com/Stablhr/Kali) and runs as a Next.js 16
+app behind a JWT auth boundary, with an Express.js API alongside it. App data currently lives in a
+local store in the browser; the remote API client in `frontend/lib/kali/api/` stays inert until
+`NEXT_PUBLIC_KALI_API_URL` points at a backend that serves it.
 
----
+### Key Features
 
-## Features
+- **Dashboard** — At-a-glance overview of boards, due-soon items, and planner previews.
+- **Inbox** — Incoming items with quick actions.
+- **Boards** — Kanban boards with board views: Board, Calendar, Table, Timeline, and Map.
+- **Schedule** — Day-column planner with drag-and-drop between days and an unscheduled pool.
+- **Content Planner** — Weekly time grid (6 AM – 11 PM) to schedule social posts by hour; drag posts
+  between slots and the unscheduled pool.
+- **Social** — Compose modal, bulk scheduling, analytics, media library, and OAuth account connection
+  (YouTube, Facebook, Instagram, TikTok).
+- **Theme** — Light & dark mode with adaptive surfaces.
+- **Accounts** — Sign up, sign in, email verification, password reset, and a role-based admin area.
 
-- **Full Auth Flow** — Sign up, sign in, forgot password, email verification, and password reset
-- **JWT-based Authentication** — Secure token handling with HTTP-only cookies and token rotation
-- **Email Service** — Nodemailer-powered transactional emails with HTML templates
-- **Role-based Models** — Separate `User` and `Admin` models with a shared base schema
-- **Admin Seed Script** — One command to create an admin account
-- **Rate Limiting & Security** — Helmet, CORS, express-rate-limit, body size limits, and input sanitization
-- **Validation** — Zod schemas with DTO pattern on the backend
-- **Structured Logging** — Pino logger integration
-- **Modern Frontend** — Next.js App Router with shadcn/ui, TailwindCSS v4, and TanStack Query
-- **Friendly Error Messages** — Raw backend errors are mapped to user-friendly messages on the frontend
+## 🛠️ Tech Stack
 
----
+### Frontend
 
-## Project Structure
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js 16 (App Router) |
+| UI library | React 19 |
+| Language | TypeScript 5 |
+| Build tool | Turbopack / Next build |
+| Styling | Tailwind CSS v4 + shadcn/ui |
+| Drag & drop | @hello-pangea/dnd |
+| Icons | Lucide React |
+| Server state | TanStack Query v5 |
+| HTTP | Axios |
+| Linter | ESLint |
 
-### Frontend (`/frontend`)
+### Backend
+
+| Layer | Technology |
+|-------|------------|
+| Framework | Express.js |
+| Database | MongoDB via Mongoose |
+| Auth | jsonwebtoken, HTTP-only cookie rotation, bcrypt |
+| Validation | Zod (DTO pattern) |
+| Email | Nodemailer |
+| Uploads | multer |
+| Logging | Pino |
+| Security | Helmet, CORS, express-rate-limit |
+
+## 📁 Project Structure
 
 ```
-frontend/
-├── app/
-│   ├── (admin)/                # Admin-protected routes
-│   │   ├── admin/dashboard/    # Admin dashboard with parallel routes
-│   │   └── layout.tsx          # Auth guard (redirects non-admins)
-│   ├── (auth)/                 # Auth pages
-│   │   ├── sign-in/
-│   │   ├── sign-up/
-│   │   ├── forgot-password/
-│   │   ├── reset-password/
-│   │   └── verify-email/
-│   ├── (public)/               # Public landing page
-│   └── (user)/                 # Authenticated user routes
-│       └── dashboard/          # User dashboard with parallel routes (@profile, @settings)
-├── components/ui/              # shadcn/ui components
-└── lib/
-    ├── api/                    # Axios HTTP client, auth API calls, error handling
-    │   ├── httpClient.ts       # Axios instance with interceptors and token refresh
-    │   ├── authApi.ts          # Auth API functions
-    │   └── getFriendlyErrorMessage.ts  # Maps error codes to friendly messages
-    ├── auth/                   # Redirect utilities
-    ├── hooks/auth/             # useLogout, useMeQuery (TanStack Query)
-    └── provider/               # ReactQueryProvider
+fluely/
+├── frontend/
+│   ├── app/
+│   │   ├── (app)/                # Authenticated app — owns /
+│   │   │   ├── boards/           # /boards, /boards/[boardId]
+│   │   │   ├── content-planner/  # /content-planner, /planner
+│   │   │   ├── dev/              # Contrast test page
+│   │   │   ├── inbox/            # /inbox
+│   │   │   ├── schedule/         # /schedule
+│   │   │   └── layout.tsx        # Auth guard, .kali-app wrapper, providers
+│   │   ├── (admin)/              # /admin/dashboard (parallel routes)
+│   │   ├── (auth)/               # sign-in, sign-up, forgot/reset, verify
+│   │   ├── (public)/             # /landing, /docs
+│   │   ├── globals.css           # Tailwind entry + shadcn tokens
+│   │   └── kali.css              # App design system, scoped to .kali-app
+│   ├── components/
+│   │   ├── kali/                 # Ported app components
+│   │   │   ├── boards/           # Boards, lists, cards & views
+│   │   │   ├── card-modal/       # Card detail modal & fields
+│   │   │   ├── content-planner/  # Weekly time grid planner
+│   │   │   ├── dashboard/        # Home dashboard
+│   │   │   ├── dev/              # Contrast test page
+│   │   │   ├── inbox/            # Inbox view
+│   │   │   ├── layout/           # Sidebar, app shell, top bar
+│   │   │   ├── planner/          # Day-column schedule planner
+│   │   │   ├── shared/           # Buttons, inputs, modals, skeletons
+│   │   │   └── social/           # Compose, analytics, media library
+│   │   └── ui/                   # shadcn/ui primitives
+│   ├── lib/
+│   │   ├── api/                  # Axios client, auth API, error mapping
+│   │   ├── auth/                 # Redirect utilities
+│   │   ├── hooks/                # useMeQuery, useLogout
+│   │   ├── kali/                 # Store, hooks, utils, optional API client
+│   │   └── provider/             # ReactQueryProvider
+│   ├── public/assets/            # Static assets & logos
+│   └── .env.example
+└── backend/
+    ├── api/
+    │   ├── config/               # DB connection, env schema
+    │   ├── constants/            # Shared constants
+    │   ├── controllers/          # Route handlers
+    │   ├── dtos/                 # Zod validation schemas
+    │   ├── logging/              # Pino logger
+    │   ├── middleware/           # Auth, error handler, rate limit, sanitize
+    │   ├── models/               # User & Admin models
+    │   ├── repositories/         # Data access layer
+    │   ├── routes/               # Express router definitions
+    │   ├── services/             # Business logic (auth, email, blocklist)
+    │   ├── templates/            # HTML email templates
+    │   └── utils/                # Error, crypto, pagination, serialization
+    ├── scripts/
+    │   └── seed-admin.ts         # Admin seed script
+    ├── .env.example
+    └── package.json
 ```
 
-### Backend (`/backend`)
-
-```
-backend/
-├── api/
-│   ├── config/                 # DB connection (Mongoose) and environment config
-│   ├── controllers/            # Route handlers
-│   ├── dtos/                   # Zod validation schemas
-│   ├── middleware/             # Auth, error handler, rate limit, sanitize, validation
-│   ├── models/                 # User & Admin models (shared BaseUser schema)
-│   │   └── base/              # BaseUser schema with timestamps
-│   ├── repositories/           # Data access layer
-│   ├── routes/                 # Express router definitions
-│   ├── services/               # Business logic (auth, email, blocklist)
-│   ├── templates/              # HTML email templates
-│   └── utils/                  # Error utilities
-├── scripts/
-│   └── seed-admin.ts           # Admin seed script
-```
-
----
-
-## Getting Started
-
-### Prerequisites
+## ⚙️ Prerequisites
 
 - Node.js 18+
+- npm
+- Git
 - MongoDB instance (local or Atlas)
 - SMTP credentials (e.g. Gmail, Resend, Mailtrap)
 
-### 1. Clone the repo
+## 🚀 Getting Started
+
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/Tobikun11-Arch/express-next-auth-kit.git
-cd express-next-auth-kit
+git clone https://github.com/Stablhr/Fluely.git
+cd fluely
 ```
 
 ### 2. Set up the Backend
@@ -98,57 +138,23 @@ npm install
 cp .env.example .env
 ```
 
-Fill in your `.env`:
+Fill in `MONGO_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, and the SMTP values — see
+`backend/.env.example` for the full list. Generate secrets with:
 
-```env
-# Server
-PORT=5000
-NODE_ENV=development
-
-# Auth - generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-JWT_SECRET=your_jwt_secret_here
-JWT_REFRESH_SECRET=your_refresh_secret_here
-
-# Database
-MONGO_URI=mongodb://localhost:27017/your-db
-
-# Email
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-SMTP_USER=your@email.com
-SMTP_PASS=your_app_password
-SMTP_FROM=Your App <no-reply@yourapp.com>
-
-# Cookies
-COOKIE_SECURE=false
-COOKIE_SAMESITE=strict
-
-# Seed Admin (used with `npm run seed:admin`)
-SEED_ADMIN_EMAIL=admin@example.com
-SEED_ADMIN_PASSWORD=Admin123!
-SEED_ADMIN_FIRST_NAME=Admin
-SEED_ADMIN_LAST_NAME=User
+```bash
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
-### 3. Seed the Admin Account
+Then seed an admin account and start the server:
 
 ```bash
 npm run seed:admin
-```
-
-This creates an admin user in your MongoDB `admins` collection. Default credentials are in your `.env` — **change the password after first login**.
-
-You can re-run this command safely — it skips if the admin already exists.
-
-### 4. Start the Backend
-
-```bash
 npm run dev
 ```
 
-Backend runs at `http://localhost:5000`.
+The API runs at `http://localhost:5000`.
 
-### 5. Set up the Frontend
+### 3. Set up the Frontend
 
 Open a new terminal:
 
@@ -158,83 +164,22 @@ npm install
 cp .env.example .env
 ```
 
-The default `.env` is already configured for local development:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:5000/api
-```
-
-### 6. Start the Frontend
+`NEXT_PUBLIC_API_URL` defaults to `http://localhost:5000/api`. Leave
+`NEXT_PUBLIC_KALI_API_URL` unset to run entirely on the local store.
 
 ```bash
 npm run dev
 ```
 
-Frontend runs at `http://localhost:3000`.
+The app runs at `http://localhost:3000`. Sign in at `/sign-in`; the planner itself is at `/` and
+requires a session. The marketing page is at `/landing`.
 
----
+### 4. Deploy
 
-## Login
+Both halves are deployable to Vercel (`backend/vercel.json` covers the API). Set the same
+environment variables in each Vercel project, and deploy them independently.
 
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | `admin@example.com` | `Admin123!` |
-| User | Register via `/sign-up` | — |
-
-Admin users are redirected to `/admin/dashboard`. Regular users go to `/dashboard`.
-
----
-
-## Auth API Routes
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/auth/register` | Create a new user account |
-| `POST` | `/api/auth/verify` | Verify email with OTP code |
-| `POST` | `/api/auth/resend-verification` | Resend verification code |
-| `POST` | `/api/auth/login` | Sign in (returns JWT in HTTP-only cookies) |
-| `POST` | `/api/auth/refresh` | Refresh access token |
-| `POST` | `/api/auth/logout` | Clear session and revoke refresh token |
-| `GET` | `/api/auth/me` | Get current authenticated user |
-| `POST` | `/api/auth/forgot-password` | Send password reset code |
-| `POST` | `/api/auth/verify-reset-code` | Verify password reset code |
-| `POST` | `/api/auth/resend-reset-code` | Resend password reset code |
-| `POST` | `/api/auth/reset-password` | Reset password with code |
-
----
-
-## Tech Stack
-
-### Frontend
-
-| Package | Purpose |
-|---------|---------|
-| Next.js 16 | App Router, SSR, routing |
-| React 19 | UI framework |
-| TailwindCSS v4 | Utility-first styling |
-| shadcn/ui | Accessible component primitives |
-| TanStack Query v5 | Server state management |
-| Axios | HTTP client with interceptors |
-| input-otp | OTP input for email verification |
-| lucide-react | Icon library |
-
-### Backend
-
-| Package | Purpose |
-|---------|---------|
-| Express.js | HTTP server framework |
-| Mongoose | MongoDB ODM |
-| jsonwebtoken | JWT creation and verification |
-| bcrypt | Password hashing |
-| Zod | Schema validation |
-| Nodemailer | Transactional email |
-| Helmet | HTTP security headers |
-| express-rate-limit | API rate limiting |
-| Pino | Structured logging |
-
----
-
-## Available Scripts
+## 📜 Available Scripts
 
 ### Backend
 
@@ -242,7 +187,7 @@ Admin users are redirected to `/admin/dashboard`. Regular users go to `/dashboar
 |---------|-------------|
 | `npm run dev` | Start dev server with hot reload |
 | `npm run build` | Compile TypeScript |
-| `npm start` | Start production server |
+| `npm start` | Start the production server |
 | `npm run seed:admin` | Seed an admin account |
 | `npm run lint` | Run ESLint |
 | `npm test` | Run tests with Jest |
@@ -251,27 +196,86 @@ Admin users are redirected to `/admin/dashboard`. Regular users go to `/dashboar
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start Next.js dev server |
-| `npm run build` | Build for production |
-| `npm start` | Start production server |
+| `npm run dev` | Start the Next.js dev server |
+| `npm run build` | Type-check and build for production |
+| `npm start` | Start the production server |
 | `npm run lint` | Run ESLint |
+| `npx tsc --noEmit` | Type-check only |
 
----
+## 🌿 Git Branching Workflow
 
-## Deployment
+### Branch Structure
 
-Both the frontend and backend include configuration for **Vercel** deployment (`vercel.json` in `/backend`). You can deploy them independently.
+```
+main
+└── feature/<short-description>
+    ├── fix/<short-description>
+    ├── hotfix/<short-description>       # (urgent production fixes)
+    └── chore/<short-description>        # (configs, deps, refactors)
+```
 
-For the backend, make sure to set all environment variables in your Vercel project settings.
+| Type | Pattern | Example |
+|------|---------|---------|
+| Feature | `feature/<short-description>` | `feature/content-planner` |
+| Bug Fix | `fix/<short-description>` | `fix/sidebar-tooltip` |
+| Hotfix | `hotfix/<short-description>` | `hotfix/login-redirect` |
+| Chore | `chore/<short-description>` | `chore/update-deps` |
 
----
+### Starting a new feature
 
-## Contributing
+```bash
+# 1. Make sure main is up to date
+git checkout main
+git pull origin main
 
-Pull requests are welcome! For major changes, please open an issue first to discuss what you'd like to change.
+# 2. Create your branch
+git checkout -b feature/content-planner
 
----
+# 3. Work on your changes, then commit
+git add .
+git commit -m "feat: add content planner calendar"
 
-## License
+# 4. Push your branch
+git push origin feature/content-planner
+```
 
-MIT
+### Merging back to main
+
+Open a Pull Request (`feature/...` → `main`) and get it reviewed before merging.
+
+## 📝 Commit Message Convention
+
+This project follows [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
+
+```
+<type>[optional scope]: <description>
+```
+
+| Type | Description |
+|------|-------------|
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `chore` | Maintenance, deps, config |
+| `style` | Formatting, no logic change |
+| `refactor` | Code restructure, no behavior change |
+| `perf` | Performance improvement |
+| `test` | Adding or updating tests |
+| `docs` | Documentation updates |
+| `revert` | Revert a previous commit |
+
+Examples:
+
+```bash
+git commit -m "feat: make content planner calendar resizable"
+git commit -m "fix(sidebar): keep tooltip aligned on collapse"
+git commit -m "chore: update react to v19"
+git commit -m "docs: update README setup steps"
+```
+
+## 🤝 Contributing
+
+Branch off `main` using the branch naming above. Follow the commit message convention. Open a Pull
+Request into `main` and request a code review before merging.
+
+More detail for agents and contributors lives in [AGENTS.md](./AGENTS.md) and
+[frontend/AGENTS.md](./frontend/AGENTS.md).

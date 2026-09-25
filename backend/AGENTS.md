@@ -20,6 +20,7 @@ npm test             # Jest (no test suite included)
 
 ```
 api/config/          # DB connection (db.ts) and env validation (env.ts)
+api/constants/       # Error codes, cookies, product enums (board roles, platforms, statuses)
 api/controllers/     # Route handlers (thin — delegate to services)
 api/services/        # Business logic (auth, email, blocklist)
 api/repositories/    # Data access layer (user, admin)
@@ -28,7 +29,7 @@ api/models/          # Mongoose models (Admin.model.ts, User.model.ts) extending
 api/routes/          # Express router definitions
 api/templates/       # HTML email templates
 api/dtos/            # Zod validation schemas
-api/utils/           # ApiError class
+api/utils/           # ApiError, actor resolution, crypto, pagination, serialization, transactions
 api/logging/         # Pino logger configuration
 scripts/             # Seed scripts (seed-admin.ts)
 ```
@@ -39,6 +40,8 @@ scripts/             # Seed scripts (seed-admin.ts)
 - Use `ApiError` class for all errors: `throw new ApiError(400, 'ERROR_CODE', 'Message')`
 - Use `env` import from `api/config/env.ts` — avoid `process.env` directly (note: COOKIE_SECURE, COOKIE_SAMESITE still use process.env — tech debt to fix)
 - Zod DTOs in `api/dtos/` validate all request bodies
+- Use `validateRequest({body, params, query})` for new routes; the older `validate(schema)` is
+  body-only and kept for the auth routes
 - Repository pattern: services call repositories, never Mongoose directly
 - Controllers are thin — validate input, call service, send response
 
