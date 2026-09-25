@@ -9,6 +9,7 @@ import {Label} from '@/components/ui/label';
 import {useRouter} from 'next/navigation';
 import {login} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
+import {getDashboardPath} from '@/lib/auth/redirects';
 
 export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -31,13 +32,7 @@ export default function SignInPage() {
     setErrorMessage(null);
     try {
       const users = await login({email, password});
-      if (users.user.type === 'admin') {
-        router.push('/admin/dashboard');
-      } else if (users.user.type === 'user') {
-        router.push('/dashboard');
-      } else {
-        router.push('/dashboard');
-      }
+      router.push(getDashboardPath(users.user.type));
     } catch (error) {
       setErrorMessage(getFriendlyErrorMessage(error, 'Failed to sign in'));
     } finally {

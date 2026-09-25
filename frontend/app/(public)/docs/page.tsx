@@ -26,13 +26,17 @@ const SECTIONS = [
   {
     title: 'Routes',
     items: [
-      '/ — landing page (this page)',
+      '/landing — marketing landing page',
       '/sign-in — login page',
       '/sign-up — register page',
       '/forgot-password — request password reset code',
       '/verify-email — enter verification code',
       '/reset-password — set new password',
-      '/dashboard — user dashboard (requires login)',
+      '/ — Kali app dashboard (requires login)',
+      '/inbox — capture inbox',
+      '/boards, /boards/[boardId] — boards with board, calendar, table, timeline and map views',
+      '/schedule — day-column planner',
+      '/content-planner — weekly social content planner',
       '/admin/dashboard — admin dashboard (requires admin role)'
     ]
   },
@@ -40,8 +44,10 @@ const SECTIONS = [
     title: 'Project Structure',
     items: [
       'frontend/app/(auth)/ — public auth pages',
-      'frontend/app/(user)/ — user dashboard with parallel routes',
+      'frontend/app/(app)/ — Kali app (dashboard, inbox, boards, schedule, content planner)',
       'frontend/app/(admin)/ — admin dashboard with parallel routes',
+      'frontend/components/kali/ — Kali feature components',
+      'frontend/lib/kali/ — Kali store, hooks, utils and API client',
       'frontend/lib/api/ — API client and error handling',
       'backend/api/services/ — business logic',
       'backend/api/repositories/ — database access',
@@ -95,7 +101,7 @@ export default function DocsPage() {
         </p>
         <div className="mt-4 flex gap-3">
           <Link
-            href="/"
+            href="/landing"
             className="rounded-full border border-gray-300 px-4 py-2 text-xs font-medium text-black transition-colors hover:bg-gray-100"
           >
             Back to Home

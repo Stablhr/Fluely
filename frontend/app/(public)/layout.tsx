@@ -5,7 +5,7 @@ export default function PublicLayout({children}: {children: React.ReactNode}) {
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-6">
-          <Link href="/" className="text-sm font-semibold tracking-tight">
+          <Link href="/landing" className="text-sm font-semibold tracking-tight">
             Express Next Auth Kit
           </Link>
           <div className="flex items-center gap-4">
@@ -14,6 +14,12 @@ export default function PublicLayout({children}: {children: React.ReactNode}) {
               className="text-sm text-gray-500 transition-colors hover:text-black"
             >
               Docs
+            </Link>
+            <Link
+              href="/"
+              className="text-sm text-gray-500 transition-colors hover:text-black"
+            >
+              Open App
             </Link>
             <Link
               href="/sign-in"

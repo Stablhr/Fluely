@@ -1,0 +1,364 @@
+/*
+ * Kali design system — scoped to the `.kali-app` subtree.
+ * Imported from app/globals.css so Tailwind processes its @theme/@utility
+ * blocks as part of the main stylesheet. The four tokens shared with
+ * globals.css (background, primary, primary-foreground, border) are
+ * re-declared on `.kali-app` so Kali's palette wins inside the app without
+ * leaking to the other route groups.
+ */
+
+@theme {
+  --color-background: #f6f8f8;
+  --color-surface: #ffffff;
+  --color-surface-alt: #edf2f2;
+  --color-surface-elevated: #ffffff;
+
+  --color-text-primary: #132a29;
+  --color-text-secondary: #5c7c79;
+  --color-text-muted: #94afac;
+
+  --color-border: #dee7e6;
+  --color-border-strong: #c7d4d2;
+
+  --color-primary: #0daba3;
+  --color-primary-hover: #0a8981;
+  --color-primary-foreground: #0f2a28;
+  --color-primary-subtle: #d2f3f0;
+  --color-primary-text: #087a72;
+
+  --color-success: #33b27a;
+  --color-success-subtle: #dff5eb;
+  --color-success-text: #1f7a50;
+  --color-warning: #e8a93d;
+  --color-warning-subtle: #fef3d9;
+  --color-warning-text: #8a6116;
+  --color-danger: #e5484d;
+  --color-danger-subtle: #ffe3e5;
+  --color-danger-text: #c42b37;
+  --color-info: #4aa8ff;
+  --color-info-subtle: #dfebfc;
+  --color-info-text: #1d5fbf;
+  --color-danger-button: #d93b49;
+
+  --color-board-canvas: #edf2f2;
+  --color-list-default: #ffffff;
+
+  --color-base-bg: #f7f8fa;
+  --color-base-surface: #ffffff;
+  --color-base-surface-alt: #fafafb;
+
+  --color-ink-900: #14161a;
+  --color-ink-700: #3f4451;
+  --color-ink-500: #8a8f98;
+  --color-ink-300: #c7cbd1;
+
+  --color-accent-purple-bg: #efe9fb;
+  --color-accent-purple-text: #7c5cdb;
+  --color-accent-green-bg: #e6f7ee;
+  --color-accent-green-text: #2fae68;
+  --color-accent-yellow-bg: #fcf4de;
+  --color-accent-yellow-text: #c79a2a;
+  --color-accent-teal-bg: #e4f7f4;
+  --color-accent-teal-text: #12a594;
+
+  --color-sidebar-bg: #14161a;
+  --color-sidebar-active: #1f2229;
+
+  --color-status-danger: #e5484d;
+  --color-status-success: #2fae68;
+
+  --radius-card: 20px;
+  --radius-chip: 10px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(20, 22, 26, 0.04), 0 4px 12px rgba(20, 22, 26, 0.04);
+  --shadow-card-hover: 0 4px 8px rgba(20, 22, 26, 0.06), 0 8px 24px rgba(20, 22, 26, 0.08);
+
+  --text-display: 28px;
+  --text-display--line-height: 34px;
+  --text-display--font-weight: 700;
+  --text-stat: 26px;
+  --text-stat--line-height: 32px;
+  --text-stat--font-weight: 700;
+  --text-card-title: 14px;
+  --text-card-title--line-height: 20px;
+  --text-card-title--font-weight: 600;
+  --text-body: 13px;
+  --text-body--line-height: 18px;
+  --text-label: 11px;
+  --text-label--line-height: 14px;
+  --text-label--font-weight: 600;
+  --text-label--letter-spacing: 0.04em;
+
+  --shadow-none: 0 0 #0000;
+  --shadow-subtle: 0 1px 2px rgba(15, 26, 25, 0.06);
+  --shadow-medium: 0 4px 12px rgba(15, 26, 25, 0.1);
+  --shadow-modal: 0 16px 48px rgba(15, 26, 25, 0.2);
+}
+
+/* Restore the shadcn values for the tokens Kali shares, so the auth,
+   landing and admin routes are unaffected by the theme block above. */
+@layer base {
+  :root {
+    --color-background: var(--background);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-border: var(--border);
+  }
+}
+
+@layer base {
+  .kali-app {
+    /* Board cards keep a constant dark appearance regardless of theme. */
+    --color-card-surface: #1a2b2a;
+    --color-card-surface-alt: #243534;
+    --color-card-text: #e8f0ef;
+    --color-card-text-secondary: #94afac;
+    --color-card-text-muted: #5c7c79;
+    --color-card-border: #2d4442;
+    --color-card-border-strong: #3d5553;
+    --color-card-border-faint: rgba(93, 125, 122, 0.45);
+
+    /* globals.css maps these four tokens to the shadcn variables, so the
+       Kali values have to be set on the base variables to take effect. */
+    --background: #f6f8f8;
+    --primary: #0daba3;
+    --primary-foreground: #0f2a28;
+    --border: #dee7e6;
+
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: default;
+  }
+
+  .kali-app ::selection {
+    background: var(--color-primary-subtle);
+  }
+
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .kali-app nav.md\:hidden {
+      padding-bottom: calc(0.375rem + env(safe-area-inset-bottom));
+    }
+  }
+}
+
+/* Dark mode token overrides, applied by the store-backed theme toggle. */
+.dark .kali-app {
+  --background: #0f1a19;
+  --primary: #0daba3;
+  --primary-foreground: #06211f;
+  --border: #2d4442;
+
+  --color-surface: #1a2b2a;
+  --color-surface-alt: #243534;
+  --color-surface-elevated: #243534;
+
+  --color-board-canvas: #243534;
+  --color-list-default: #1a2b2a;
+
+  --color-text-primary: #e8f0ef;
+  --color-text-secondary: #94afac;
+  --color-text-muted: #5c7c79;
+
+  --color-border-strong: #3d5553;
+
+  --color-primary: #0daba3;
+  --color-primary-hover: #10c4bb;
+  --color-primary-foreground: #06211f;
+  --color-primary-subtle: #1a3d3a;
+  --color-primary-text: #10c4bb;
+
+  --color-success: #33b27a;
+  --color-success-subtle: #1a2e23;
+  --color-success-text: #6fdca8;
+  --color-warning: #e8a93d;
+  --color-warning-subtle: #3d331f;
+  --color-warning-text: #f0c674;
+  --color-danger: #e5484d;
+  --color-danger-subtle: #3d1f23;
+  --color-danger-text: #ff8589;
+  --color-info: #4aa8ff;
+  --color-info-subtle: #16283d;
+  --color-info-text: #7cb8ff;
+  --color-danger-button: #d93b49;
+
+  --color-base-bg: #0f1a19;
+  --color-base-surface: #1a2b2a;
+  --color-base-surface-alt: #243534;
+
+  --color-ink-900: #e8f0ef;
+  --color-ink-700: #c3d6d4;
+  --color-ink-500: #94afac;
+  --color-ink-300: #2d4442;
+
+  --color-accent-purple-bg: #2a2440;
+  --color-accent-purple-text: #a78bfa;
+  --color-accent-green-bg: #1a2e23;
+  --color-accent-green-text: #6fdca8;
+  --color-accent-yellow-bg: #3d331f;
+  --color-accent-yellow-text: #f0c674;
+  --color-accent-teal-bg: #1a3d3a;
+  --color-accent-teal-text: #10c4bb;
+
+  --color-sidebar-bg: #14161a;
+  --color-sidebar-active: #1f2229;
+
+  --color-status-danger: #e5484d;
+  --color-status-success: #2fae68;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 4px 8px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+@utility scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(13, 171, 163, 0.35) transparent;
+  &::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(13, 171, 163, 0.3);
+    border-radius: 9999px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(13, 171, 163, 0.5);
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-in {
+  animation: fade-in 0.18s ease-out;
+}
+
+@keyframes drop-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.94);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(3px) scale(1.02);
+  }
+  75% {
+    transform: translateY(-1px) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@utility animate-drop {
+  animation: drop-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes gentle-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@utility animate-float {
+  animation: gentle-float 3.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+@utility skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-alt) 25%,
+    var(--color-border) 50%,
+    var(--color-surface-alt) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Smooth placeholder collapse when cards reorder */
+[data-rfd-placeholder-context] {
+  transition: height 0.25s ease;
+}
+
+@media print {
+  .kali-app aside,
+  .kali-app nav,
+  .kali-app [data-topbar],
+  .kali-app .no-print,
+  .kali-app .fixed {
+    display: none !important;
+  }
+
+  .kali-app * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .kali-app body,
+  .kali-app html {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .kali-app main {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    width: 100% !important;
+  }
+
+  .kali-app .bg-board-canvas {
+    background: #fff !important;
+  }
+
+  .kali-app [class*="flex"][class*="h-full"][class*="items-start"][class*="gap-"] {
+    gap: 8px !important;
+    padding: 8px !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+  }
+
+  .kali-app [class*="rounded-xl"],
+  .kali-app [class*="rounded-lg"] {
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+}
