@@ -130,7 +130,7 @@ export default function CardSocialPosts({ cardId }: { cardId: string }) {
 
       {linkModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-3" role="dialog" aria-modal="true" aria-labelledby="link-social-post-title">
-          <div className="absolute inset-0 bg-[#0f1a19]/50" onClick={() => setLinkModalOpen(false)} />
+          <div className="absolute inset-0 bg-brand-ink/50" onClick={() => setLinkModalOpen(false)} />
           <div className="animate-in relative z-10 w-full max-w-sm rounded-[14px] border border-border bg-surface shadow-modal">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h3 id="link-social-post-title" className="text-sm font-semibold text-text-primary">Link Social Post</h3>

@@ -35,7 +35,7 @@ lib/provider/       # ReactQueryProvider
 ## App UI
 
 The product UI is ported from [Stablhr/Kali](https://github.com/Stablhr/Kali) and lives under
-`components/kali/` and `lib/kali/`. Two rules keep it isolated from the rest of the app:
+`components/kali/` and `lib/kali/`. Three rules keep it isolated from the rest of the app:
 
 - **Token scoping.** `app/kali.css` defines the app's colors, radii, and type scale on `.kali-app`
   and `.dark .kali-app`. `app/(app)/layout.tsx` renders `AppShell` inside that wrapper. Any new
@@ -44,6 +44,9 @@ The product UI is ported from [Stablhr/Kali](https://github.com/Stablhr/Kali) an
 - **Own primitives.** The app uses `components/kali/shared/` (Button, Input, Modal, Toast) instead
   of `components/ui/` to keep upstream styling intact. Use the shadcn equivalents on the auth,
   landing, docs, and admin routes; don't mix the two inside one surface.
+- **Brand tokens, not hex.** Colors come from the `brand-*` and semantic tokens in
+  `app/kali.css` (So Matcha: Celtic Blue, Tea Green, Vanilla, Ivory, Drab Dark Brown). Never hardcode
+  a hex in a component; the full system is documented in [Design.md](./Design.md).
 
 App data lives in `lib/kali/store/`, a `useSyncExternalStore` store backed by `localStorage` and
 namespaced per user id. The remote API in `lib/kali/api/` is inert until `NEXT_PUBLIC_KALI_API_URL`

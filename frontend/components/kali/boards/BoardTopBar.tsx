@@ -137,7 +137,7 @@ export default function BoardTopBar({
             <span
               className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full sm:h-3 sm:w-3"
               style={{
-                background: 'var(--color-success, #33B27A)',
+                background: 'var(--color-success, #8fa85c)',
                 boxShadow: '0 0 0 2px var(--surface-bg-subtle, #FFFFFF)',
               }}
             />

@@ -222,7 +222,7 @@ export default function TimelineView({ boardId, search, filter, onOpenCard }: Ti
                           left: pos.left,
                           width: pos.width,
                           top: ci * 30 + 8,
-                          background: label ? label.color : '#0DABA3',
+                          background: label ? label.color : '#3971B8',
                           height: 24,
                           textShadow: '0 1px 2px rgb(0 0 0 / 0.35)',
                         }}
@@ -255,7 +255,7 @@ export default function TimelineView({ boardId, search, filter, onOpenCard }: Ti
                       {card.labelIds[0] && (
                         <span
                           className="h-2 w-2 shrink-0 rounded-full"
-                          style={{ background: board.labels[card.labelIds[0]]?.color ?? '#0DABA3' }}
+                          style={{ background: board.labels[card.labelIds[0]]?.color ?? '#3971B8' }}
                         />
                       )}
                       {card.title}

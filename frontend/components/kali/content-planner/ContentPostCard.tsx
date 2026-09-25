@@ -68,7 +68,7 @@ export default function ContentPostCard({ post, index, onClick, compact }: Conte
           {!thumb && !compact && (
             <div
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-[10px] text-white"
-              style={{ background: enabledPlatforms[0] ? PLATFORM_COLORS[enabledPlatforms[0].platform] : '#94afac' }}
+              style={{ background: enabledPlatforms[0] ? PLATFORM_COLORS[enabledPlatforms[0].platform] : '#8a9068' }}
             >
               {enabledPlatforms[0] && <PlatformIcon platform={enabledPlatforms[0].platform} size={14} />}
             </div>

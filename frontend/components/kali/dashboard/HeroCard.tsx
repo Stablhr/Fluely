@@ -46,7 +46,7 @@ export default function HeroCard() {
   const area = `${PAD},${H - PAD} ${line} ${W - PAD},${H - PAD}`
 
   return (
-    <div className="flex flex-col rounded-card bg-base-surface p-6 shadow-card transition-shadow duration-150 hover:shadow-card-hover">
+    <div className="flex flex-col rounded-hero bg-base-surface p-6 shadow-card transition-shadow duration-150 hover:shadow-card-hover">
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-chip bg-accent-teal-bg text-accent-teal-text">
           <TrendingUp size={14} />

@@ -110,7 +110,7 @@ export default function TipsGoalsSidebar({ activeTab, socialPosts }: {
     return goalsList
   }, [socialPosts])
 
-  const goalColors = ['#0daba3', '#ff0000', '#1877f2', '#e4405f', '#33b27a']
+  const goalColors = ['#3971b8', '#ff0000', '#1877f2', '#e4405f', '#33b27a']
   const tip = TIPS[tipIndex % TIPS.length]
   const TipIcon = tip.icon
 

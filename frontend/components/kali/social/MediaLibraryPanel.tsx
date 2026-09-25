@@ -21,7 +21,7 @@ export default function MediaLibraryPanel({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[#0f1a19]/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-brand-ink/50" onClick={onClose} />
       <div className="animate-in relative z-10 flex h-full max-h-[620px] w-full max-w-md flex-col overflow-hidden rounded-[14px] border border-border bg-surface shadow-modal">
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <Library size={16} className="text-primary" />

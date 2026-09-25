@@ -3,13 +3,15 @@
 import { MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-export type StatTone = 'purple' | 'green' | 'yellow' | 'teal'
+export type StatTone = 'blue' | 'green' | 'vanilla' | 'white'
 
+/* Flat brand color blocks, not tinted washes. Blue carries ivory text; the
+   lighter blocks carry ink. See frontend/Design.md §4.2. */
 const TONES: Record<StatTone, string> = {
-  purple: 'bg-accent-purple-bg',
-  green: 'bg-accent-green-bg',
-  yellow: 'bg-accent-yellow-bg',
-  teal: 'bg-accent-teal-bg',
+  blue: 'bg-brand-blue text-brand-ivory',
+  green: 'bg-brand-green text-brand-ink',
+  vanilla: 'bg-brand-vanilla text-brand-ink',
+  white: 'bg-surface text-brand-ink border border-border',
 }
 
 interface StatCardProps {
@@ -21,15 +23,15 @@ interface StatCardProps {
 }
 
 export default function StatCard({ tone, label, value, icon, className = '' }: StatCardProps) {
+  const onBlue = tone === 'blue'
+
   return (
-    <div
-      className={`rounded-card ${TONES[tone]} p-5 shadow-card transition-shadow duration-150 hover:shadow-card-hover ${className}`}
-    >
+    <div className={`rounded-card p-5 transition-shadow duration-150 ${TONES[tone]} ${className}`}>
       <div className="flex items-center justify-between">
-        <span className="text-label uppercase text-ink-500">{label}</span>
-        {icon ?? <MoreHorizontal size={16} className="text-ink-500" />}
+        <span className={`text-label uppercase ${onBlue ? 'text-brand-ivory/70' : 'text-brand-ink/60'}`}>{label}</span>
+        {icon ?? <MoreHorizontal size={16} className={onBlue ? 'text-brand-ivory/70' : 'text-brand-ink/50'} />}
       </div>
-      <p className="mt-2 text-stat text-ink-900">{value}</p>
+      <p className="text-stat mt-2">{value}</p>
     </div>
   )
 }

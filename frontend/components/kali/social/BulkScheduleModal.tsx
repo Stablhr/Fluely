@@ -44,7 +44,7 @@ export default function BulkScheduleModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[#0f1a19]/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-brand-ink/50" onClick={onClose} />
       <div className="animate-in relative z-10 w-full max-w-md rounded-[14px] border border-border bg-surface p-4 shadow-modal">
         <div className="flex items-center gap-2">
           <CalendarDays size={16} className="text-primary" />

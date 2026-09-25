@@ -8,71 +8,96 @@
  */
 
 @theme {
-  --color-background: #f6f8f8;
+  /* ── So Matcha brand palette ─────────────────────────────────────────── */
+  --color-brand-blue: #3971b8;
+  --color-brand-green: #c8d69b;
+  --color-brand-vanilla: #f6e6a5;
+  --color-brand-ivory: #fbfcee;
+  --color-brand-ink: #343b1b;
+
+  /* Derived brand tints. Text tints are darker/warmer relatives of the ink
+     brown so body copy stays legible without introducing a second hue. */
+  --color-ink-secondary: #5f6740;
+  --color-ink-faint: #8a9068;
+  --color-blue-hover: #2f5c96;
+  --color-blue-deep: #24466f;
+  --color-blue-subtle: #e6edf8;
+  --color-green-subtle: #eef3de;
+  --color-vanilla-subtle: #fbf3d4;
+
+  /* ── Surfaces ────────────────────────────────────────────────────────── */
+  --color-background: #fbfcee;
   --color-surface: #ffffff;
-  --color-surface-alt: #edf2f2;
+  --color-surface-alt: #f4f3e2;
   --color-surface-elevated: #ffffff;
 
-  --color-text-primary: #132a29;
-  --color-text-secondary: #5c7c79;
-  --color-text-muted: #94afac;
+  --color-text-primary: #343b1b;
+  --color-text-secondary: #5f6740;
+  --color-text-muted: #8a9068;
 
-  --color-border: #dee7e6;
-  --color-border-strong: #c7d4d2;
+  --color-border: #e4e3cd;
+  --color-border-strong: #cfceac;
 
-  --color-primary: #0daba3;
-  --color-primary-hover: #0a8981;
-  --color-primary-foreground: #0f2a28;
-  --color-primary-subtle: #d2f3f0;
-  --color-primary-text: #087a72;
+  /* ── Brand primary (Celtic Blue) ─────────────────────────────────────── */
+  --color-primary: #3971b8;
+  --color-primary-hover: #2f5c96;
+  --color-primary-foreground: #fbfcee;
+  --color-primary-subtle: #e6edf8;
+  --color-primary-text: #2f5c96;
 
-  --color-success: #33b27a;
-  --color-success-subtle: #dff5eb;
-  --color-success-text: #1f7a50;
-  --color-warning: #e8a93d;
-  --color-warning-subtle: #fef3d9;
-  --color-warning-text: #8a6116;
-  --color-danger: #e5484d;
-  --color-danger-subtle: #ffe3e5;
-  --color-danger-text: #c42b37;
-  --color-info: #4aa8ff;
-  --color-info-subtle: #dfebfc;
-  --color-info-text: #1d5fbf;
-  --color-danger-button: #d93b49;
+  /* ── Semantic ────────────────────────────────────────────────────────── */
+  --color-success: #8fa85c;
+  --color-success-subtle: #eef3de;
+  --color-success-text: #4c5c22;
+  --color-warning: #d9a520;
+  --color-warning-subtle: #fbf3d4;
+  --color-warning-text: #7a5c07;
+  --color-danger: #cf4b40;
+  --color-danger-subtle: #fbe9e7;
+  --color-danger-text: #a3332a;
+  --color-info: #4a86c8;
+  --color-info-subtle: #e6edf8;
+  --color-info-text: #2f5c96;
+  --color-danger-button: #c0392f;
 
-  --color-board-canvas: #edf2f2;
+  --color-board-canvas: #f4f3e2;
   --color-list-default: #ffffff;
 
-  --color-base-bg: #f7f8fa;
+  --color-base-bg: #f4f3e2;
   --color-base-surface: #ffffff;
-  --color-base-surface-alt: #fafafb;
+  --color-base-surface-alt: #faf9ec;
 
-  --color-ink-900: #14161a;
-  --color-ink-700: #3f4451;
-  --color-ink-500: #8a8f98;
-  --color-ink-300: #c7cbd1;
+  --color-ink-900: #343b1b;
+  --color-ink-700: #5f6740;
+  --color-ink-500: #8a9068;
+  --color-ink-300: #cfceac;
 
-  --color-accent-purple-bg: #efe9fb;
-  --color-accent-purple-text: #7c5cdb;
-  --color-accent-green-bg: #e6f7ee;
-  --color-accent-green-text: #2fae68;
-  --color-accent-yellow-bg: #fcf4de;
-  --color-accent-yellow-text: #c79a2a;
-  --color-accent-teal-bg: #e4f7f4;
-  --color-accent-teal-text: #12a594;
+  /* Flat brand color blocks for stat cards, tags, and highlights. */
+  --color-accent-purple-bg: #ffffff;
+  --color-accent-purple-text: #343b1b;
+  --color-accent-green-bg: #c8d69b;
+  --color-accent-green-text: #343b1b;
+  --color-accent-yellow-bg: #f6e6a5;
+  --color-accent-yellow-text: #343b1b;
+  --color-accent-teal-bg: #3971b8;
+  --color-accent-teal-text: #fbfcee;
 
-  --color-sidebar-bg: #14161a;
-  --color-sidebar-active: #1f2229;
+  --color-sidebar-bg: #3971b8;
+  --color-sidebar-active: #2f5c96;
+  --color-sidebar-accent: #c8d69b;
 
-  --color-status-danger: #e5484d;
-  --color-status-success: #2fae68;
+  --color-status-danger: #cf4b40;
+  --color-status-success: #8fa85c;
 
-  --radius-card: 20px;
-  --radius-chip: 10px;
+  /* ── Shape: exaggerated, blobby, pill-heavy ──────────────────────────── */
+  --radius-card: 24px;
+  --radius-hero: 32px;
+  --radius-chip: 16px;
   --radius-pill: 999px;
 
-  --shadow-card: 0 1px 2px rgba(20, 22, 26, 0.04), 0 4px 12px rgba(20, 22, 26, 0.04);
-  --shadow-card-hover: 0 4px 8px rgba(20, 22, 26, 0.06), 0 8px 24px rgba(20, 22, 26, 0.08);
+  /* ── Elevation: soft and low-opacity; flat by default ─────────────────── */
+  --shadow-card: 0 2px 10px rgba(52, 59, 27, 0.04);
+  --shadow-card-hover: 0 6px 20px rgba(52, 59, 27, 0.07);
 
   --text-display: 28px;
   --text-display--line-height: 34px;
@@ -91,9 +116,9 @@
   --text-label--letter-spacing: 0.04em;
 
   --shadow-none: 0 0 #0000;
-  --shadow-subtle: 0 1px 2px rgba(15, 26, 25, 0.06);
-  --shadow-medium: 0 4px 12px rgba(15, 26, 25, 0.1);
-  --shadow-modal: 0 16px 48px rgba(15, 26, 25, 0.2);
+  --shadow-subtle: 0 1px 3px rgba(52, 59, 27, 0.05);
+  --shadow-medium: 0 6px 20px rgba(52, 59, 27, 0.08);
+  --shadow-modal: 0 18px 50px rgba(52, 59, 27, 0.16);
 }
 
 /* Restore the shadcn values for the tokens Kali shares, so the auth,
@@ -109,24 +134,38 @@
 
 @layer base {
   .kali-app {
-    /* Board cards keep a constant dark appearance regardless of theme. */
-    --color-card-surface: #1a2b2a;
-    --color-card-surface-alt: #243534;
-    --color-card-text: #e8f0ef;
-    --color-card-text-secondary: #94afac;
-    --color-card-text-muted: #5c7c79;
-    --color-card-border: #2d4442;
-    --color-card-border-strong: #3d5553;
-    --color-card-border-faint: rgba(93, 125, 122, 0.45);
+    /* Board cards sit on the ivory canvas as white blocks with ink text. */
+    --color-card-surface: #ffffff;
+    --color-card-surface-alt: #f7f6ea;
+    --color-card-text: #343b1b;
+    --color-card-text-secondary: #5f6740;
+    --color-card-text-muted: #8a9068;
+    --color-card-border: #e4e3cd;
+    --color-card-border-strong: #cfceac;
+    --color-card-border-faint: rgba(138, 144, 104, 0.45);
 
     /* globals.css maps these four tokens to the shadcn variables, so the
-       Kali values have to be set on the base variables to take effect. */
-    --background: #f6f8f8;
-    --primary: #0daba3;
-    --primary-foreground: #0f2a28;
-    --border: #dee7e6;
+       brand values have to be set on the base variables to take effect. */
+    --background: #fbfcee;
+    --primary: #3971b8;
+    --primary-foreground: #fbfcee;
+    --border: #e4e3cd;
 
-    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-comfortaa), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  /* Poppins carries headings, numerals, and the wordmark; Comfortaa handles
+     everything else. Declared once here so components do not repeat it. */
+  .kali-app :is(h1, h2, h3, h4),
+  .kali-app .font-heading,
+  .kali-app .text-display,
+  .kali-app .text-stat {
+    font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.015em;
+  }
+
+  .kali-app .font-body {
+    font-family: var(--font-comfortaa), ui-sans-serif, system-ui, sans-serif;
   }
 
   button {
@@ -148,91 +187,103 @@
   }
 }
 
-/* Dark mode token overrides, applied by the store-backed theme toggle. */
+/* Dark mode token overrides, applied by the store-backed theme toggle.
+   The So Matcha palette is designed for the light theme; dark mode keeps
+   the same hues at lower luminance so the brand still reads. */
 .dark .kali-app {
-  --background: #0f1a19;
-  --primary: #0daba3;
-  --primary-foreground: #06211f;
-  --border: #2d4442;
+  --background: #1a1d12;
+  --primary: #5b93d6;
+  --primary-foreground: #10130b;
+  --border: #3a3f28;
 
-  --color-surface: #1a2b2a;
-  --color-surface-alt: #243534;
-  --color-surface-elevated: #243534;
+  --color-surface: #242818;
+  --color-surface-alt: #2f3320;
+  --color-surface-elevated: #2f3320;
 
-  --color-board-canvas: #243534;
-  --color-list-default: #1a2b2a;
+  --color-board-canvas: #1f2216;
+  --color-list-default: #242818;
 
-  --color-text-primary: #e8f0ef;
-  --color-text-secondary: #94afac;
-  --color-text-muted: #5c7c79;
+  --color-text-primary: #f2f3e4;
+  --color-text-secondary: #c3c7a4;
+  --color-text-muted: #8f9573;
 
-  --color-border-strong: #3d5553;
+  --color-border-strong: #4a5033;
 
-  --color-primary: #0daba3;
-  --color-primary-hover: #10c4bb;
-  --color-primary-foreground: #06211f;
-  --color-primary-subtle: #1a3d3a;
-  --color-primary-text: #10c4bb;
+  --color-primary: #5b93d6;
+  --color-primary-hover: #7aabe3;
+  --color-primary-foreground: #10130b;
+  --color-primary-subtle: #1f2c40;
+  --color-primary-text: #8fb8e8;
 
-  --color-success: #33b27a;
-  --color-success-subtle: #1a2e23;
-  --color-success-text: #6fdca8;
-  --color-warning: #e8a93d;
-  --color-warning-subtle: #3d331f;
-  --color-warning-text: #f0c674;
-  --color-danger: #e5484d;
-  --color-danger-subtle: #3d1f23;
-  --color-danger-text: #ff8589;
-  --color-info: #4aa8ff;
-  --color-info-subtle: #16283d;
-  --color-info-text: #7cb8ff;
-  --color-danger-button: #d93b49;
+  --color-success: #a8bd6d;
+  --color-success-subtle: #2a331a;
+  --color-success-text: #c8d69b;
+  --color-warning: #e0b748;
+  --color-warning-subtle: #3a3218;
+  --color-warning-text: #f6e6a5;
+  --color-danger: #e0705f;
+  --color-danger-subtle: #3b211d;
+  --color-danger-text: #f0a196;
+  --color-info: #6fa0dc;
+  --color-info-subtle: #1f2c40;
+  --color-info-text: #8fb8e8;
+  --color-danger-button: #c0392f;
 
-  --color-base-bg: #0f1a19;
-  --color-base-surface: #1a2b2a;
-  --color-base-surface-alt: #243534;
+  --color-base-bg: #1a1d12;
+  --color-base-surface: #242818;
+  --color-base-surface-alt: #2f3320;
 
-  --color-ink-900: #e8f0ef;
-  --color-ink-700: #c3d6d4;
-  --color-ink-500: #94afac;
-  --color-ink-300: #2d4442;
+  --color-ink-900: #f2f3e4;
+  --color-ink-700: #c3c7a4;
+  --color-ink-500: #8f9573;
+  --color-ink-300: #3a3f28;
 
-  --color-accent-purple-bg: #2a2440;
-  --color-accent-purple-text: #a78bfa;
-  --color-accent-green-bg: #1a2e23;
-  --color-accent-green-text: #6fdca8;
-  --color-accent-yellow-bg: #3d331f;
-  --color-accent-yellow-text: #f0c674;
-  --color-accent-teal-bg: #1a3d3a;
-  --color-accent-teal-text: #10c4bb;
+  --color-accent-purple-bg: #2f3320;
+  --color-accent-purple-text: #f2f3e4;
+  --color-accent-green-bg: #4a5c2a;
+  --color-accent-green-text: #f2f3e4;
+  --color-accent-yellow-bg: #55491f;
+  --color-accent-yellow-text: #f6e6a5;
+  --color-accent-teal-bg: #2a4470;
+  --color-accent-teal-text: #dce8f7;
 
-  --color-sidebar-bg: #14161a;
-  --color-sidebar-active: #1f2229;
+  --color-sidebar-bg: #14243b;
+  --color-sidebar-active: #1e3450;
+  --color-sidebar-accent: #c8d69b;
 
-  --color-status-danger: #e5484d;
-  --color-status-success: #2fae68;
+  --color-status-danger: #e0705f;
+  --color-status-success: #a8bd6d;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-card-hover: 0 4px 8px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.45);
+  --color-card-surface: #242818;
+  --color-card-surface-alt: #2f3320;
+  --color-card-text: #f2f3e4;
+  --color-card-text-secondary: #c3c7a4;
+  --color-card-text-muted: #8f9573;
+  --color-card-border: #3a3f28;
+  --color-card-border-strong: #4a5033;
+  --color-card-border-faint: rgba(143, 149, 115, 0.45);
 
-  --shadow-subtle: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-modal: 0 16px 48px rgba(0, 0, 0, 0.55);
+  --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.22);
+  --shadow-card-hover: 0 6px 20px rgba(0, 0, 0, 0.3);
+
+  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --shadow-medium: 0 6px 20px rgba(0, 0, 0, 0.38);
+  --shadow-modal: 0 18px 50px rgba(0, 0, 0, 0.5);
 }
 
 @utility scroll-slim {
   scrollbar-width: thin;
-  scrollbar-color: rgba(13, 171, 163, 0.35) transparent;
+  scrollbar-color: rgba(57, 113, 184, 0.35) transparent;
   &::-webkit-scrollbar {
     height: 8px;
     width: 8px;
   }
   &::-webkit-scrollbar-thumb {
-    background: rgba(13, 171, 163, 0.3);
+    background: rgba(57, 113, 184, 0.3);
     border-radius: 9999px;
   }
   &::-webkit-scrollbar-thumb:hover {
-    background: rgba(13, 171, 163, 0.5);
+    background: rgba(57, 113, 184, 0.5);
   }
   &::-webkit-scrollbar-track {
     background: transparent;

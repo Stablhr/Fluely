@@ -6,7 +6,7 @@ import type { List } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 
 const LIST_COLORS = [
-  '', '#FFFFFF', '#0DABA3', '#33B27A', '#FF8B5E', '#E8A93D',
+  '', '#FFFFFF', '#3971B8', '#33B27A', '#FF8B5E', '#E8A93D',
   '#FF5E6C', '#7C5CFC', '#3B82F6', '#E879F9',
 ]
 

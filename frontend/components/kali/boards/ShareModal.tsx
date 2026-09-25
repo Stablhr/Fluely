@@ -255,7 +255,7 @@ export default function ShareModal({ board, onClose }: { board: Board; onClose: 
                             member={{
                               id: share.id,
                               name: share.name,
-                              color: '#0DABA3',
+                              color: '#3971B8',
                             }}
                             size={34}
                           />

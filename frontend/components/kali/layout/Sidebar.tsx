@@ -59,7 +59,7 @@ function Logo({ collapsed }: { collapsed: boolean }) {
         aria-hidden="true"
       />
       {!collapsed && (
-        <span className="text-[16px] font-bold tracking-tight" style={{ color: 'var(--surface-text)' }}>Kali</span>
+        <span className="font-heading text-[16px] font-bold tracking-tight" style={{ color: 'var(--color-brand-ivory)' }}>Fluely</span>
       )}
     </div>
   )
@@ -116,7 +116,7 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave }: Sideb
   const inboxCount = data.inbox.length
   const you = members.find((m) => m.name === 'You') ?? members[0]
 
-  const theme = useAdaptiveTheme('#14161A')
+  const theme = useAdaptiveTheme('#3971b8')
   const sidebarVars = adaptiveVars(theme)
 
   const boards = Object.values(data.boards)
@@ -155,12 +155,12 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave }: Sideb
                   collapsed
                     ? `relative mx-auto flex h-9 w-9 items-center justify-center rounded-md transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary ${
                         isActive
-                          ? 'bg-sidebar-active text-white'
+                          ? 'bg-sidebar-active text-brand-ivory'
                           : 'text-[var(--surface-text-muted)] hover:bg-white/[0.06] hover:text-[var(--surface-text)]'
                       }`
                     : `relative flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary ${
                         isActive
-                          ? 'bg-sidebar-active font-semibold text-white'
+                          ? 'bg-sidebar-active font-semibold text-brand-ivory'
                           : 'font-medium text-[var(--surface-text-muted)] hover:bg-white/[0.06] hover:text-[var(--surface-text)]'
                       }`
                 }
@@ -173,20 +173,20 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave }: Sideb
                   <>
                     {/* Left accent bar */}
                     {isActive && !collapsed && (
-                      <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-primary" />
+                      <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-brand-green" />
                     )}
                     {isActive && collapsed && (
-                      <span className="absolute left-1 top-1 bottom-1 w-[3px] rounded-full bg-primary" />
+                      <span className="absolute left-1 top-1 bottom-1 w-[3px] rounded-full bg-brand-green" />
                     )}
                     <Icon size={16} className="shrink-0" />
                     {!collapsed && <span className="flex-1">{item.label}</span>}
                     {item.to === '/inbox' && inboxCount > 0 && (
                       collapsed ? (
-                        <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-sidebar-bg bg-primary px-1 font-mono text-[9px] font-semibold leading-none text-primary-foreground">
+                        <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-sidebar-bg bg-brand-vanilla px-1 font-mono text-[9px] font-semibold leading-none text-brand-ink">
                           {inboxCount}
                         </span>
                       ) : (
-                        <span className="ml-2 rounded-full bg-primary px-1.5 py-0.5 font-mono text-[10px] font-medium text-primary-foreground">
+                        <span className="ml-2 rounded-pill bg-brand-vanilla px-1.5 py-0.5 font-mono text-[10px] font-medium text-brand-ink">
                           {inboxCount}
                         </span>
                       )
@@ -244,7 +244,7 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave }: Sideb
             {you && (
               <div className="flex items-center gap-2 rounded-md px-2.5 py-2" style={{ background: themeBg }}>
                 <Avatar member={you} size={22} />
-                <span className="text-[13px] font-semibold" style={{ color: 'var(--surface-text)' }}>{you.name}</span>
+                <span className="text-[13px] font-semibold" style={{ color: 'var(--color-brand-ivory)' }}>{you.name}</span>
               </div>
             )}
             <LogoutButton collapsed={collapsed} />
@@ -274,7 +274,7 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave }: Sideb
               <Icon size={20} />
               <span className="text-[10px] font-medium">{item.label}</span>
               {item.to === '/inbox' && inboxCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 rounded-full bg-primary px-1 py-0.5 font-mono text-[8px] font-medium text-primary-foreground">
+                <span className="absolute -right-0.5 -top-0.5 rounded-pill bg-brand-vanilla px-1 py-0.5 font-mono text-[8px] font-medium text-brand-ink">
                   {inboxCount}
                 </span>
               )}

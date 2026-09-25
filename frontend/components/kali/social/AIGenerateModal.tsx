@@ -37,7 +37,7 @@ export default function AIGenerateModal({ onUse, onClose }: AIGenerateModalProps
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-3" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title">
-      <div className="absolute inset-0 bg-[#0f1a19]/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-brand-ink/50" onClick={onClose} />
       <div className="animate-in relative z-10 flex w-full max-w-lg flex-col rounded-[14px] border border-border bg-surface shadow-modal">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">

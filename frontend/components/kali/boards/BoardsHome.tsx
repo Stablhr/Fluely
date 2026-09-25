@@ -59,14 +59,14 @@ export default function BoardsHome() {
                   toggleStar(board.id)
                 }}
                 title={board.starred ? 'Unstar' : 'Star'}
-                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-[#0f1a19]/45 opacity-0 transition-opacity duration-150 hover:bg-[#0f1a19]/60 group-hover:opacity-100 focus-visible:opacity-100"
+                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-brand-ink/45 opacity-0 transition-opacity duration-150 hover:bg-brand-ink/60 group-hover:opacity-100 focus-visible:opacity-100"
               >
                 <Star
                   size={15}
                   className={board.starred ? 'fill-warning text-warning' : 'text-white'}
                 />
               </button>
-              <span className="absolute bottom-2 left-2 right-2 truncate rounded-md bg-[#0f1a19]/55 px-2 py-1 text-sm font-semibold text-white">
+              <span className="absolute bottom-2 left-2 right-2 truncate rounded-pill bg-brand-ink/55 px-2.5 py-1 text-sm font-semibold text-brand-ivory">
                 {board.name}
               </span>
             </div>

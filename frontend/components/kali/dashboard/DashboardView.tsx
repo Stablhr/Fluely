@@ -28,10 +28,10 @@ export default function DashboardView() {
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
         <HeroCard />
         <div className="grid grid-cols-2 gap-4">
-          <StatCard tone="purple" label="Boards" value={boardCount} />
-          <StatCard tone="green" label="Due this week" value={dueThisWeek} />
-          <StatCard tone="yellow" label="Inbox unread" value={inboxCount} />
-          <StatCard tone="teal" label="Starred boards" value={starredCount} />
+          <StatCard tone="green" label="Boards" value={boardCount} />
+          <StatCard tone="vanilla" label="Due this week" value={dueThisWeek} />
+          <StatCard tone="blue" label="Inbox unread" value={inboxCount} />
+          <StatCard tone="white" label="Starred boards" value={starredCount} />
         </div>
       </div>
 

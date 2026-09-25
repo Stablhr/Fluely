@@ -24,7 +24,7 @@ export default function Modal({ open, onClose, children, className = '' }: Modal
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 sm:p-6 md:p-8">
-      <div className="absolute inset-0 bg-[#0f1a19]/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-brand-ink/50" onClick={onClose} />
       <div
         className={`animate-in relative z-10 flex h-full w-full flex-col overflow-hidden rounded-[14px] border border-border bg-surface shadow-modal ${className}`}
       >

@@ -121,7 +121,7 @@ export default function PostDetailModal({ postId, onClose, onEdit }: {
 
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="post-detail-title">
-      <div className="absolute inset-0 bg-[#0f1a19]/50 backdrop-blur-sm" onClick={handleClose} />
+      <div className="absolute inset-0 bg-brand-ink/50 backdrop-blur-sm" onClick={handleClose} />
       <div className="relative z-10 flex h-full items-start justify-center overflow-y-auto p-3 pt-8 sm:pt-16">
         <div className="animate-in flex w-full max-w-2xl flex-col rounded-[14px] border border-border bg-surface glass-heavy shadow-modal">
           {/* Header */}

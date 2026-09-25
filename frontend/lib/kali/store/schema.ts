@@ -300,7 +300,7 @@ export interface AppData {
 
 export const YOU_ID = 'member-you'
 
-export const MEMBER_COLORS = ['#0DABA3', '#4AA8FF', '#FF8B5E', '#8B7CF6', '#33B27A', '#F6C453', '#FF5E6C']
+export const MEMBER_COLORS = ['#3971B8', '#4AA8FF', '#FF8B5E', '#8B7CF6', '#33B27A', '#F6C453', '#FF5E6C']
 
 export const LABEL_SWATCHES = [
   { name: 'Marketing', color: '#8B7CF6' },

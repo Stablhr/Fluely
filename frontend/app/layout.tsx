@@ -1,5 +1,5 @@
 import type {Metadata} from 'next';
-import {Geist, Geist_Mono, JetBrains_Mono} from 'next/font/google';
+import {Geist, Geist_Mono, JetBrains_Mono, Poppins, Comfortaa} from 'next/font/google';
 import './globals.css';
 import {cn} from '@/lib/utils';
 import ReactQueryProvider from '@/lib/provider/ReactQueryProvider';
@@ -17,6 +17,21 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin']
+});
+
+/* So Matcha brand faces — Poppins for headings and numerals, Comfortaa for
+   body copy. Exposed as --font-poppins / --font-comfortaa so the theme layer
+   can publish them as the font-heading and font-body utilities. */
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
+  variable: '--font-poppins'
+});
+
+const comfortaa = Comfortaa({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-comfortaa'
 });
 
 export const metadata: Metadata = {
@@ -60,7 +75,9 @@ export default function RootLayout({
         geistSans.variable,
         geistMono.variable,
         'font-mono',
-        jetbrainsMono.variable
+        jetbrainsMono.variable,
+        poppins.variable,
+        comfortaa.variable
       )}
     >
       <body className="min-h-full flex flex-col">
