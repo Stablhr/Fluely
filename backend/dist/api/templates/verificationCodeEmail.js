@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.verificationCodeEmailTemplate = verificationCodeEmailTemplate;
-function verificationCodeEmailTemplate({ appName = 'your app name', code, expiresMinutes, recipientName }) {
+function verificationCodeEmailTemplate({ appName = 'Fluely', code, expiresMinutes, recipientName }) {
     const safeRecipient = recipientName?.trim();
     const title = `Verify your ${appName} account`;
     const text = `${safeRecipient ? `Hi ${safeRecipient},` : 'Hi,'}\n\n` +

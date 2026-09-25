@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.resetPasswordEmailTemplate = resetPasswordEmailTemplate;
-function resetPasswordEmailTemplate({ appName = 'your app name', code, expiresMinutes, recipientName }) {
+function resetPasswordEmailTemplate({ appName = 'Fluely', code, expiresMinutes, recipientName }) {
     const safeRecipient = recipientName?.trim();
     const title = `Reset your ${appName} password`;
     const text = `${safeRecipient ? `Hi ${safeRecipient},` : 'Hi,'}\n\n` +

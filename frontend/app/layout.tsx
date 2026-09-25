@@ -36,8 +36,8 @@ const comfortaa = Comfortaa({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://yourdomain.vercel.app'), // Replace with your actual URL
-  title: 'App name',
-  description: 'App name description',
+  title: 'Fluely',
+  description: 'Project-Management System with Social Media Content Planner',
   icons: {
     icon: [
       {url: '/assets/logo.png', type: 'image/png', sizes: '32x32'},
@@ -46,8 +46,8 @@ export const metadata: Metadata = {
     apple: '/assets/logo.png'
   },
   openGraph: {
-    title: 'App name',
-    description: 'App name description',
+    title: 'Fluely',
+    description: 'Project-Management and Social Media Planner',
     url: 'https://yourdomain.vercel.app/',
     type: 'website',
     images: [
