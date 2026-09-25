@@ -3,14 +3,14 @@
 import type { CSSProperties, ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Inbox, Columns3, CalendarDays, Sun, Moon, CalendarRange } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { LayoutDashboard, Inbox, Columns3, CalendarDays, Settings, LogOut, CalendarRange } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import { useAdaptiveTheme, adaptiveVars } from '@/lib/kali/hooks/useAdaptiveTheme'
+import { useLogout } from '@/lib/hooks/auth/useLogout'
 import CaptureBox from '../shared/CaptureBox'
 import Avatar from '../shared/Avatar'
 import StorageMeter from '../shared/StorageMeter'
-import type { ThemeMode } from '@/lib/kali/store/schema'
 
 interface NavLinkProps {
   to: string
@@ -44,11 +44,7 @@ const NAV = [
   { to: '/boards', label: 'Boards', icon: Columns3 },
   { to: '/schedule', label: 'Schedule', icon: CalendarDays },
   { to: '/content-planner', label: 'Content Planner', icon: CalendarRange },
-]
-
-const THEME_OPTIONS: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
-  { value: 'light', icon: Sun, label: 'Light' },
-  { value: 'dark', icon: Moon, label: 'Dark' },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 function Logo({ collapsed }: { collapsed: boolean }) {
@@ -69,54 +65,43 @@ function Logo({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-function ThemeToggle({ collapsed, mode, setDarkMode }: { collapsed: boolean; mode: ThemeMode; setDarkMode: (m: ThemeMode) => void }) {
+function LogoutButton({ collapsed }: { collapsed: boolean }) {
+  const router = useRouter()
+  const logout = useLogout()
+
+  const handleLogout = () => {
+    logout.mutate(undefined, {
+      onSettled: () => router.replace('/sign-in')
+    })
+  }
+
+  const label = logout.isPending ? 'Signing out…' : 'Sign out'
+
   if (collapsed) {
     return (
-      <div className="flex flex-col items-center gap-1 px-2">
-        <div className="flex flex-col rounded-lg p-1" style={{ background: 'var(--surface-bg-subtle)' }}>
-          {THEME_OPTIONS.map(({ value, icon: Icon, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setDarkMode(value)}
-              title={label}
-              aria-pressed={mode === value}
-              className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-150 outline-none focus-visible:outline-2 focus-visible:outline-primary active:scale-[0.98] ${
-                mode === value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-white/[0.08]'
-              }`}
-              style={{ color: mode === value ? undefined : 'var(--surface-text-muted)' }}
-            >
-              <Icon size={15} />
-            </button>
-          ))}
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={handleLogout}
+        disabled={logout.isPending}
+        title={label}
+        aria-label={label}
+        className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--surface-text-muted)] transition-colors duration-150 outline-none hover:bg-white/[0.08] hover:text-[var(--surface-text)] focus-visible:outline-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50"
+      >
+        <LogOut size={15} />
+      </button>
     )
   }
 
   return (
-    <div className="grid grid-cols-2 gap-0.5 rounded-lg p-0.5" style={{ background: 'var(--surface-bg-subtle)' }}>
-      {THEME_OPTIONS.map(({ value, icon: Icon, label }) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => setDarkMode(value)}
-          title={label}
-          aria-pressed={mode === value}
-          className={`flex flex-col items-center gap-0.5 rounded-md py-1.5 text-[10px] font-medium transition-colors duration-150 outline-none focus-visible:outline-2 focus-visible:outline-primary active:scale-[0.98] ${
-            mode === value
-              ? 'bg-primary text-primary-foreground font-semibold'
-              : 'hover:bg-white/[0.08]'
-          }`}
-          style={{ color: mode === value ? undefined : 'var(--surface-text-muted)' }}
-        >
-          <Icon size={14} />
-          <span>{label}</span>
-        </button>
-      ))}
-    </div>
+    <button
+      type="button"
+      onClick={handleLogout}
+      disabled={logout.isPending}
+      className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium text-[var(--surface-text-muted)] transition-colors duration-150 outline-none hover:bg-white/[0.08] hover:text-[var(--surface-text)] focus-visible:outline-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50"
+    >
+      <LogOut size={15} className="shrink-0" />
+      <span className="flex-1 text-left">{label}</span>
+    </button>
   )
 }
 
@@ -127,10 +112,9 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave }: SidebarProps) {
-  const { data, members, setDarkMode } = useStore()
+  const { data, members } = useStore()
   const inboxCount = data.inbox.length
   const you = members.find((m) => m.name === 'You') ?? members[0]
-  const mode = data.ui.darkMode ?? 'light'
 
   const theme = useAdaptiveTheme('#14161A')
   const sidebarVars = adaptiveVars(theme)
@@ -248,10 +232,10 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave }: Sideb
           )}
         </nav>
 
-        {/* Footer: CaptureBox → User → Theme → Storage */}
+        {/* Footer: CaptureBox → User → Sign out → Storage */}
         {collapsed ? (
           <div className="flex flex-col items-center gap-2 border-t px-2 py-3" style={{ borderColor: theme.border }}>
-            <ThemeToggle collapsed={collapsed} mode={mode} setDarkMode={setDarkMode} />
+            <LogoutButton collapsed={collapsed} />
             <StorageMeter collapsed />
           </div>
         ) : (
@@ -263,7 +247,7 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave }: Sideb
                 <span className="text-[13px] font-semibold" style={{ color: 'var(--surface-text)' }}>{you.name}</span>
               </div>
             )}
-            <ThemeToggle collapsed={collapsed} mode={mode} setDarkMode={setDarkMode} />
+            <LogoutButton collapsed={collapsed} />
             <StorageMeter />
           </div>
         )}
