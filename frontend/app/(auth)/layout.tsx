@@ -23,27 +23,49 @@ const AuthLayout = ({children}: AuthLayoutProps) => {
   if (isLoading || isFetching) return <Loading />;
 
   return (
-    <div className="flex min-h-screen">
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <Image
-          src="/assets/auth_img2.JPG"
-          loading="eager"
-          alt="App background image"
-          className="absolute inset-0 w-full h-full object-cover"
-          width={800}
-          height={1200}
-        />
-        <div className="absolute inset-0 bg-primary/78" />
-        <div className="relative z-10 flex flex-col justify-end p-12 text-primary-foreground">
-          <h1 className="text-4xl font-bold mb-3">APP name</h1>
-          <p className="text-lg opacity-90">
-            App description goes here. This is a sample description to fill the space and give an idea of how the layout looks with text content.
-          </p>
-        </div>
-      </div>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 font-body sm:p-6 lg:p-10">
+      {/* The card clips its own corners, so the brand panel below can sit flush
+          against the left edge and still pick up the rounded outer corners. */}
+      <div className="grid w-full max-w-[920px] overflow-hidden rounded-hero bg-card shadow-2xl shadow-brand-ink/10 md:grid-cols-2">
+        <div className="relative hidden overflow-hidden bg-brand-blue p-7 md:flex md:flex-col md:justify-between sm:p-9 lg:p-12">
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <div className="absolute -top-28 -left-20 h-72 w-72 rounded-full bg-brand-green/80 blur-3xl" />
+            <div className="absolute -top-16 -right-24 h-80 w-80 rounded-full bg-brand-vanilla/70 blur-3xl" />
+            <div className="absolute -bottom-24 -left-16 h-80 w-80 rounded-full bg-brand-vanilla/75 blur-3xl" />
+            <div className="absolute -right-20 -bottom-16 h-72 w-72 rounded-full bg-brand-green/60 blur-3xl" />
+            <div className="absolute inset-0 bg-linear-to-br from-brand-blue/80 via-transparent to-blue-deep/70" />
+          </div>
 
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-12 bg-background">
-        <div className="w-full max-w-md">{children}</div>
+          <div className="relative z-10 flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-ivory/90">
+              <Image
+                src="/assets/kali-logo.png"
+                alt=""
+                width={28}
+                height={28}
+                aria-hidden
+                className="h-7 w-7 rounded-lg"
+              />
+            </span>
+            <span className="font-heading text-[17px] font-bold tracking-tight text-brand-ivory">
+              Fluely
+            </span>
+          </div>
+
+          <div className="relative z-10">
+            <h1 className="max-w-xs font-heading text-4xl font-bold leading-tight text-brand-ivory">
+              APP name
+            </h1>
+            <p className="mt-3 max-w-xs font-body text-[15px] leading-relaxed text-brand-ivory/80">
+              App description goes here. This is a sample description to fill the
+              space and give an idea of how the layout looks with text content.
+            </p>
+          </div>
+        </div>
+
+        <div className="p-7 sm:p-9 lg:p-12">
+          <div className="mx-auto w-full max-w-sm">{children}</div>
+        </div>
       </div>
     </div>
   );

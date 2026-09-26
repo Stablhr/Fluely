@@ -10,6 +10,17 @@ import {useRouter} from 'next/navigation';
 import {login} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
 import {getDashboardPath} from '@/lib/auth/redirects';
+import {
+  authErrorClass,
+  authFooterClass,
+  authInlineLinkClass,
+  authInputClass,
+  authLabelClass,
+  authPasswordToggleClass,
+  authPrimaryButtonClass,
+  authSubtitleClass,
+  authTitleClass,
+} from '@/lib/auth/authStyles';
 
 export default function SignInPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -41,22 +52,21 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">
-          Welcome back
-        </h2>
-        <p className="text-muted-foreground">
-          Sign in to your account to continue
-        </p>
+        <h2 className={authTitleClass}>Welcome back</h2>
+        <p className={authSubtitleClass}>Sign in to your account to continue</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="email">Email or Phone Number</Label>
+          <Label htmlFor="email" className={authLabelClass}>
+            Email or Phone Number
+          </Label>
           <Input
             id="email"
             type="text"
+            className={authInputClass}
             placeholder="you@example.com or 09xxxxxxxxx"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -67,11 +77,10 @@ export default function SignInPage() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link
-              href="/forgot-password"
-              className="text-sm text-primary hover:underline font-medium"
-            >
+            <Label htmlFor="password" className={authLabelClass}>
+              Password
+            </Label>
+            <Link href="/forgot-password" className={authInlineLinkClass}>
               Forgot password?
             </Link>
           </div>
@@ -79,6 +88,7 @@ export default function SignInPage() {
             <Input
               id="password"
               type={showPassword ? 'text' : 'password'}
+              className={`${authInputClass} pr-12`}
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -89,36 +99,34 @@ export default function SignInPage() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               disabled={isSubmitting}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className={authPasswordToggleClass}
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPassword ? (
+                <EyeOff className="size-[18px]" />
+              ) : (
+                <Eye className="size-[18px]" />
+              )}
             </button>
           </div>
         </div>
 
         <Button
           type="submit"
-          className="w-full bg-black"
+          className={authPrimaryButtonClass}
           size="lg"
           disabled={isSubmitting}
         >
-          <LogIn size={18} />
+          <LogIn className="size-[18px]" />
           {isSubmitting ? 'Signing in...' : 'Sign In'}
         </Button>
 
-        {errorMessage && (
-          <div className="rounded-md border border-destructive/30 px-3 py-2 text-sm text-destructive">
-            {errorMessage}
-          </div>
-        )}
+        {errorMessage && <div className={authErrorClass}>{errorMessage}</div>}
       </form>
 
-      <p className="text-center text-sm text-muted-foreground">
+      <p className={authFooterClass}>
         Don&apos;t have an account?{' '}
-        <Link
-          href="/sign-up"
-          className="text-black font-semibold hover:underline"
-        >
+        <Link href="/sign-up" className={authInlineLinkClass}>
           Sign up
         </Link>
       </p>

@@ -7,6 +7,14 @@ import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {useRouter} from 'next/navigation';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
+import {
+  authErrorClass,
+  authInputClass,
+  authLabelClass,
+  authPrimaryButtonClass,
+  authSubtitleClass,
+  authTitleClass,
+} from '@/lib/auth/authStyles';
 import { sendPasswordResetCode } from '@/lib/api/authApi';
 
 export default function ForgotPasswordPage() {
@@ -44,19 +52,20 @@ export default function ForgotPasswordPage() {
       </Link>
 
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">
+        <h2 className={authTitleClass}>
           Forgot password?
         </h2>
-        <p className="text-muted-foreground">
+        <p className={authSubtitleClass}>
           Enter your email and we&apos;ll send you a 6-digit code to reset your password.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label className={authLabelClass} htmlFor="email">Email</Label>
           <Input
             id="email"
+            className={authInputClass}
             type="email"
             placeholder="you@example.com"
             value={email}
@@ -68,16 +77,16 @@ export default function ForgotPasswordPage() {
 
         <Button
           type="submit"
-          className="w-full bg-black"
+          className={authPrimaryButtonClass}
           size="lg"
           disabled={isSubmitting}
         >
-          <Send size={18} />
+          <Send className="size-[18px]" />
           {isSubmitting ? 'Sending...' : 'Send Code'}
         </Button>
 
         {errorMessage && (
-          <div className="rounded-md border border-destructive/30 px-3 py-2 text-sm text-destructive">
+          <div className={authErrorClass}>
             {errorMessage}
           </div>
         )}

@@ -9,6 +9,17 @@ import {Label} from '@/components/ui/label';
 import {useRouter, useSearchParams} from 'next/navigation';
 import {resetPassword} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
+import {
+  authErrorClass,
+  authFooterClass,
+  authInlineLinkClass,
+  authInputClass,
+  authLabelClass,
+  authPasswordToggleClass,
+  authPrimaryButtonClass,
+  authSubtitleClass,
+  authTitleClass,
+} from '@/lib/auth/authStyles';
 
 export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -57,19 +68,20 @@ export default function ResetPasswordPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">
+        <h2 className={authTitleClass}>
           Reset password
         </h2>
-        <p className="text-muted-foreground">
+        <p className={authSubtitleClass}>
           Enter your new password below.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="password">New Password</Label>
+          <Label className={authLabelClass} htmlFor="password">New Password</Label>
           <div className="relative">
             <Input
+              className={`${authInputClass} pr-12`}
               id="password"
               type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"
@@ -82,16 +94,17 @@ export default function ResetPasswordPage() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               disabled={isSubmitting}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              className={authPasswordToggleClass}
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPassword ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
             </button>
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm New Password</Label>
+          <Label className={authLabelClass} htmlFor="confirmPassword">Confirm New Password</Label>
           <Input
+            className={authInputClass}
             id="confirmPassword"
             type="password"
             placeholder="••••••••"
@@ -104,26 +117,26 @@ export default function ResetPasswordPage() {
 
         <Button
           type="submit"
-          className="w-full bg-black"
+          className={authPrimaryButtonClass}
           size="lg"
           disabled={isSubmitting}
         >
-          <KeyRound size={18} />
+          <KeyRound className="size-[18px]" />
           {isSubmitting ? 'Resetting...' : 'Reset Password'}
         </Button>
 
         {errorMessage && (
-          <div className="rounded-md border border-destructive/30 px-3 py-2 text-sm text-destructive">
+          <div className={authErrorClass}>
             {errorMessage}
           </div>
         )}
       </form>
 
-      <p className="text-center text-sm text-muted-foreground">
+      <p className={authFooterClass}>
         Remember your password?{' '}
         <Link
           href="/sign-in"
-          className="text-black font-semibold hover:underline"
+          className={authInlineLinkClass}
         >
           Sign in
         </Link>

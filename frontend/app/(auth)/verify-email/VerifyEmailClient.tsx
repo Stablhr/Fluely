@@ -17,6 +17,15 @@ import {
   resendPasswordResetCode
 } from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
+import {
+  authErrorClass,
+  authFooterClass,
+  authInlineLinkClass,
+  authLabelClass,
+  authPrimaryButtonClass,
+  authSubtitleClass,
+  authTitleClass,
+} from '@/lib/auth/authStyles';
 
 export default function VerifyEmailClient() {
   const router = useRouter();
@@ -93,10 +102,10 @@ export default function VerifyEmailClient() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">
+        <h2 className={authTitleClass}>
           {isResetMode ? 'Check your email' : 'Verify your email'}
         </h2>
-        <p className="text-muted-foreground">
+        <p className={authSubtitleClass}>
           {isResetMode
             ? `Enter the 6-digit code we sent to ${emailFromQuery} to reset your password.`
             : 'Enter the 6-digit code we sent to your email address.'}
@@ -105,7 +114,7 @@ export default function VerifyEmailClient() {
 
       <form onSubmit={handleVerify} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="otp">Verification Code</Label>
+          <Label className={authLabelClass} htmlFor="otp">Verification Code</Label>
           <div className="flex justify-center">
             <InputOTP
               id="otp"
@@ -134,7 +143,7 @@ export default function VerifyEmailClient() {
 
         <Button
           type="submit"
-          className="w-full bg-black"
+          className={authPrimaryButtonClass}
           size="lg"
           disabled={isSubmitting || !canSubmit}
         >
@@ -157,7 +166,7 @@ export default function VerifyEmailClient() {
         </Button>
 
         {errorMessage && (
-          <div className="rounded-md border border-destructive/30 px-3 py-2 text-sm text-destructive">
+          <div className={authErrorClass}>
             {errorMessage}
           </div>
         )}
@@ -169,13 +178,13 @@ export default function VerifyEmailClient() {
         )}
       </form>
 
-      <p className="text-center text-sm text-muted-foreground">
+      <p className={authFooterClass}>
         {isResetMode ? (
           <>
             Remember your password?{' '}
             <Link
               href="/sign-in"
-              className="text-black font-semibold hover:underline"
+              className={authInlineLinkClass}
             >
               Sign in
             </Link>
@@ -185,7 +194,7 @@ export default function VerifyEmailClient() {
             Already verified?{' '}
             <Link
               href="/sign-in"
-              className="text-black font-semibold hover:underline"
+              className={authInlineLinkClass}
             >
               Sign in
             </Link>

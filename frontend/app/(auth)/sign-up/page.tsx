@@ -9,6 +9,17 @@ import {Label} from '@/components/ui/label';
 import {useRouter} from 'next/navigation';
 import {registerCustomer} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
+import {
+  authErrorClass,
+  authFooterClass,
+  authInlineLinkClass,
+  authInputClass,
+  authLabelClass,
+  authPasswordToggleClass,
+  authPrimaryButtonClass,
+  authSubtitleClass,
+  authTitleClass,
+} from '@/lib/auth/authStyles';
 
 export default function SignUpPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -62,18 +73,19 @@ export default function SignUpPage() {
    return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">
+        <h2 className={authTitleClass}>
           Create an account
         </h2>
-        <p className="text-muted-foreground">
+        <p className={authSubtitleClass}>
           Your app highlights 
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="firstName">First Name</Label>
+          <Label className={authLabelClass} htmlFor="firstName">First Name</Label>
           <Input
+            className={authInputClass}
             id="firstName"
             type="text"
             placeholder="Juan"
@@ -85,8 +97,9 @@ export default function SignUpPage() {
         </div>
 
           <div className="space-y-2">
-          <Label htmlFor="lastName">Last Name</Label>
+          <Label className={authLabelClass} htmlFor="lastName">Last Name</Label>
           <Input
+            className={authInputClass}
             id="lastName"
             type="text"
             placeholder="Dela Cruz"
@@ -98,8 +111,9 @@ export default function SignUpPage() {
         </div>
 
          <div className="space-y-2">
-          <Label htmlFor="username">Username</Label>
+          <Label className={authLabelClass} htmlFor="username">Username</Label>
           <Input
+            className={authInputClass}
             id="username"
             type="text"
             placeholder="user@123"
@@ -111,9 +125,10 @@ export default function SignUpPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
+          <Label className={authLabelClass} htmlFor="email">Email</Label>
           <Input
             id="email"
+            className={authInputClass}
             type="email"
             placeholder="you@example.com"
             value={email}
@@ -124,9 +139,10 @@ export default function SignUpPage() {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label className={authLabelClass} htmlFor="password">Password</Label>
           <div className="relative">
             <Input
+              className={`${authInputClass} pr-12`}
               id="password"
               type={showPassword ? 'text' : 'password'}
               placeholder="••••••••"
@@ -139,16 +155,17 @@ export default function SignUpPage() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               disabled={isSubmitting}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              className={authPasswordToggleClass}
             >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              {showPassword ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
             </button>
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm Password</Label>
+          <Label className={authLabelClass} htmlFor="confirmPassword">Confirm Password</Label>
           <Input
+            className={authInputClass}
             id="confirmPassword"
             placeholder="••••••••"
             type="password"
@@ -161,26 +178,26 @@ export default function SignUpPage() {
 
         <Button
           type="submit"
-          className="w-full bg-black"
+          className={authPrimaryButtonClass}
           size="lg"
           disabled={isSubmitting}
         >
-          <UserPlus size={18} />
+          <UserPlus className="size-[18px]" />
           {isSubmitting ? 'Creating account...' : 'Create Account'}
         </Button>
 
         {errorMessage && (
-          <div className="rounded-md border border-destructive/30 px-3 py-2 text-sm text-destructive">
+          <div className={authErrorClass}>
             {errorMessage}
           </div>
         )}
       </form>
 
-      <p className="text-center text-sm text-muted-foreground">
+      <p className={authFooterClass}>
         Already have an account?{' '}
         <Link
           href="/sign-in"
-          className="text-black font-semibold hover:underline"
+          className={authInlineLinkClass}
         >
           Sign in
         </Link>
