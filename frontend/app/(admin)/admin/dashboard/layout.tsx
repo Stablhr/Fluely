@@ -62,8 +62,8 @@ export default function AdminDashboardLayout({
       <aside className="hidden md:flex flex-col w-64 min-h-screen bg-black shadow-xl z-40">
         <div className="flex items-center justify-center py-6 px-4 border-b border-gray-800">
           <Image
-            src="/assets/logo.png"
-            alt="App logo"
+            src="/assets/fluely_logo.png"
+            alt="Fluely logo"
             width={130}
             height={130}
             className="object-contain drop-shadow-lg"

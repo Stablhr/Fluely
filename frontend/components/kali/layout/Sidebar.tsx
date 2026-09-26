@@ -51,11 +51,11 @@ function Logo({ collapsed }: { collapsed: boolean }) {
   return (
     <div className="flex items-center gap-2.5 px-3 py-4">
       <Image
-        src="/assets/kali-logo.png"
-        alt="Kali logo"
+        src="/assets/fluely_logo.png"
+        alt="Fluely logo"
         width={32}
         height={32}
-        className="h-8 w-8 shrink-0 rounded-lg"
+        className="h-8 w-8 shrink-0 rounded-lg object-contain"
         aria-hidden="true"
       />
       {!collapsed && (

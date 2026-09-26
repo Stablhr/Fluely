@@ -40,11 +40,10 @@ export const metadata: Metadata = {
   title: 'Fluely',
   description: 'Project-Management System with Social Media Content Planner',
   icons: {
-    icon: [
-      {url: '/assets/logo.png', type: 'image/png', sizes: '32x32'},
-      {url: '/assets/logo.png', type: 'image/png', sizes: '192x192'}
-    ],
-    apple: '/assets/logo.png'
+    // The supplied favicon asset is 413x604 rather than a square icon, so the
+    // real intrinsic size is declared instead of invented 32x32/192x192 hints.
+    icon: [{url: '/assets/fluely_favicon.png', type: 'image/png', sizes: '413x604'}],
+    apple: '/assets/fluely_favicon.png'
   },
   openGraph: {
     title: 'Fluely',
@@ -53,10 +52,10 @@ export const metadata: Metadata = {
     type: 'website',
     images: [
       {
-        url: '/assets/logo.png', // Replace with your actual image path of logo
-        width: 1200,
-        height: 630,
-        alt: 'App name Preview'
+        url: '/assets/fluely_logo.png',
+        width: 589,
+        height: 423,
+        alt: 'Fluely'
       }
     ]
   }

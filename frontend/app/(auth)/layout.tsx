@@ -39,12 +39,12 @@ const AuthLayout = ({children}: AuthLayoutProps) => {
           <div className="relative z-10 flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-ivory/90">
               <Image
-                src="/assets/kali-logo.png"
+                src="/assets/fluely_logo.png"
                 alt=""
                 width={28}
                 height={28}
                 aria-hidden
-                className="h-7 w-7 rounded-lg"
+                className="h-7 w-7 rounded-lg object-contain"
               />
             </span>
             <span className="font-heading text-[17px] font-bold tracking-tight text-brand-ivory">
