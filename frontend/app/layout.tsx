@@ -4,6 +4,7 @@ import './globals.css';
 import {cn} from '@/lib/utils';
 import ReactQueryProvider from '@/lib/provider/ReactQueryProvider';
 import LoadingScreenProvider from '@/lib/provider/LoadingScreenProvider';
+import {LOADING_FRAMES} from '@/lib/loadingFrames';
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
@@ -80,6 +81,14 @@ export default function RootLayout({
         comfortaa.variable
       )}
     >
+      <head>
+        {/* The boot curtain is part of the server HTML, so its mascot frames are
+            requested in parallel with the bundle rather than after hydration.
+            These are the same URLs the <img> uses, so the preloads are hits. */}
+        {LOADING_FRAMES.map((src) => (
+          <link key={src} rel="preload" as="image" href={src} />
+        ))}
+      </head>
       <body className="min-h-full flex flex-col">
         <ReactQueryProvider>
           <LoadingScreenProvider>{children}</LoadingScreenProvider>

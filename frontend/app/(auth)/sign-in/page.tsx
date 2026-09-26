@@ -10,6 +10,7 @@ import {useRouter} from 'next/navigation';
 import {login} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
 import {getDashboardPath} from '@/lib/auth/redirects';
+import {holdForMinimum} from '@/lib/auth/loadingCurtain';
 import {useLoadingScreen} from '@/lib/provider/LoadingScreenProvider';
 import {
   authErrorClass,
@@ -43,11 +44,15 @@ export default function SignInPage() {
 
     setIsSubmitting(true);
     setErrorMessage(null);
+    const startedAt = Date.now();
     show('login');
     try {
       const users = await login({email, password});
-      // Deliberately no hide() on success: the curtain stays up across the
-      // redirect so the dashboard never flashes in behind it.
+      // Hold the curtain until MIN_CURTAIN_MS so the mascot gets a readable
+      // pass, then hand off to the dashboard. Deliberately no hide() on
+      // success: the curtain stays up across the navigation so the dashboard
+      // never flashes in behind it.
+      await holdForMinimum(startedAt);
       router.push(getDashboardPath(users.user.type));
     } catch (error) {
       hide();

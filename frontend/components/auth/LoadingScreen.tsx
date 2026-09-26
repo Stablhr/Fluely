@@ -2,52 +2,62 @@
 
 import {useEffect, useState} from 'react';
 import Image from 'next/image';
+import {LOADING_FRAMES} from '@/lib/loadingFrames';
 
 /**
  * Full-screen loading curtain shown while a sign-in or sign-out request is in
- * flight. The mascot run-cycle is four hand-drawn frames swapped on a timer
- * (option A from the brief: no framer-motion in this project), and the progress
- * bar underneath is a separate CSS animation so it can run at its own rhythm
- * instead of being locked to the frame cycle.
+ * flight, and on the first paint of any full page load. The mascot run-cycle is
+ * four hand-drawn frames swapped on a timer (option A from the brief: no
+ * framer-motion in this project), and the progress bar underneath is a separate
+ * CSS animation so it can run at its own rhythm instead of being locked to the
+ * frame cycle.
  *
  * Colors come from the brand tokens in app/kali.css — Ivory background, Drab
  * Dark Brown text, Poppins for the heading.
  */
 
-/* Order matters: 1 mid-leap, 2 upright peak, 3 leaning run, 4 running. */
-export const LOADING_FRAMES = [
-  '/assets/Loading/fluely_loading_1.png',
-  '/assets/Loading/fluely_loading_2.png',
-  '/assets/Loading/fluely_loading_3.png',
-  '/assets/Loading/fluely_loading_4.png',
-] as const;
-
-/* ~5.7fps reads as a run cycle; slower than this and it looks like a slideshow. */
+/* ~5.7fps reads as a run cycle; slower than this and it looks like a slideshow.
+   The curtain itself is held on screen for a minimum of MIN_CURTAIN_MS
+   (lib/auth/loadingCurtain.ts) so a fast response cannot reduce the whole thing
+   to a single frame. */
 const FRAME_INTERVAL_MS = 175;
 
 const COPY = {
   login: 'Signing you in...',
   logout: 'Signing you out...',
+  /* Boot curtain, shown on the first paint of a full page load. */
+  load: 'Getting things ready...',
 } as const;
 
 export type LoadingScreenMode = keyof typeof COPY;
 
 /**
- * Pull the four frames into the browser cache.
+ * Pull the four frames into the browser cache, resolving once they have decoded.
  *
  * Called from the provider on app mount rather than from the component below:
  * starting the download when the curtain opens is too late, because frame one
  * would still be in flight and the mascot would pop in a beat after the
  * overlay. The frames render with `unoptimized`, so the URL cached here is the
  * same one that ends up in the img src.
+ *
+ * The returned promise is what lets the boot curtain wait for a real mascot
+ * instead of lifting on an empty box. It never rejects: a frame that fails to
+ * load must not wedge the page behind a full-screen overlay.
  */
-export function preloadLoadingFrames() {
-  if (typeof window === 'undefined') return;
+export function preloadLoadingFrames(): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
 
-  for (const src of LOADING_FRAMES) {
-    const image = new window.Image();
-    image.src = src;
-  }
+  return Promise.all(
+    LOADING_FRAMES.map(
+      (src) =>
+        new Promise<void>((resolve) => {
+          const image = new window.Image();
+          image.onload = () => resolve();
+          image.onerror = () => resolve();
+          image.src = src;
+        })
+    )
+  ).then(() => undefined);
 }
 
 type LoadingScreenProps = {
