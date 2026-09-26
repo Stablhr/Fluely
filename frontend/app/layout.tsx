@@ -3,6 +3,7 @@ import {Geist, Geist_Mono, JetBrains_Mono, Poppins, Comfortaa} from 'next/font/g
 import './globals.css';
 import {cn} from '@/lib/utils';
 import ReactQueryProvider from '@/lib/provider/ReactQueryProvider';
+import LoadingScreenProvider from '@/lib/provider/LoadingScreenProvider';
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
@@ -81,7 +82,9 @@ export default function RootLayout({
       )}
     >
       <body className="min-h-full flex flex-col">
-        <ReactQueryProvider>{children}</ReactQueryProvider>
+        <ReactQueryProvider>
+          <LoadingScreenProvider>{children}</LoadingScreenProvider>
+        </ReactQueryProvider>
       </body>
     </html>
   );

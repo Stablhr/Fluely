@@ -10,6 +10,7 @@ import {useRouter} from 'next/navigation';
 import {login} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
 import {getDashboardPath} from '@/lib/auth/redirects';
+import {useLoadingScreen} from '@/lib/provider/LoadingScreenProvider';
 import {
   authErrorClass,
   authFooterClass,
@@ -28,6 +29,7 @@ export default function SignInPage() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const {show, hide} = useLoadingScreen();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,10 +43,14 @@ export default function SignInPage() {
 
     setIsSubmitting(true);
     setErrorMessage(null);
+    show('login');
     try {
       const users = await login({email, password});
+      // Deliberately no hide() on success: the curtain stays up across the
+      // redirect so the dashboard never flashes in behind it.
       router.push(getDashboardPath(users.user.type));
     } catch (error) {
+      hide();
       setErrorMessage(getFriendlyErrorMessage(error, 'Failed to sign in'));
     } finally {
       setIsSubmitting(false);

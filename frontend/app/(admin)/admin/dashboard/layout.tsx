@@ -2,8 +2,7 @@
 import {useSearchParams} from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import {useRouter} from 'next/navigation';
-import {useLogout} from '@/lib/hooks/auth/useLogout';
+import {useSignOut} from '@/lib/hooks/auth/useSignOut';
 import {Home, Settings, LogOut, LayoutDashboard} from 'lucide-react';
 
 const TABS = [
@@ -42,8 +41,7 @@ export default function AdminDashboardLayout({
 }: AdminDashboardLayoutProps) {
   const searchParams = useSearchParams();
   const tab = searchParams.get('tab');
-  const router = useRouter();
-  const logoutMutation = useLogout();
+  const signOutMutation = useSignOut();
 
   const slotByTab: Record<string, React.ReactNode | undefined> = {
     settings,
@@ -51,8 +49,7 @@ export default function AdminDashboardLayout({
   };
 
   const handleLogout = async () => {
-    await logoutMutation.mutateAsync();
-    router.replace('/sign-in');
+    await signOutMutation.signOut();
   };
 
   const isActive = (itemTab: string | null) =>
@@ -112,7 +109,7 @@ export default function AdminDashboardLayout({
         <div className="px-3 pb-5 pt-2 border-t border-gray-800">
           <button
             onClick={handleLogout}
-            disabled={logoutMutation.isPending}
+            disabled={signOutMutation.isPending}
             className="
               w-full flex items-center gap-3 px-4 py-3 rounded-xl
               text-sm font-semibold tracking-wide
@@ -122,7 +119,7 @@ export default function AdminDashboardLayout({
             "
           >
             <LogOut size={20} className="shrink-0" />
-            <span>{logoutMutation.isPending ? 'Logging out…' : 'Logout'}</span>
+            <span>{signOutMutation.isPending ? 'Logging out…' : 'Logout'}</span>
           </button>
         </div>
       </aside>

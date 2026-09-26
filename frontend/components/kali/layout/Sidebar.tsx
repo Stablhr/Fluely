@@ -3,11 +3,11 @@
 import type { CSSProperties, ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Inbox, Columns3, CalendarDays, Settings, LogOut, CalendarRange } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import { useAdaptiveTheme, adaptiveVars } from '@/lib/kali/hooks/useAdaptiveTheme'
-import { useLogout } from '@/lib/hooks/auth/useLogout'
+import { useSignOut } from '@/lib/hooks/auth/useSignOut'
 import CaptureBox from '../shared/CaptureBox'
 import Avatar from '../shared/Avatar'
 import StorageMeter from '../shared/StorageMeter'
@@ -66,23 +66,20 @@ function Logo({ collapsed }: { collapsed: boolean }) {
 }
 
 function LogoutButton({ collapsed }: { collapsed: boolean }) {
-  const router = useRouter()
-  const logout = useLogout()
+  const { signOut, isPending } = useSignOut()
 
   const handleLogout = () => {
-    logout.mutate(undefined, {
-      onSettled: () => router.replace('/sign-in')
-    })
+    void signOut()
   }
 
-  const label = logout.isPending ? 'Signing out…' : 'Sign out'
+  const label = isPending ? 'Signing out…' : 'Sign out'
 
   if (collapsed) {
     return (
       <button
         type="button"
         onClick={handleLogout}
-        disabled={logout.isPending}
+        disabled={isPending}
         title={label}
         aria-label={label}
         className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--surface-text-muted)] transition-colors duration-150 outline-none hover:bg-white/[0.08] hover:text-[var(--surface-text)] focus-visible:outline-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50"
@@ -96,7 +93,7 @@ function LogoutButton({ collapsed }: { collapsed: boolean }) {
     <button
       type="button"
       onClick={handleLogout}
-      disabled={logout.isPending}
+      disabled={isPending}
       className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium text-[var(--surface-text-muted)] transition-colors duration-150 outline-none hover:bg-white/[0.08] hover:text-[var(--surface-text)] focus-visible:outline-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50"
     >
       <LogOut size={15} className="shrink-0" />
