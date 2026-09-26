@@ -3,6 +3,16 @@
 @import "shadcn/tailwind.css";
 @import "./kali.css";
 
+/* The product is light-only: every route group renders on the ivory canvas
+   (#fbfcee) declared in :root below, and there is no dark palette.
+
+   `dark` stays declared as a CLASS-based variant on purpose. Tailwind v4
+   otherwise falls back to its built-in `@media (prefers-color-scheme: dark)`,
+   which would make every `dark:*` class in the vendored shadcn components
+   switch on for visitors whose OS is set to dark. Nothing ever adds a `dark`
+   class to <html>, so these utilities stay inert — but declaring the variant
+   keeps that guarantee explicit rather than dependent on the vendored classes
+   only ever referencing CSS variables. */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -84,40 +94,6 @@
   --sidebar-accent: #2f5c96;
   --sidebar-accent-foreground: #fbfcee;
   --sidebar-border: #2f5c96;
-  --sidebar-ring: #c8d69b;
-}
-
-.dark {
-  --background: #1a1d12;
-  --foreground: #f2f3e4;
-  --card: #242818;
-  --card-foreground: #f2f3e4;
-  --popover: #242818;
-  --popover-foreground: #f2f3e4;
-  --primary: #5b93d6;
-  --primary-foreground: #10130b;
-  --secondary: #2f3320;
-  --secondary-foreground: #f2f3e4;
-  --muted: #2f3320;
-  --muted-foreground: #a8ad8a;
-  --accent: #333a1f;
-  --accent-foreground: #f2f3e4;
-  --destructive: #e06b5f;
-  --border: #3a3f28;
-  --input: #3a3f28;
-  --ring: #5b93d6;
-  --chart-1: #c8d69b;
-  --chart-2: #f6e6a5;
-  --chart-3: #5b93d6;
-  --chart-4: #a8ad8a;
-  --chart-5: #f2f3e4;
-  --sidebar: #14243b;
-  --sidebar-foreground: #f2f3e4;
-  --sidebar-primary: #f6e6a5;
-  --sidebar-primary-foreground: #10130b;
-  --sidebar-accent: #1e3450;
-  --sidebar-accent-foreground: #f2f3e4;
-  --sidebar-border: #1e3450;
   --sidebar-ring: #c8d69b;
 }
 

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { AppData, Board, Card, Label, List, Member, Share, SocialPost, SocialPostPlatform, SocialMediaAttachment, SocialAnalytics, PublishingJob, Platform, ThemeMode } from './schema'
+import type { AppData, Board, Card, Label, List, Member, Share, SocialPost, SocialPostPlatform, SocialMediaAttachment, SocialAnalytics, PublishingJob, Platform } from './schema'
 
 export interface Store {
   data: AppData
@@ -48,7 +48,6 @@ export interface Store {
   removeShare: (boardId: string, shareId: string) => void
   updateShareRole: (boardId: string, shareId: string, role: Share['role']) => void
   createShareLink: (boardId: string) => void
-  setDarkMode: (mode: ThemeMode) => void
   resetAll: () => void
   // Social Posts
   socialPosts: SocialPost[]

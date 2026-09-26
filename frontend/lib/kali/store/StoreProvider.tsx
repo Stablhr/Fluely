@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { AppData, Board, Card, List, Label, Share, SocialPost, SocialPostPlatform, SocialMediaAttachment, SocialAnalytics, Platform, ThemeMode } from './schema'
+import type { AppData, Board, Card, List, Label, Share, SocialPost, SocialPostPlatform, SocialMediaAttachment, SocialAnalytics, Platform } from './schema'
 import { BOARD_TEMPLATES, emptyData } from './schema'
 import { clearData, loadData, saveData } from './storage'
 import { StoreContext } from './useStore'
@@ -817,12 +817,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     })
 
-  const setDarkMode = (mode: ThemeMode) =>
-    mutate((prev) => ({
-      ...prev,
-      ui: { ...prev.ui, darkMode: mode },
-    }))
-
   const resetAll = () => {
     clearData()
     setData(emptyData())
@@ -955,7 +949,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     removeShare,
     updateShareRole,
     createShareLink,
-    setDarkMode,
     resetAll,
     socialPosts: social.posts,
     socialJobs: social.jobs,

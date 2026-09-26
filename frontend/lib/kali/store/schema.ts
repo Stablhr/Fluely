@@ -283,8 +283,6 @@ export interface TaskNotification {
   updatedAt: string
 }
 
-export type ThemeMode = 'light' | 'dark'
-
 export interface AppData {
   version: number
   boards: Record<string, Board>
@@ -294,7 +292,6 @@ export interface AppData {
   members: Record<string, Member>
   ui: {
     lastVisitedBoardId: string | null
-    darkMode: ThemeMode
   }
 }
 
@@ -366,7 +363,6 @@ export function emptyData(): AppData {
     },
     ui: {
       lastVisitedBoardId: null,
-      darkMode: typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
     },
   }
 }

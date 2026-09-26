@@ -7,7 +7,6 @@ import {useMeQuery} from '@/lib/hooks/auth/useMeQuery';
 import {getDashboardPath} from '@/lib/auth/redirects';
 import {StoreProvider} from '@/lib/kali/store/StoreProvider';
 import {useStore} from '@/lib/kali/store/useStore';
-import {useThemeMode} from '@/lib/kali/hooks/useThemeMode';
 import AppShell from '@/components/kali/layout/AppShell';
 import ErrorBoundary from '@/components/kali/shared/ErrorBoundary';
 import ToastProvider from '@/components/kali/shared/Toast';
@@ -58,8 +57,6 @@ function AuthGate({children}: {children: React.ReactNode}) {
 }
 
 function AppFrame({children}: {children: React.ReactNode}) {
-  useThemeMode();
-
   return (
     <div className="kali-app">
       <AppShell>
