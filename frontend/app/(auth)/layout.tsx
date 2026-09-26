@@ -54,11 +54,10 @@ const AuthLayout = ({children}: AuthLayoutProps) => {
 
           <div className="relative z-10">
             <h1 className="max-w-xs font-heading text-4xl font-bold leading-tight text-brand-ivory">
-              APP name
+              Fluely
             </h1>
             <p className="mt-3 max-w-xs font-body text-[15px] leading-relaxed text-brand-ivory/80">
-              App description goes here. This is a sample description to fill the
-              space and give an idea of how the layout looks with text content.
+              Plan your tasks, organize your boards, and stay on top of your week — all in one place.
             </p>
           </div>
         </div>
