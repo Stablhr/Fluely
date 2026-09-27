@@ -51,16 +51,22 @@ const NAV = [
 function Logo({ collapsed }: { collapsed: boolean }) {
   return (
     <div className="flex items-center gap-2.5 px-3 py-4">
+      {/* The source is 413x604, so object-contain in a square box letterboxes it
+          to roughly two-thirds of the box width — a h-8 box drew it about 22px
+          wide. h-16 gives the mark real presence next to the wordmark.
+
+          Stays h-8 when collapsed: the rail is only 52px wide and 8px of that
+          is padding either side, so a larger mark would overflow it. */}
       <Image
-        src="/assets/fluely_logo.png"
+        src="/assets/fluely_favicon.png"
         alt="Fluely logo"
-        width={32}
-        height={32}
-        className="h-8 w-8 shrink-0 rounded-lg object-contain"
+        width={64}
+        height={64}
+        className={`shrink-0 rounded-lg object-contain ${collapsed ? 'h-8 w-8' : 'h-16 w-16'}`}
         aria-hidden="true"
       />
       {!collapsed && (
-        <span className="font-heading text-[16px] font-bold tracking-tight" style={{ color: 'var(--color-brand-ivory)' }}>Fluely</span>
+        <span className="font-heading text-[22px] font-bold tracking-tight" style={{ color: 'var(--color-brand-ivory)' }}>Fluely</span>
       )}
     </div>
   )
