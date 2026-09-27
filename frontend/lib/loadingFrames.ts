@@ -9,8 +9,8 @@
  * cache genuinely satisfies it.
  */
 export const LOADING_FRAMES = [
-  '/assets/Loading/fluely_action_frame_1.png',
-  '/assets/Loading/fluely_action_frame_2.png',
-  '/assets/Loading/fluely_action_frame_3.png',
-  '/assets/Loading/fluely_action_frame_4.png',
+  '/assets/Loading/fluely_loading_frame_1.png',
+  '/assets/Loading/fluely_loading_frame_2.png',
+  '/assets/Loading/fluely_loading_frame_3.png',
+  '/assets/Loading/fluely_loading_frame_4.png',
 ] as const;
