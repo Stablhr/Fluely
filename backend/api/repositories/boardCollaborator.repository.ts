@@ -23,6 +23,10 @@ export const boardCollaboratorRepository = {
   find: (boardId: Types.ObjectId, userId: Types.ObjectId) =>
     BoardCollaboratorModel.findOne({boardId, userId}).exec(),
 
+  /** Scoped to the invitee, so one person can never answer another's invitation. */
+  findByIdForUser: (id: string, userId: Types.ObjectId) =>
+    BoardCollaboratorModel.findOne({_id: id, userId}).exec(),
+
   listForBoard: (boardId: Types.ObjectId) =>
     BoardCollaboratorModel.find({boardId}).sort({createdAt: 1}).exec(),
 

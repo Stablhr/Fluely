@@ -7,6 +7,7 @@ type CreateBoardInput = Pick<
   'name' | 'description' | 'ownerId' | 'visibility' | 'background' | 'template' | 'labels'
 > & {
   workspaceId?: Types.ObjectId | null;
+  publicSlug?: string | null;
   settings?: Partial<BoardDocument['settings']>;
 };
 

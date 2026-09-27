@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.exportQuerySchema = exports.activityQuerySchema = exports.captionSchema = exports.retryJobSchema = exports.runDueSchema = exports.socialPostListQuerySchema = exports.socialPostPatchSchema = exports.socialPostCreateSchema = exports.socialAccountPatchSchema = exports.socialAccountCreateSchema = exports.mediaListQuerySchema = exports.shareCreateSchema = exports.invitationCreateSchema = exports.memberPatchSchema = exports.memberCreateSchema = exports.reactionSchema = exports.commentPatchSchema = exports.commentCreateSchema = exports.labelPatchSchema = exports.labelCreateSchema = exports.cardReorderSchema = exports.cardMoveSchema = exports.cardPatchSchema = exports.cardCreateSchema = exports.listReorderSchema = exports.listPatchSchema = exports.listCreateSchema = exports.boardListQuerySchema = exports.boardPatchSchema = exports.boardCreateSchema = exports.inboxListQuerySchema = exports.inboxPatchSchema = exports.inboxCreateSchema = exports.preferencesPatchSchema = exports.preferencesSchema = exports.socialCardParamsSchema = exports.jobIdParamsSchema = exports.postIdParamsSchema = exports.accountIdParamsSchema = exports.inboxIdParamsSchema = exports.mediaIdParamsSchema = exports.tokenParamsSchema = exports.shareIdParamsSchema = exports.invitationIdParamsSchema = exports.memberIdParamsSchema = exports.labelIdParamsSchema = exports.cardIdParamsSchema = exports.listIdParamsSchema = exports.boardIdParamsSchema = exports.paginationQuerySchema = void 0;
+exports.socialPostPatchSchema = exports.socialPostCreateSchema = exports.socialAccountPatchSchema = exports.socialAccountCreateSchema = exports.mediaListQuerySchema = exports.shareCreateSchema = exports.invitationCreateSchema = exports.memberPatchSchema = exports.memberCreateSchema = exports.reactionSchema = exports.commentPatchSchema = exports.commentCreateSchema = exports.labelPatchSchema = exports.labelCreateSchema = exports.cardReorderSchema = exports.cardMoveSchema = exports.cardPatchSchema = exports.cardCreateSchema = exports.listReorderSchema = exports.listPatchSchema = exports.listCreateSchema = exports.boardPublicSlugParamsSchema = exports.invitationRespondSchema = exports.collaboratorIdParamsSchema = exports.collaboratorRolePatchSchema = exports.collaboratorInviteSchema = exports.boardVisibilityPatchSchema = exports.boardListQuerySchema = exports.boardPatchSchema = exports.boardCreateSchema = exports.inboxListQuerySchema = exports.inboxPatchSchema = exports.inboxCreateSchema = exports.preferencesPatchSchema = exports.preferencesSchema = exports.socialCardParamsSchema = exports.jobIdParamsSchema = exports.postIdParamsSchema = exports.accountIdParamsSchema = exports.inboxIdParamsSchema = exports.mediaIdParamsSchema = exports.tokenParamsSchema = exports.shareIdParamsSchema = exports.invitationIdParamsSchema = exports.memberIdParamsSchema = exports.labelIdParamsSchema = exports.cardIdParamsSchema = exports.listIdParamsSchema = exports.boardIdParamsSchema = exports.paginationQuerySchema = void 0;
+exports.exportQuerySchema = exports.activityQuerySchema = exports.captionSchema = exports.retryJobSchema = exports.runDueSchema = exports.socialPostListQuerySchema = void 0;
 exports.isIanaTimezone = isIanaTimezone;
 const zod_1 = require("zod");
 const objectId = zod_1.z.string().regex(/^[a-f\d]{24}$/i, 'Invalid ObjectId');
@@ -100,6 +101,32 @@ exports.boardListQuerySchema = exports.paginationQuerySchema.extend({
     scope: zod_1.z.enum(['accessible', 'discoverable']).default('accessible'),
     search: text(200).optional(),
     visibility: zod_1.z.enum(['private', 'workspace', 'public']).optional()
+});
+/**
+ * Deliberately narrower than `boardPatchSchema`. Visibility has its own
+ * owner-only route, and reusing the general patch schema here would let a
+ * request smuggle name or description changes through the permission check that
+ * guards visibility.
+ */
+exports.boardVisibilityPatchSchema = zod_1.z.object({
+    visibility: zod_1.z.enum(['private', 'workspace', 'public'])
+});
+exports.collaboratorInviteSchema = zod_1.z.object({
+    email: zod_1.z.string().trim().toLowerCase().email().max(320),
+    role: zod_1.z.enum(['editor', 'viewer']).default('viewer')
+});
+exports.collaboratorRolePatchSchema = zod_1.z.object({
+    role: zod_1.z.enum(['editor', 'viewer'])
+});
+exports.collaboratorIdParamsSchema = zod_1.z.object({
+    boardId: objectId,
+    collaboratorId: objectId
+});
+exports.invitationRespondSchema = zod_1.z.object({
+    decision: zod_1.z.enum(['accepted', 'declined'])
+});
+exports.boardPublicSlugParamsSchema = zod_1.z.object({
+    boardPublicSlug: zod_1.z.string().trim().min(6).max(64)
 });
 exports.listCreateSchema = zod_1.z.object({
     name: requiredText(120),

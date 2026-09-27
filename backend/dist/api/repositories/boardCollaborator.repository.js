@@ -9,6 +9,8 @@ exports.boardCollaboratorRepository = {
         ...data
     }),
     find: (boardId, userId) => BoardCollaborator_model_1.BoardCollaboratorModel.findOne({ boardId, userId }).exec(),
+    /** Scoped to the invitee, so one person can never answer another's invitation. */
+    findByIdForUser: (id, userId) => BoardCollaborator_model_1.BoardCollaboratorModel.findOne({ _id: id, userId }).exec(),
     listForBoard: (boardId) => BoardCollaborator_model_1.BoardCollaboratorModel.find({ boardId }).sort({ createdAt: 1 }).exec(),
     /** Accepted collaborations only: the rows that actually grant access. */
     listAcceptedForUser: (userId) => BoardCollaborator_model_1.BoardCollaboratorModel.find({ userId, status: 'accepted' }).exec(),

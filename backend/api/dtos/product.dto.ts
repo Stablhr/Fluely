@@ -29,8 +29,7 @@ export const labelIdParamsSchema = z.object({boardId: objectId, labelId: require
 export const memberIdParamsSchema = z.object({boardId: objectId, memberId: objectId});
 export const invitationIdParamsSchema = z.object({invitationId: objectId});
 export const shareIdParamsSchema = z.object({shareId: objectId});
-export const tokenParamsSchema = z.object({token: requiredText(32)});
-export const mediaIdParamsSchema = z.object({mediaId: objectId});
+export const tokenParamsSchema = z.object({token: requiredText(32)});export const mediaIdParamsSchema = z.object({mediaId: objectId});
 export const inboxIdParamsSchema = z.object({inboxId: objectId});
 export const accountIdParamsSchema = z.object({accountId: objectId});
 export const postIdParamsSchema = z.object({postId: objectId});
@@ -108,6 +107,38 @@ export const boardListQuerySchema = paginationQuerySchema.extend({
   scope: z.enum(['accessible', 'discoverable']).default('accessible'),
   search: text(200).optional(),
   visibility: z.enum(['private', 'workspace', 'public']).optional()
+});
+
+/**
+ * Deliberately narrower than `boardPatchSchema`. Visibility has its own
+ * owner-only route, and reusing the general patch schema here would let a
+ * request smuggle name or description changes through the permission check that
+ * guards visibility.
+ */
+export const boardVisibilityPatchSchema = z.object({
+  visibility: z.enum(['private', 'workspace', 'public'])
+});
+
+export const collaboratorInviteSchema = z.object({
+  email: z.string().trim().toLowerCase().email().max(320),
+  role: z.enum(['editor', 'viewer']).default('viewer')
+});
+
+export const collaboratorRolePatchSchema = z.object({
+  role: z.enum(['editor', 'viewer'])
+});
+
+export const collaboratorIdParamsSchema = z.object({
+  boardId: objectId,
+  collaboratorId: objectId
+});
+
+export const invitationRespondSchema = z.object({
+  decision: z.enum(['accepted', 'declined'])
+});
+
+export const boardPublicSlugParamsSchema = z.object({
+  boardPublicSlug: z.string().trim().min(6).max(64)
 });
 
 export const listCreateSchema = z.object({
