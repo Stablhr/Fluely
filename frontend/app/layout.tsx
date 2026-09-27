@@ -54,8 +54,8 @@ export const metadata: Metadata = {
     images: [
       {
         url: '/assets/fluely_logo.png',
-        width: 589,
-        height: 423,
+        width: 1480,
+        height: 1063,
         alt: 'Fluely'
       }
     ]
