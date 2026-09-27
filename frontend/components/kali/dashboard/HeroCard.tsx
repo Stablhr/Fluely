@@ -73,8 +73,8 @@ export default function HeroCard() {
       >
         <defs>
           <linearGradient id="hero-spark-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" style={{ stopColor: 'var(--color-accent-teal-text)', stopOpacity: 0.28 }} />
-            <stop offset="100%" style={{ stopColor: 'var(--color-accent-teal-text)', stopOpacity: 0 }} />
+            <stop offset="0%" style={{ stopColor: 'var(--color-brand-blue)', stopOpacity: 0.28 }} />
+            <stop offset="100%" style={{ stopColor: 'var(--color-brand-blue)', stopOpacity: 0 }} />
           </linearGradient>
         </defs>
         {points.map((p) => (
@@ -83,7 +83,7 @@ export default function HeroCard() {
             cx={p.x}
             cy={p.y}
             r={2.5}
-            className="fill-accent-teal-text"
+            className="fill-brand-blue"
           >
             <title>{`${p.short} ${new Date(p.iso + 'T00:00:00').getDate()} · ${p.count} task${p.count === 1 ? '' : 's'}`}</title>
           </circle>
@@ -95,7 +95,7 @@ export default function HeroCard() {
           strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="stroke-accent-teal-text"
+          className="stroke-brand-blue"
         />
       </svg>
 
