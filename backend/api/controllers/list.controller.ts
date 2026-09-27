@@ -26,7 +26,7 @@ export const listController = {
 
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      res.status(201).json({list: await listService.create(requireBoard(req), req.body)});
+      res.status(201).json(await listService.create(requireBoard(req), req.body));
     } catch (error) {
       next(error);
     }
@@ -34,9 +34,9 @@ export const listController = {
 
   async update(req: Request, res: Response, next: NextFunction) {
     try {
-      res.status(200).json({
-        list: await listService.update(requireBoard(req), req.params.listId, req.body)
-      });
+      res.status(200).json(
+        await listService.update(requireBoard(req), req.params.listId, req.body)
+      );
     } catch (error) {
       next(error);
     }
@@ -45,8 +45,9 @@ export const listController = {
   async reorder(req: Request, res: Response, next: NextFunction) {
     try {
       const {listOrder, expectedRevision} = req.body;
-      await listService.reorder(requireBoard(req), listOrder, expectedRevision);
-      res.status(200).json({listOrder});
+      res
+        .status(200)
+        .json(await listService.reorder(requireBoard(req), listOrder, expectedRevision));
     } catch (error) {
       next(error);
     }

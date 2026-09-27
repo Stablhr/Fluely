@@ -270,7 +270,7 @@ describe('child writes share the board revision', () => {
   it('reports a conflict when the revision bump matches nothing', async () => {
     // Someone else committed between the client reading revision 4 and this
     // write landing. The card must not be created.
-    mockedBoards.bumpRevision.mockResolvedValue({matchedCount: 0} as never);
+    mockedBoards.bumpRevision.mockResolvedValue(null as never);
     mockedLists.findByIdForBoard.mockResolvedValue(list());
 
     await expect(
@@ -278,6 +278,23 @@ describe('child writes share the board revision', () => {
     ).rejects.toMatchObject({statusCode: 409, code: 'REVISION_CONFLICT'});
 
     expect(mockedLists.create).not.toHaveBeenCalled();
+  });
+
+  it('hands back the new revision so the next write is not a self-conflict', async () => {
+    // Every child write advances the board's counter. A client that kept
+    // sending the revision it started with would have its second write rejected
+    // as a conflict with itself, so the new value has to travel back.
+    mockedBoards.bumpRevision.mockResolvedValue({revision: 5} as never);
+    mockedLists.findByIdForBoard.mockResolvedValue(list());
+    mockedLists.create.mockResolvedValue(list() as never);
+    mockedBoards.update.mockResolvedValue(undefined as never);
+
+    const result = await listService.create(board(4), {
+      name: 'To do',
+      expectedRevision: 4,
+    });
+
+    expect(result.revision).toBe(5);
   });
 
   it('folds the expected revision into the bump so the check cannot be skipped', async () => {

@@ -55,11 +55,16 @@ export const boardRepository = {
    * Conditional revision bump, for writes to a board's children (lists, cards).
    * Takes a filter rather than an id so the revision that was already checked
    * can be folded into the write, which is what makes the bump a compare-and-set
-   * instead of a blind increment. The raw result is returned so the caller can
-   * tell a real bump from a lost race.
+   * instead of a blind increment.
+   *
+   * `findOneAndUpdate` rather than `updateOne` so the new revision comes back in
+   * the same round trip: every child write advances the counter, and a client
+   * that cannot read the new value would have its next write rejected as a
+   * conflict with itself. `new: true` returns the post-increment document; null
+   * means the compare-and-set lost, i.e. somebody else wrote first.
    */
   bumpRevision: (filter: Record<string, unknown>) =>
-    BoardModel.updateOne(filter, {$inc: {revision: 1}}).exec(),
+    BoardModel.findOneAndUpdate(filter, {$inc: {revision: 1}}, {new: true}).exec(),
 
   findWithRevision: (id: string, expectedRevision?: number) => {
     const filter: FilterQuery<BoardDocument> = {_id: id};

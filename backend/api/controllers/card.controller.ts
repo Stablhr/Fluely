@@ -21,7 +21,7 @@ export const cardController = {
 
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      res.status(201).json({card: await cardService.create(requireBoard(req), req.body)});
+      res.status(201).json(await cardService.create(requireBoard(req), req.body));
     } catch (error) {
       next(error);
     }
@@ -29,9 +29,9 @@ export const cardController = {
 
   async update(req: Request, res: Response, next: NextFunction) {
     try {
-      res.status(200).json({
-        card: await cardService.update(requireBoard(req), req.params.cardId, req.body)
-      });
+      res.status(200).json(
+        await cardService.update(requireBoard(req), req.params.cardId, req.body)
+      );
     } catch (error) {
       next(error);
     }
@@ -50,13 +50,14 @@ export const cardController = {
   async reorder(req: Request, res: Response, next: NextFunction) {
     try {
       const {cardOrder, expectedRevision} = req.body;
-      const order = await cardService.reorder(
-        requireBoard(req),
-        req.params.listId,
-        cardOrder,
-        expectedRevision
+      res.status(200).json(
+        await cardService.reorder(
+          requireBoard(req),
+          req.params.listId,
+          cardOrder,
+          expectedRevision
+        )
       );
-      res.status(200).json({cardOrder: order});
     } catch (error) {
       next(error);
     }

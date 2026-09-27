@@ -24,25 +24,32 @@ export function assertBoardRevision(board: BoardDocument, expectedRevision?: num
 }
 
 /**
- * Records a child write against the board's revision.
+ * Records a child write against the board's revision and returns the new value.
  *
  * Conditional on the revision that was checked, so two writers that both read
  * revision 4 cannot both land: the loser's update matches no document and is
  * reported as a conflict instead of silently overwriting the winner.
+ *
+ * The new revision comes back so callers can pass it on to the client. Every
+ * child write advances the counter, and a client that keeps sending the
+ * revision it started with would have its second write rejected as a conflict
+ * with itself -- so the value has to travel with the response, not be guessed
+ * at on the client.
  */
 export async function bumpBoardRevision(
   boardId: Types.ObjectId | string,
   expectedRevision?: number
-): Promise<void> {
+): Promise<number> {
   const filter: Record<string, unknown> = {_id: boardId};
   if (expectedRevision !== undefined) filter.revision = expectedRevision;
 
-  const result = await boardRepository.bumpRevision(filter);
-  if (result.matchedCount === 0) {
+  const updated = await boardRepository.bumpRevision(filter);
+  if (!updated) {
     throw new ApiError(
       409,
       ErrorCodes.REVISION_CONFLICT,
       'This board changed since you loaded it. Refresh and try again.'
     );
   }
+  return updated.revision;
 }

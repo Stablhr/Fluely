@@ -124,7 +124,7 @@ export const cardService = {
     // A card may only be filed under a list on its own board, so the target list
     // is proven before anything is written.
     await requireListForBoard(input.listId, board._id);
-    await bumpBoardRevision(board._id, input.expectedRevision);
+    const revision = await bumpBoardRevision(board._id, input.expectedRevision);
 
     const card = await cardRepository.create({
       boardId: board._id,
@@ -148,12 +148,12 @@ export const cardService = {
       cardOrder: [...(await listOrderOf(input.listId, board._id)), card._id]
     });
 
-    return serializeCard(card);
+    return {card: serializeCard(card), revision};
   },
 
   async update(board: BoardDocument, cardId: string, input: CardInput) {
     await requireCardForBoard(cardId, board._id);
-    await bumpBoardRevision(board._id, input.expectedRevision);
+    const revision = await bumpBoardRevision(board._id, input.expectedRevision);
 
     const patch: Record<string, unknown> = {};
     if (input.title !== undefined) patch.title = input.title;
@@ -182,7 +182,7 @@ export const cardService = {
 
     await cardRepository.update(cardId, board._id, patch);
     const updated = await requireCardForBoard(cardId, board._id);
-    return serializeCard(updated);
+    return {card: serializeCard(updated), revision};
   },
 
   /**
@@ -203,7 +203,7 @@ export const cardService = {
       );
     }
 
-    await bumpBoardRevision(board._id, input.expectedRevision);
+    const revision = await bumpBoardRevision(board._id, input.expectedRevision);
 
     const sameList = card.listId.toString() === targetList._id.toString();
     if (!sameList) {
@@ -227,7 +227,11 @@ export const cardService = {
     await cardRepository.move(cardId, board._id, targetList._id);
 
     const moved = await requireCardForBoard(cardId, board._id);
-    return {card: serializeCard(moved), listId: targetList._id.toString()};
+    return {
+      card: serializeCard(moved),
+      listId: targetList._id.toString(),
+      revision
+    };
   },
 
   /** Sets a list's card order, after checking every id is a card of this board. */
@@ -240,16 +244,16 @@ export const cardService = {
     await requireListForBoard(listId, board._id);
     await assertOrderFitsList(board._id, listId, cardOrder);
 
-    await bumpBoardRevision(board._id, expectedRevision);
+    const revision = await bumpBoardRevision(board._id, expectedRevision);
     await listRepository.update(listId, board._id, {
       cardOrder: cardOrder.map(id => new Types.ObjectId(id))
     });
-    return cardOrder;
+    return {cardOrder, revision};
   },
 
   async remove(board: BoardDocument, cardId: string, expectedRevision?: number) {
     const card = await requireCardForBoard(cardId, board._id);
-    await bumpBoardRevision(board._id, expectedRevision);
+    const revision = await bumpBoardRevision(board._id, expectedRevision);
 
     const order = (await listOrderOf(card.listId.toString(), board._id)).filter(
       id => id.toString() !== cardId
@@ -257,7 +261,7 @@ export const cardService = {
     await listRepository.update(card.listId.toString(), board._id, {cardOrder: order});
     await cardRepository.delete(cardId, board._id);
 
-    return {message: 'Card deleted'};
+    return {message: 'Card deleted', revision};
   }
 };
 

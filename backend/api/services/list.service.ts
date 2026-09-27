@@ -65,7 +65,7 @@ export const listService = {
     // leaves no trace. Bumping first is safe: an over-advanced revision only
     // costs the next client a refresh, whereas the reverse order would leave a
     // list created against a revision nobody holds.
-    await bumpBoardRevision(board._id, input.expectedRevision);
+    const revision = await bumpBoardRevision(board._id, input.expectedRevision);
 
     const list = await listRepository.create({
       boardId: board._id,
@@ -81,12 +81,12 @@ export const listService = {
       listOrder: [...board.listOrder, list._id]
     }, false);
 
-    return serializeList(list);
+    return {list: serializeList(list), revision};
   },
 
   async update(board: BoardDocument, listId: string, input: ListInput) {
     await requireListForBoard(listId, board._id);
-    await bumpBoardRevision(board._id, input.expectedRevision);
+    const revision = await bumpBoardRevision(board._id, input.expectedRevision);
 
     const patch: Record<string, unknown> = {};
     if (input.name !== undefined) patch.name = input.name;
@@ -110,7 +110,7 @@ export const listService = {
 
     await listRepository.update(listId, board._id, patch);
     const updated = await requireListForBoard(listId, board._id);
-    return serializeList(updated);
+    return {list: serializeList(updated), revision};
   },
 
   /** Replaces the board's list order wholesale, after proving every id is ours. */
@@ -130,14 +130,14 @@ export const listService = {
       );
     }
 
-    await bumpBoardRevision(board._id, expectedRevision);
+    const revision = await bumpBoardRevision(board._id, expectedRevision);
     await boardRepository.update(board._id.toString(), {listOrder: ids}, false);
-    return ids.map(id => id.toString());
+    return {listOrder: ids.map(id => id.toString()), revision};
   },
 
   async remove(board: BoardDocument, listId: string, expectedRevision?: number) {
     await requireListForBoard(listId, board._id);
-    await bumpBoardRevision(board._id, expectedRevision);
+    const revision = await bumpBoardRevision(board._id, expectedRevision);
 
     // Drop the list from the board's order, or the board keeps pointing at a
     // list that no longer exists.
@@ -149,6 +149,6 @@ export const listService = {
     );
 
     await listRepository.delete(listId, board._id);
-    return {message: 'List deleted'};
+    return {message: 'List deleted', revision};
   }
 };
