@@ -68,8 +68,24 @@ const BoardSchema = new Schema<BoardDocument>(
   {timestamps: true}
 );
 
-// Only public boards are addressable by slug, and each slug must be unique.
-BoardSchema.index({publicSlug: 1}, {unique: true, sparse: true});
+/**
+ * Only public boards are addressable by slug, and each slug must be unique.
+ *
+ * The filter matters more than it looks. A plain `sparse` unique index does not
+ * do what it appears to: sparse skips documents where the field is *absent*, not
+ * where it is explicitly `null`. Every private board stores `publicSlug: null`,
+ * so a sparse unique index allows exactly one private board and rejects the
+ * second with E11000. Restricting the index to actual strings keeps slugs unique
+ * while leaving any number of unpublished boards alone.
+ *
+ * Existing deployments still carry the old index; see
+ * `scripts/fix-public-slug-index.ts`, which must run once before this takes
+ * effect.
+ */
+BoardSchema.index(
+  {publicSlug: 1},
+  {unique: true, partialFilterExpression: {publicSlug: {$type: 'string'}}}
+);
 // Drives the "workspace boards" listing.
 BoardSchema.index({workspaceId: 1, visibility: 1});
 

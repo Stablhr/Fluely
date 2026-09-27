@@ -7,6 +7,11 @@ import {
   isPubliclyAddressable,
   resolveAccessLevel
 } from './boardAccess.service';
+import {assertBoardRevision} from './boardRevision';
+import {listRepository} from '../repositories/list.repository';
+import {cardRepository} from '../repositories/card.repository';
+import {listService} from './list.service';
+import {cardService} from './card.service';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
 import {createPublicSlug} from '../utils/slug';
@@ -95,13 +100,7 @@ function serializeBoard(board: BoardRow) {
 
 /** Rejects a stale write rather than silently clobbering a concurrent change. */
 function assertRevision(board: BoardDocument, expectedRevision?: number) {
-  if (expectedRevision !== undefined && board.revision !== expectedRevision) {
-    throw new ApiError(
-      409,
-      ErrorCodes.REVISION_CONFLICT,
-      'This board changed since you loaded it. Refresh and try again.'
-    );
-  }
+  assertBoardRevision(board, expectedRevision);
 }
 
 async function primaryWorkspaceId(actor: Actor): Promise<Types.ObjectId | null> {
@@ -244,6 +243,35 @@ export const boardService = {
 
   async get(board: BoardDocument, level: BoardAccessLevel) {
     return serializeBoard(toRow(board, level));
+  },
+
+  /**
+   * The board's children in one response.
+   *
+   * Separate from `get` on purpose: a rename should not drag every card with it,
+   * and the client can refresh the shell and the children independently. The
+   * board's `listOrder` is authoritative for lists, so the lists come back in
+   * that order rather than by their own `position`.
+   */
+  async structure(board: BoardDocument) {
+    const [lists, cards] = await Promise.all([
+      listRepository.listByBoard(board._id),
+      cardRepository.listByBoard(board._id)
+    ]);
+
+    const byPosition = new Map(lists.map(list => [list._id.toString(), list]));
+    const ordered = (board.listOrder ?? [])
+      .map(id => byPosition.get(id.toString()))
+      .filter((list): list is NonNullable<typeof list> => Boolean(list));
+
+    // Anything the order array does not mention still belongs to the board;
+    // dropping it would hide real work.
+    const orphans = lists.filter(list => !board.listOrder.some(id => id.equals(list._id)));
+
+    return {
+      lists: [...ordered, ...orphans].map(listService.serialize),
+      cards: cards.map(cardService.serialize)
+    };
   },
 
   async update(board: BoardDocument, input: UpdateBoardInput, level: BoardAccessLevel) {

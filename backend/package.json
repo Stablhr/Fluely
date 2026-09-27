@@ -8,6 +8,7 @@
     "dev": "tsx watch index.ts",
     "start": "node dist/index.js",
     "seed:admin": "tsx scripts/seed-admin.ts",
+    "fix:slug-index": "tsx scripts/fix-public-slug-index.ts",
     "lint": "eslint .",
     "test": "jest"
   },

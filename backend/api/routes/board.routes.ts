@@ -1,6 +1,8 @@
 import {Router} from 'express';
 import {boardController} from '../controllers/board.controller';
 import {boardCollaboratorController} from '../controllers/boardCollaborator.controller';
+import {listController} from '../controllers/list.controller';
+import {cardController} from '../controllers/card.controller';
 import {validateRequest} from '../middleware/validation';
 import {requireAuth, requireUser} from '../middleware/auth';
 import {requireBoardAccess} from '../middleware/boardAccess';
@@ -12,11 +14,20 @@ import {
   boardPatchSchema,
   boardPublicSlugParamsSchema,
   boardVisibilityPatchSchema,
+  cardCreateSchema,
+  cardIdParamsSchema,
+  cardMoveSchema,
+  cardPatchSchema,
+  cardReorderSchema,
   collaboratorIdParamsSchema,
   collaboratorInviteSchema,
   collaboratorRolePatchSchema,
   invitationIdParamsSchema,
-  invitationRespondSchema
+  invitationRespondSchema,
+  listCreateSchema,
+  listIdParamsSchema,
+  listPatchSchema,
+  listReorderSchema
 } from '../dtos/product.dto';
 
 const router = Router();
@@ -97,6 +108,106 @@ router.patch(
   validateRequest({params: boardIdParamsSchema, body: boardVisibilityPatchSchema}),
   requireBoardAccess('owner'),
   boardController.setVisibility
+);
+
+// ── Structure (lists and cards in one read) ───────────────────────
+router.get(
+  '/:boardId/structure',
+  authReadLimiter,
+  validateRequest({params: boardIdParamsSchema}),
+  requireBoardAccess('read'),
+  boardController.structure
+);
+
+// ── Lists ─────────────────────────────────────────────────────────
+router.get(
+  '/:boardId/lists',
+  authReadLimiter,
+  validateRequest({params: boardIdParamsSchema}),
+  requireBoardAccess('read'),
+  listController.list
+);
+
+router.post(
+  '/:boardId/lists',
+  authActionLimiter,
+  validateRequest({params: boardIdParamsSchema, body: listCreateSchema}),
+  requireBoardAccess('write'),
+  listController.create
+);
+
+router.patch(
+  '/:boardId/list-order',
+  authActionLimiter,
+  validateRequest({params: boardIdParamsSchema, body: listReorderSchema}),
+  requireBoardAccess('write'),
+  listController.reorder
+);
+
+router.patch(
+  '/:boardId/lists/:listId',
+  authActionLimiter,
+  validateRequest({params: listIdParamsSchema, body: listPatchSchema}),
+  requireBoardAccess('write'),
+  listController.update
+);
+
+router.delete(
+  '/:boardId/lists/:listId',
+  authActionLimiter,
+  validateRequest({params: listIdParamsSchema}),
+  requireBoardAccess('write'),
+  listController.remove
+);
+
+// ── Cards ─────────────────────────────────────────────────────────
+router.get(
+  '/:boardId/cards',
+  authReadLimiter,
+  validateRequest({params: boardIdParamsSchema}),
+  requireBoardAccess('read'),
+  cardController.list
+);
+
+router.post(
+  '/:boardId/cards',
+  authActionLimiter,
+  validateRequest({params: boardIdParamsSchema, body: cardCreateSchema}),
+  requireBoardAccess('write'),
+  cardController.create
+);
+
+router.patch(
+  '/:boardId/lists/:listId/card-order',
+  authActionLimiter,
+  validateRequest({params: listIdParamsSchema, body: cardReorderSchema}),
+  requireBoardAccess('write'),
+  cardController.reorder
+);
+
+router.patch(
+  '/:boardId/cards/:cardId',
+  authActionLimiter,
+  validateRequest({params: cardIdParamsSchema, body: cardPatchSchema}),
+  requireBoardAccess('write'),
+  cardController.update
+);
+
+/** Declared after the PATCH so "move" is never read as a card id. */
+router.post(
+  '/:boardId/cards/:cardId/move',
+  authActionLimiter,
+  validateRequest({params: cardIdParamsSchema, body: cardMoveSchema}),
+  requireBoardAccess('write'),
+  cardController.move
+);
+
+router.delete(
+  '/:boardId/cards/:cardId',
+  authActionLimiter,
+  validateRequest({params: cardIdParamsSchema}),
+  requireBoardAccess('write'),
+  cardController.remove
 );
 
 // ── Collaborators ─────────────────────────────────────────────────

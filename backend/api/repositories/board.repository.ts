@@ -51,6 +51,16 @@ export const boardRepository = {
   setPublicSlug: (id: string, publicSlug: string | null) =>
     BoardModel.updateOne({_id: id}, {publicSlug, $inc: {revision: 1}}).exec(),
 
+  /**
+   * Conditional revision bump, for writes to a board's children (lists, cards).
+   * Takes a filter rather than an id so the revision that was already checked
+   * can be folded into the write, which is what makes the bump a compare-and-set
+   * instead of a blind increment. The raw result is returned so the caller can
+   * tell a real bump from a lost race.
+   */
+  bumpRevision: (filter: Record<string, unknown>) =>
+    BoardModel.updateOne(filter, {$inc: {revision: 1}}).exec(),
+
   findWithRevision: (id: string, expectedRevision?: number) => {
     const filter: FilterQuery<BoardDocument> = {_id: id};
     if (expectedRevision !== undefined) filter.revision = expectedRevision;

@@ -9,6 +9,7 @@ import {
 import {Actor} from '../api/utils/actor';
 import {ActorType, BoardVisibility} from '../api/constants/product';
 import {Types} from 'mongoose';
+import {BoardModel} from '../api/models/Board.model';
 
 const OWNER = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaa1');
 const EDITOR = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaa2');
@@ -204,5 +205,24 @@ describe('isPubliclyAddressable', () => {
     expect(isPubliclyAddressable({visibility: 'public', publicSlug: null})).toBe(false);
     expect(isPubliclyAddressable({visibility: 'private', publicSlug: 'abc'})).toBe(false);
     expect(isPubliclyAddressable({visibility: 'workspace', publicSlug: 'abc'})).toBe(false);
+  });
+});
+
+describe('Board.publicSlug index', () => {
+  it('is a partial index, not a sparse one', () => {
+    // A sparse unique index skips documents where the field is *absent*, not
+    // where it is explicitly null. Every unpublished board stores null, so a
+    // sparse index permits exactly one private board and rejects the second with
+    // E11000 -- which surfaced as a 500 on "create board".
+    const index = BoardModel.schema
+      .indexes()
+      .find(([fields]) => fields.publicSlug === 1);
+
+    expect(index).toBeDefined();
+    const [, options] = index as [Record<string, 1>, Record<string, unknown>];
+
+    expect(options.unique).toBe(true);
+    expect(options.sparse).toBeUndefined();
+    expect(options.partialFilterExpression).toEqual({publicSlug: {$type: 'string'}});
   });
 });

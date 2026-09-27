@@ -53,6 +53,16 @@ export const boardController = {
     }
   },
 
+  /** Lists and cards together, for a client refreshing a board's contents. */
+  async structure(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const {board} = requireBoard(_req);
+      res.status(200).json(await boardService.structure(board));
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async update(req: Request, res: Response, next: NextFunction) {
     try {
       const {board, level} = requireBoard(req);
