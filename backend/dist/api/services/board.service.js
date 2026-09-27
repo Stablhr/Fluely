@@ -173,7 +173,8 @@ exports.boardService = {
      * have instead of orphaning them. The read path ignores the slug unless
      * visibility is still 'public', which is what revokes them.
      */
-    async setVisibility(board, visibility) {
+    async setVisibility(board, visibility, expectedRevision) {
+        assertRevision(board, expectedRevision);
         if (visibility === 'workspace' && !board.workspaceId) {
             throw new error_1.ApiError(400, errorCodes_1.ErrorCodes.VALIDATION_ERROR, 'This board is not in a workspace, so it cannot be shared with one');
         }

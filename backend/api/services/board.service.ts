@@ -274,7 +274,13 @@ export const boardService = {
    * have instead of orphaning them. The read path ignores the slug unless
    * visibility is still 'public', which is what revokes them.
    */
-  async setVisibility(board: BoardDocument, visibility: BoardVisibility) {
+  async setVisibility(
+    board: BoardDocument,
+    visibility: BoardVisibility,
+    expectedRevision?: number
+  ) {
+    assertRevision(board, expectedRevision);
+
     if (visibility === 'workspace' && !board.workspaceId) {
       throw new ApiError(
         400,

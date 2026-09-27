@@ -116,7 +116,8 @@ export const boardListQuerySchema = paginationQuerySchema.extend({
  * guards visibility.
  */
 export const boardVisibilityPatchSchema = z.object({
-  visibility: z.enum(['private', 'workspace', 'public'])
+  visibility: z.enum(['private', 'workspace', 'public']),
+  expectedRevision: z.number().int().positive().optional()
 });
 
 export const collaboratorInviteSchema = z.object({

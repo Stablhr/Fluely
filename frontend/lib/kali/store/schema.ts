@@ -12,18 +12,61 @@ export interface Label {
   color: string
 }
 
-export type ShareRole = 'admin' | 'member' | 'observer'
+/**
+ * The board access ladder, mirroring the server's own resolver in
+ * `backend/api/services/boardAccess.service.ts`.
+ *
+ * The client copy is a display and gating aid, not a permission: every route
+ * re-checks on the server. It exists so the UI can grey out controls instead of
+ * offering an action that is guaranteed to 403.
+ */
+export type BoardAccessLevel =
+  | 'owner'
+  | 'editor'
+  | 'viewer'
+  | 'workspace-view'
+  | 'public-view'
+  | 'none'
 
-export interface Share {
-  id: string
-  name: string
-  role: ShareRole
+/** Access levels permitted to change board content. Mirrors the server's own set. */
+const WRITE_ACCESS_LEVELS: ReadonlySet<BoardAccessLevel> = new Set([
+  'owner',
+  'editor',
+])
+
+/** Access levels permitted to change visibility, membership, or delete. */
+const MANAGE_ACCESS_LEVELS: ReadonlySet<BoardAccessLevel> = new Set(['owner'])
+
+export function canWriteBoard(access: BoardAccessLevel): boolean {
+  return WRITE_ACCESS_LEVELS.has(access)
 }
 
-export interface ShareLink {
-  token: string
-  enabled: boolean
-  createdAt: string
+export function canManageBoard(access: BoardAccessLevel): boolean {
+  return MANAGE_ACCESS_LEVELS.has(access)
+}
+
+/** Collaborator roles. `editor` can write, `viewer` is read-only. */
+export type CollaboratorRole = 'editor' | 'viewer'
+
+export type CollaboratorStatus = 'pending' | 'accepted' | 'declined'
+
+/**
+ * A person invited to a board.
+ *
+ * `id` is the collaborator row id — the one the role and remove routes take —
+ * while `userId` identifies the account. They differ because one user can hold
+ * exactly one row per board, and the row is what carries role and status.
+ */
+export interface Collaborator {
+  id: string
+  userId: string
+  name: string
+  email: string
+  role: CollaboratorRole
+  status: CollaboratorStatus
+  invitedByName: string
+  invitedAt: string
+  respondedAt: string | null
 }
 
 export interface FileAttachment {
@@ -74,8 +117,22 @@ export interface Board {
   updatedAt: string
   listOrder: string[]
   labels: Record<string, Label>
-  shares: Share[]
-  shareLink?: ShareLink
+  collaborators: Collaborator[]
+  /**
+   * What the signed-in person may do with this board.
+   *
+   * `owner` is also the value given to a board that has never left this
+   * browser, so local-only boards stay fully editable until they are imported.
+   */
+  access: BoardAccessLevel
+  /** Null while the board is local-only. */
+  ownerId: string | null
+  /** Null while local-only, or for a personal board with no workspace. */
+  workspaceId: string | null
+  /** The addressable handle, present only while `visibility` is `public`. */
+  publicSlug: string | null
+  /** Server-side optimistic-concurrency counter; null while local-only. */
+  revision: number | null
   settings: BoardSettings
   activity: ActivityItem[]
   archivedLists: ArchivedList[]

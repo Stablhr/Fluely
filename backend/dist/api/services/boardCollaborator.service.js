@@ -129,17 +129,28 @@ exports.boardCollaboratorService = {
     async listPendingForUser(actor) {
         const rows = await boardCollaborator_repository_1.boardCollaboratorRepository.listPendingForUser(actor.actorId);
         const boards = await board_repository_1.boardRepository.listByIds(rows.map(row => row.boardId));
-        const owners = await Promise.all(boards.map(board => user_repository_1.userRepository.findById(board.ownerId.toString())));
-        const boardNameById = new Map(boards.map(board => [board._id.toString(), board.name]));
-        return rows.map((row, index) => ({
-            id: row._id.toString(),
-            boardId: row.boardId.toString(),
-            boardName: boardNameById.get(row.boardId.toString()) ?? '',
-            role: row.role,
-            invitedAt: row.invitedAt,
-            invitedByName: owners[index]
-                ? `${owners[index].firstName} ${owners[index].lastName}`.trim()
-                : ''
-        }));
+        // Keyed lookups rather than index arithmetic: `listByIds` is a $in query, so
+        // its result order is Mongo's to choose and need not match the order of
+        // `rows`. Indexing the owners positionally could therefore attribute one
+        // board's owner to a different invitation.
+        const boardById = new Map(boards.map(board => [board._id.toString(), board]));
+        const ownerNameByBoardId = new Map(await Promise.all(boards.map(async (board) => {
+            const owner = await user_repository_1.userRepository.findById(board.ownerId.toString());
+            return [
+                board._id.toString(),
+                owner ? `${owner.firstName} ${owner.lastName}`.trim() : ''
+            ];
+        })));
+        return rows.map(row => {
+            const boardId = row.boardId.toString();
+            return {
+                id: row._id.toString(),
+                boardId,
+                boardName: boardById.get(boardId)?.name ?? '',
+                role: row.role,
+                invitedAt: row.invitedAt,
+                invitedByName: ownerNameByBoardId.get(boardId) ?? ''
+            };
+        });
     }
 };

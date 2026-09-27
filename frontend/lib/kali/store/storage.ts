@@ -4,6 +4,15 @@ import { emptyData } from './schema'
 const STORAGE_KEY = 'kali_data'
 const SCHEMA_VERSION = 1
 
+/**
+ * Fills in fields added after a board was first written to storage.
+ *
+ * Deliberately additive and deliberately does *not* bump SCHEMA_VERSION:
+ * `loadData` throws away everything on a version mismatch, so a bump would
+ * silently delete every board, card, and attachment any existing user has. The
+ * collaboration fields below are all new, so old boards simply take defaults
+ * and keep working.
+ */
 function migrateBoard(board: Board): void {
   if (!board.settings) {
     board.settings = { commentPermission: 'members', selfJoin: false }
@@ -14,9 +23,21 @@ function migrateBoard(board: Board): void {
   if (!Array.isArray(board.archivedLists)) {
     board.archivedLists = []
   }
-  if (!Array.isArray(board.shares)) {
-    board.shares = []
+  // Replaces the old free-form `shares` array, which held names the server never
+  // knew about. Dropping it here is safe: those entries were decorative.
+  if (!Array.isArray(board.collaborators)) {
+    board.collaborators = []
   }
+  delete (board as Partial<Board> & { shares?: unknown; shareLink?: unknown }).shares
+  delete (board as Partial<Board> & { shareLink?: unknown }).shareLink
+  // A board that only ever existed in this browser is fully the user's to edit.
+  if (!board.access) {
+    board.access = 'owner'
+  }
+  if (board.ownerId === undefined) board.ownerId = null
+  if (board.workspaceId === undefined) board.workspaceId = null
+  if (board.publicSlug === undefined) board.publicSlug = null
+  if (board.revision === undefined) board.revision = null
 }
 
 export function loadData(): AppData {

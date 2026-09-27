@@ -109,7 +109,8 @@ exports.boardListQuerySchema = exports.paginationQuerySchema.extend({
  * guards visibility.
  */
 exports.boardVisibilityPatchSchema = zod_1.z.object({
-    visibility: zod_1.z.enum(['private', 'workspace', 'public'])
+    visibility: zod_1.z.enum(['private', 'workspace', 'public']),
+    expectedRevision: zod_1.z.number().int().positive().optional()
 });
 exports.collaboratorInviteSchema = zod_1.z.object({
     email: zod_1.z.string().trim().toLowerCase().email().max(320),

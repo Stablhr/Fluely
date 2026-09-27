@@ -71,6 +71,32 @@ export function getFriendlyErrorMessage(
         return 'Too many requests. Please wait a moment and try again.';
       case 'NETWORK_ERROR':
         return 'Network error. Please check your connection and try again.';
+
+      /* Boards, collaboration, and workspaces. */
+      case 'BOARD_NOT_FOUND':
+        return 'That board no longer exists, or you no longer have access to it.';
+      case 'COLLABORATOR_NOT_FOUND':
+        return 'That person is no longer a collaborator on this board.';
+      case 'COLLABORATOR_EXISTS':
+        return 'That person is already a collaborator on this board.';
+      case 'CANNOT_INVITE_SELF':
+        return 'You cannot invite yourself to a board you already own.';
+      case 'CANNOT_MODIFY_OWNER':
+        return "The board owner's access cannot be changed.";
+      case 'REVISION_CONFLICT':
+        return 'Someone else changed this board while you were editing. Reload to see their changes.';
+      case 'WORKSPACE_NOT_FOUND':
+        return 'That workspace no longer exists.';
+      case 'WORKSPACE_MEMBER_EXISTS':
+        return 'That person is already a member of this workspace.';
+      case 'QUOTA_EXCEEDED':
+        return 'Storage quota reached. Delete some files and try again.';
+      case 'UNSUPPORTED_MEDIA_TYPE':
+        return 'That file type is not supported.';
+      case 'FILE_TOO_LARGE':
+        return 'That file is too large to upload.';
+      case 'VALIDATION_ERROR':
+        return 'Please check the details you entered and try again.';
       default:
         break;
     }

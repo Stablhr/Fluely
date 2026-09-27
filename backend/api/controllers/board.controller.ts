@@ -67,7 +67,11 @@ export const boardController = {
     try {
       const {board} = requireBoard(req);
       res.status(200).json({
-        board: await boardService.setVisibility(board, req.body.visibility)
+        board: await boardService.setVisibility(
+        board,
+        req.body.visibility,
+        req.body.expectedRevision
+      )
       });
     } catch (error) {
       next(error);
