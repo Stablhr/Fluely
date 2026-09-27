@@ -1,8 +1,8 @@
-import type { AppData, Board, SocialPost, SocialPostPlatform } from './schema'
-import { emptyData } from './schema'
+import type { AppData, Board, SocialPost, SocialPostPlatform } from "./schema";
+import { emptyData } from "./schema";
 
-const STORAGE_KEY = 'kali_data'
-const SCHEMA_VERSION = 1
+const STORAGE_KEY = "kali_data";
+const SCHEMA_VERSION = 1;
 
 /**
  * Fills in fields added after a board was first written to storage.
@@ -15,62 +15,67 @@ const SCHEMA_VERSION = 1
  */
 function migrateBoard(board: Board): void {
   if (!board.settings) {
-    board.settings = { commentPermission: 'members', selfJoin: false }
+    board.settings = { commentPermission: "members", selfJoin: false };
   }
   if (!Array.isArray(board.activity)) {
-    board.activity = []
+    board.activity = [];
   }
   if (!Array.isArray(board.archivedLists)) {
-    board.archivedLists = []
+    board.archivedLists = [];
   }
   // Replaces the old free-form `shares` array, which held names the server never
   // knew about. Dropping it here is safe: those entries were decorative.
   if (!Array.isArray(board.collaborators)) {
-    board.collaborators = []
+    board.collaborators = [];
   }
-  delete (board as Partial<Board> & { shares?: unknown; shareLink?: unknown }).shares
-  delete (board as Partial<Board> & { shareLink?: unknown }).shareLink
+  delete (board as Partial<Board> & { shares?: unknown; shareLink?: unknown })
+    .shares;
+  delete (board as Partial<Board> & { shareLink?: unknown }).shareLink;
   // A board that only ever existed in this browser is fully the user's to edit.
   if (!board.access) {
-    board.access = 'owner'
+    board.access = "owner";
   }
-  if (board.ownerId === undefined) board.ownerId = null
-  if (board.workspaceId === undefined) board.workspaceId = null
-  if (board.publicSlug === undefined) board.publicSlug = null
-  if (board.revision === undefined) board.revision = null
+  if (board.ownerId === undefined) board.ownerId = null;
+  if (board.workspaceId === undefined) board.workspaceId = null;
+  if (board.publicSlug === undefined) board.publicSlug = null;
+  if (board.revision === undefined) board.revision = null;
 }
 
 export function loadData(): AppData {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return emptyData()
-    const parsed = JSON.parse(raw) as AppData
-    if (!parsed || typeof parsed !== 'object' || parsed.version !== SCHEMA_VERSION) {
-      return emptyData()
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return emptyData();
+    const parsed = JSON.parse(raw) as AppData;
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      parsed.version !== SCHEMA_VERSION
+    ) {
+      return emptyData();
     }
-    if (!parsed.ui) parsed.ui = emptyData().ui
+    if (!parsed.ui) parsed.ui = emptyData().ui;
     for (const board of Object.values(parsed.boards)) {
-      migrateBoard(board)
+      migrateBoard(board);
     }
-    return parsed
+    return parsed;
   } catch {
-    return emptyData()
+    return emptyData();
   }
 }
 
 export function saveData(data: AppData): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
     throw new Error(
-      'Could not save — browser storage is full. Remove large attachments or reset data to continue.',
-    )
+      "Could not save — browser storage is full. Remove large attachments or reset data to continue.",
+    );
   }
 }
 
 export function clearData(): void {
   try {
-    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(STORAGE_KEY);
   } catch {
     // ignore
   }
@@ -78,77 +83,86 @@ export function clearData(): void {
 
 /* ── Social Posts persistence ─────────────────────────────── */
 
-const SOCIAL_POSTS_KEY = 'kali-social-posts'
-const SOCIAL_POSTS_VERSION = 1
+const SOCIAL_POSTS_KEY = "kali-social-posts";
+const SOCIAL_POSTS_VERSION = 1;
 
-function migrateSocialPostPlatform(p: Record<string, unknown>): SocialPostPlatform {
+function migrateSocialPostPlatform(
+  p: Record<string, unknown>,
+): SocialPostPlatform {
   return {
-    platform: (p.platform as SocialPostPlatform['platform']) ?? 'facebook',
+    platform: (p.platform as SocialPostPlatform["platform"]) ?? "facebook",
     enabled: p.enabled !== false,
-    status: (p.status as SocialPostPlatform['status']) ?? 'pending',
-    caption: (p.caption as string) ?? '',
+    status: (p.status as SocialPostPlatform["status"]) ?? "pending",
+    caption: (p.caption as string) ?? "",
     hashtags: Array.isArray(p.hashtags) ? (p.hashtags as string[]) : [],
     mentions: Array.isArray(p.mentions) ? (p.mentions as string[]) : [],
     location: p.location as string | undefined,
     altText: p.altText as string | undefined,
-    visibility: (p.visibility as SocialPostPlatform['visibility']) ?? 'public',
+    visibility: (p.visibility as SocialPostPlatform["visibility"]) ?? "public",
     deepLink: p.deepLink as string | undefined,
     publishedUrl: p.publishedUrl as string | undefined,
     platformPostId: p.platformPostId as string | undefined,
     error: p.error as string | undefined,
     publishedAt: p.publishedAt as string | undefined,
-  }
+  };
 }
 
 function migrateSocialPosts(data: unknown): SocialPost[] {
-  if (!Array.isArray(data)) return []
+  if (!Array.isArray(data)) return [];
   return data.map((post: Record<string, unknown>) => {
     const migrated: SocialPost = {
-      id: (post.id as string) ?? '',
-      title: (post.title as string) ?? '',
-      caption: (post.caption as string) ?? '',
+      id: (post.id as string) ?? "",
+      title: (post.title as string) ?? "",
+      caption: (post.caption as string) ?? "",
       platforms: Array.isArray(post.platforms)
-        ? (post.platforms as Record<string, unknown>[]).map(migrateSocialPostPlatform)
+        ? (post.platforms as Record<string, unknown>[]).map(
+            migrateSocialPostPlatform,
+          )
         : [],
-      media: Array.isArray(post.media) ? (post.media as SocialPost['media']) : [],
+      media: Array.isArray(post.media)
+        ? (post.media as SocialPost["media"])
+        : [],
       cardId: post.cardId as string | undefined,
       scheduledDate: post.scheduledDate as string | undefined,
       scheduledTime: post.scheduledTime as string | undefined,
-      status: (post.status as SocialPost['status']) ?? 'draft',
-      repeat: (post.repeat as SocialPost['repeat']) ?? 'none',
+      status: (post.status as SocialPost["status"]) ?? "draft",
+      repeat: (post.repeat as SocialPost["repeat"]) ?? "none",
       repeatUntil: post.repeatUntil as string | undefined,
-      analytics: Array.isArray(post.analytics) ? (post.analytics as SocialPost['analytics']) : undefined,
-      aiGeneration: (post.aiGeneration as SocialPost['aiGeneration']) ?? undefined,
+      analytics: Array.isArray(post.analytics)
+        ? (post.analytics as SocialPost["analytics"])
+        : undefined,
+      aiGeneration:
+        (post.aiGeneration as SocialPost["aiGeneration"]) ?? undefined,
       tags: Array.isArray(post.tags) ? (post.tags as string[]) : [],
       createdAt: (post.createdAt as string) ?? new Date().toISOString(),
       updatedAt: (post.updatedAt as string) ?? new Date().toISOString(),
-    }
-    return migrated
-  })
+    };
+    return migrated;
+  });
 }
 
 export function loadSocialPosts(): SocialPost[] {
   try {
-    const raw = localStorage.getItem(SOCIAL_POSTS_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as { version?: number; data?: unknown }
-    if (!parsed || typeof parsed !== 'object') return []
+    const raw = localStorage.getItem(SOCIAL_POSTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as { version?: number; data?: unknown };
+    if (!parsed || typeof parsed !== "object") return [];
     if (parsed.version !== SOCIAL_POSTS_VERSION) {
-      return migrateSocialPosts(parsed.data)
+      return migrateSocialPosts(parsed.data);
     }
-    return Array.isArray(parsed.data) ? (parsed.data as SocialPost[]) : []
+    return Array.isArray(parsed.data) ? (parsed.data as SocialPost[]) : [];
   } catch {
-    return []
+    return [];
   }
 }
 
 export function saveSocialPosts(posts: SocialPost[]): void {
   try {
-    const payload = { version: SOCIAL_POSTS_VERSION, data: posts }
-    localStorage.setItem(SOCIAL_POSTS_KEY, JSON.stringify(payload))
+    const payload = { version: SOCIAL_POSTS_VERSION, data: posts };
+    localStorage.setItem(SOCIAL_POSTS_KEY, JSON.stringify(payload));
   } catch {
     throw new Error(
-      'Could not save social posts — browser storage is full. Remove large media attachments to continue.',
-    )
+      "Could not save social posts — browser storage is full. Remove large media attachments to continue.",
+    );
   }
 }

@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import {useEffect} from 'react';
-import {useRouter} from 'next/navigation';
-import {AlertTriangle, X} from 'lucide-react';
-import {useMeQuery} from '@/lib/hooks/auth/useMeQuery';
-import {getDisplayName, type AuthUser} from '@/lib/api/authApi';
-import {getDashboardPath} from '@/lib/auth/redirects';
-import {StoreProvider} from '@/lib/kali/store/StoreProvider';
-import {useStore} from '@/lib/kali/store/useStore';
-import AppShell from '@/components/kali/layout/AppShell';
-import ErrorBoundary from '@/components/kali/shared/ErrorBoundary';
-import ToastProvider from '@/components/kali/shared/Toast';
-import Loading from '../loading';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, X } from "lucide-react";
+import { useMeQuery } from "@/lib/hooks/auth/useMeQuery";
+import { getDisplayName, type AuthUser } from "@/lib/api/authApi";
+import { getDashboardPath } from "@/lib/auth/redirects";
+import { StoreProvider } from "@/lib/kali/store/StoreProvider";
+import { useStore } from "@/lib/kali/store/useStore";
+import AppShell from "@/components/kali/layout/AppShell";
+import ErrorBoundary from "@/components/kali/shared/ErrorBoundary";
+import ToastProvider from "@/components/kali/shared/Toast";
+import Loading from "../loading";
 
 function ErrorToast() {
-  const {error, dismissError} = useStore();
+  const { error, dismissError } = useStore();
   if (!error) return null;
 
   return (
@@ -48,19 +48,19 @@ function AuthGate({
   children: (user: AuthUser) => React.ReactNode;
 }) {
   const router = useRouter();
-  const {data, isLoading, isFetching, isError, isSuccess} = useMeQuery();
+  const { data, isLoading, isFetching, isError, isSuccess } = useMeQuery();
 
-  const isRedirecting = isError || (isSuccess && data.user.type !== 'user');
+  const isRedirecting = isError || (isSuccess && data.user.type !== "user");
 
   useEffect(() => {
     if (isError) {
-      router.replace('/sign-in');
+      router.replace("/sign-in");
       return;
     }
 
     if (!isSuccess) return;
 
-    if (data.user.type !== 'user') {
+    if (data.user.type !== "user") {
       router.replace(getDashboardPath(data.user.type));
     }
   }, [data, isError, isSuccess, router]);
@@ -70,7 +70,7 @@ function AuthGate({
   return <>{children(data.user)}</>;
 }
 
-function AppFrame({children}: {children: React.ReactNode}) {
+function AppFrame({ children }: { children: React.ReactNode }) {
   return (
     <div className="kali-app">
       <AppShell>
@@ -81,11 +81,17 @@ function AppFrame({children}: {children: React.ReactNode}) {
   );
 }
 
-export default function AppLayout({children}: {children: React.ReactNode}) {
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGate>
       {(user) => (
-        <StoreProvider currentUserName={getDisplayName(user)}>
+        <StoreProvider
+          currentUser={{
+            id: user.id,
+            name: getDisplayName(user),
+            workspaceId: user.workspaceId ?? null,
+          }}
+        >
           <ToastProvider>
             <AppFrame>{children}</AppFrame>
           </ToastProvider>

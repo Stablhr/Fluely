@@ -1,37 +1,53 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Check, X } from 'lucide-react'
-import { BOARD_TEMPLATES } from '@/lib/kali/store/schema'
-import { useStore } from '@/lib/kali/store/useStore'
-import Modal from '../shared/Modal'
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Check, X } from "lucide-react";
+import { BOARD_TEMPLATES } from "@/lib/kali/store/schema";
+import { useStore } from "@/lib/kali/store/useStore";
+import Modal from "../shared/Modal";
 
 interface CreateBoardModalProps {
-  open: boolean
-  onClose: () => void
+  open: boolean;
+  onClose: () => void;
 }
 
-export default function CreateBoardModal({ open, onClose }: CreateBoardModalProps) {
-  const { createBoard } = useStore()
-  const router = useRouter()
-  const [selected, setSelected] = useState(BOARD_TEMPLATES[0].id)
-  const [name, setName] = useState('')
+export default function CreateBoardModal({
+  open,
+  onClose,
+}: CreateBoardModalProps) {
+  const { createBoard } = useStore();
+  const router = useRouter();
+  const [selected, setSelected] = useState(BOARD_TEMPLATES[0].id);
+  const [name, setName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
-  const template = BOARD_TEMPLATES.find((t) => t.id === selected) ?? BOARD_TEMPLATES[0]
+  const template =
+    BOARD_TEMPLATES.find((t) => t.id === selected) ?? BOARD_TEMPLATES[0];
 
-  const submit = () => {
-    const boardName = name.trim() || template.name
-    const boardId = createBoard(template.id, boardName)
-    setName('')
-    onClose()
-    router.push(`/boards/${boardId}`)
-  }
+  // Awaited rather than fired: the board is created on the server, so navigating
+  // before the response lands would send the user to an id that does not exist
+  // yet. The store raises its own error if this fails.
+  const submit = async () => {
+    if (isCreating) return;
+    const boardName = name.trim() || template.name;
+    setIsCreating(true);
+    try {
+      const boardId = await createBoard(template.id, boardName);
+      setName("");
+      onClose();
+      router.push(`/boards/${boardId}`);
+    } catch {
+      setIsCreating(false);
+    }
+  };
 
   return (
     <Modal open={open} onClose={onClose} className="max-w-md">
       <div className="flex items-center justify-between px-6 pt-5">
-        <h2 className="text-[17px] font-semibold text-text-primary">Create board</h2>
+        <h2 className="text-[17px] font-semibold text-text-primary">
+          Create board
+        </h2>
         <button
           type="button"
           onClick={onClose}
@@ -49,21 +65,23 @@ export default function CreateBoardModal({ open, onClose }: CreateBoardModalProp
               key={t.id}
               type="button"
               onClick={() => {
-                setSelected(t.id)
-                setName('')
+                setSelected(t.id);
+                setName("");
               }}
               aria-pressed={selected === t.id}
               className={`relative rounded-lg p-2 text-left ring-1 transition-colors duration-150 ${
                 selected === t.id
-                  ? 'ring-2 ring-primary bg-primary-subtle/40 dark:bg-primary-subtle'
-                  : 'ring-border-strong hover:bg-surface-alt'
+                  ? "ring-2 ring-primary bg-primary-subtle/40 dark:bg-primary-subtle"
+                  : "ring-border-strong hover:bg-surface-alt"
               }`}
             >
               <span
                 className="block h-9 rounded-md"
                 style={{ background: t.swatch }}
               />
-              <span className="mt-1.5 block truncate text-xs font-semibold text-text-primary">{t.name}</span>
+              <span className="mt-1.5 block truncate text-xs font-semibold text-text-primary">
+                {t.name}
+              </span>
               {selected === t.id && (
                 <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <Check size={12} />
@@ -73,17 +91,22 @@ export default function CreateBoardModal({ open, onClose }: CreateBoardModalProp
           ))}
         </div>
 
-        <p className="mt-3 text-xs leading-relaxed text-text-secondary">{template.description}</p>
+        <p className="mt-3 text-xs leading-relaxed text-text-secondary">
+          {template.description}
+        </p>
 
         <div className="mt-4">
-          <label htmlFor="board-title" className="text-[11px] font-semibold uppercase tracking-[0.05em] text-text-secondary">
+          <label
+            htmlFor="board-title"
+            className="text-[11px] font-semibold uppercase tracking-[0.05em] text-text-secondary"
+          >
             Board title
           </label>
           <input
             id="board-title"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            onKeyDown={(e) => e.key === "Enter" && void submit()}
             placeholder={template.name}
             autoFocus
             className="mt-1.5 w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/20"
@@ -101,12 +124,13 @@ export default function CreateBoardModal({ open, onClose }: CreateBoardModalProp
         </button>
         <button
           type="button"
-          onClick={submit}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary-hover active:scale-[0.98]"
+          onClick={() => void submit()}
+          disabled={isCreating}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary-hover active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
         >
-          Create
+          {isCreating ? "Creating…" : "Create"}
         </button>
       </div>
     </Modal>
-  )
+  );
 }

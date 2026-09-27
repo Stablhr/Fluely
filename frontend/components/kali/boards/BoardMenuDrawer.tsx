@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   X,
   Share2,
@@ -16,109 +16,120 @@ import {
   Activity,
   Archive,
   Trash2,
-} from 'lucide-react'
-import type { Board } from '@/lib/kali/store/schema'
-import { useStore } from '@/lib/kali/store/useStore'
-import ShareModal from './ShareModal'
-import VisibilityModal from './VisibilityModal'
-import LabelsModal from './LabelsModal'
-import ArchivedPanel from './ArchivedPanel'
-import ExportPrintModal from './ExportPrintModal'
-import SettingsModal from './SettingsModal'
-import BackgroundPickerPopover from './BackgroundPickerPopover'
-import BoardActivityPanel from './BoardActivityPanel'
+} from "lucide-react";
+import type { Board } from "@/lib/kali/store/schema";
+import { useStore } from "@/lib/kali/store/useStore";
+import ShareModal from "./ShareModal";
+import VisibilityModal from "./VisibilityModal";
+import LabelsModal from "./LabelsModal";
+import ArchivedPanel from "./ArchivedPanel";
+import ExportPrintModal from "./ExportPrintModal";
+import SettingsModal from "./SettingsModal";
+import BackgroundPickerPopover from "./BackgroundPickerPopover";
+import BoardActivityPanel from "./BoardActivityPanel";
 
 type DrawerModal =
-  | 'share'
-  | 'visibility'
-  | 'labels'
-  | 'archived'
-  | 'exportPrint'
-  | 'settings'
-  | 'activity'
-  | null
+  | "share"
+  | "visibility"
+  | "labels"
+  | "archived"
+  | "exportPrint"
+  | "settings"
+  | "activity"
+  | null;
 
 export default function BoardMenuDrawer({
   board,
   open,
   onClose,
 }: {
-  board: Board
-  open: boolean
-  onClose: () => void
+  board: Board;
+  open: boolean;
+  onClose: () => void;
 }) {
-  const { data, setBoardDescription, toggleStar, resetAll, deleteBoard, makeTemplate } = useStore()
-  const router = useRouter()
-  const [modal, setModal] = useState<DrawerModal>(null)
-  const [desc, setDesc] = useState(board.description)
-  const [aboutOpen, setAboutOpen] = useState(false)
-  const [bgOpen, setBgOpen] = useState(false)
-  const [templateConfirm, setTemplateConfirm] = useState(false)
+  const {
+    data,
+    setBoardDescription,
+    toggleStar,
+    resetAll,
+    deleteBoard,
+    makeTemplate,
+  } = useStore();
+  const router = useRouter();
+  const [modal, setModal] = useState<DrawerModal>(null);
+  const [desc, setDesc] = useState(board.description);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [bgOpen, setBgOpen] = useState(false);
+  const [templateConfirm, setTemplateConfirm] = useState(false);
 
-  const [wasOpen, setWasOpen] = useState(open)
+  const [wasOpen, setWasOpen] = useState(open);
 
   if (open !== wasOpen) {
-    setWasOpen(open)
+    setWasOpen(open);
     if (open) {
-      setDesc(board.description)
-      setAboutOpen(false)
-      setBgOpen(false)
-      setTemplateConfirm(false)
+      setDesc(board.description);
+      setAboutOpen(false);
+      setBgOpen(false);
+      setTemplateConfirm(false);
     }
   }
 
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
-  if (!open) return null
+  if (!open) return null;
 
   const archivedCardCount = Object.values(data.cards).filter(
     (c) => c.boardId === board.id && c.archived,
-  ).length
-  const archivedListCount = (board.archivedLists ?? []).length
+  ).length;
+  const archivedListCount = (board.archivedLists ?? []).length;
 
   const menuItem =
-    'flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium text-text-primary transition-colors duration-150 hover:bg-surface-alt'
+    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm font-medium text-text-primary transition-colors duration-150 hover:bg-surface-alt";
 
   const handleDeleteBoard = () => {
-    if (window.confirm(`Delete "${board.name}"? All lists and cards on it will be removed. This cannot be undone.`)) {
-      deleteBoard(board.id)
-      router.push('/boards')
+    if (
+      window.confirm(
+        `Delete "${board.name}"? All lists and cards on it will be removed. This cannot be undone.`,
+      )
+    ) {
+      deleteBoard(board.id);
+      router.push("/boards");
     }
-  }
+  };
 
   const handleReset = () => {
     if (
       window.confirm(
-        'Reset ALL app data? This clears every board, card, and inbox item on this device. This cannot be undone.',
+        "Reset ALL app data? This clears every board, card, and inbox item on this device. This cannot be undone.",
       )
     ) {
-      resetAll()
-      router.push('/')
+      resetAll();
+      router.push("/");
     }
-  }
+  };
 
   const handleMakeTemplate = () => {
-    const newId = makeTemplate(board.id)
+    const newId = makeTemplate(board.id);
     if (newId) {
-      onClose()
-      router.push(`/boards/${newId}`)
+      onClose();
+      router.push(`/boards/${newId}`);
     }
-  }
+  };
 
   const visibilityLabel = {
-    private: 'Private',
-    workspace: 'Workspace',
-    public: 'Public',
-  }[board.visibility]
+    private: "Private",
+    workspace: "Workspace",
+    public: "Public",
+  }[board.visibility];
 
-  const members = board.shares ?? []
+  const members = board.collaborators.filter((c) => c.status === "accepted");
 
   return (
     <>
@@ -140,7 +151,11 @@ export default function BoardMenuDrawer({
           {/* ── Group 1 ── */}
           <section className="space-y-0.5">
             {/* Share */}
-            <button type="button" className={menuItem} onClick={() => setModal('share')}>
+            <button
+              type="button"
+              className={menuItem}
+              onClick={() => setModal("share")}
+            >
               <Share2 size={15} className="text-text-secondary" />
               <span className="flex-1">Share</span>
               {members.length > 0 && (
@@ -176,27 +191,37 @@ export default function BoardMenuDrawer({
                 <textarea
                   value={desc}
                   onChange={(e) => {
-                    setDesc(e.target.value)
-                    setBoardDescription(board.id, e.target.value)
+                    setDesc(e.target.value);
+                    setBoardDescription(board.id, e.target.value);
                   }}
                   rows={3}
                   placeholder="Add a description to your board"
                   className="w-full resize-none rounded-md border border-border-strong bg-surface px-2.5 py-2 text-sm leading-relaxed text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
                 {board.description && (
-                  <p className="mt-1 truncate text-xs text-text-muted">{board.description}</p>
+                  <p className="mt-1 truncate text-xs text-text-muted">
+                    {board.description}
+                  </p>
                 )}
               </div>
             )}
 
             {/* Visibility */}
-            <button type="button" className={menuItem} onClick={() => setModal('visibility')}>
+            <button
+              type="button"
+              className={menuItem}
+              onClick={() => setModal("visibility")}
+            >
               <Eye size={15} className="text-text-secondary" />
               <span className="flex-1">Visibility: {visibilityLabel}</span>
             </button>
 
             {/* Print, export, and share */}
-            <button type="button" className={menuItem} onClick={() => setModal('exportPrint')}>
+            <button
+              type="button"
+              className={menuItem}
+              onClick={() => setModal("exportPrint")}
+            >
               <Printer size={15} className="text-text-secondary" />
               <span className="flex-1">Print, export, and share</span>
             </button>
@@ -209,9 +234,15 @@ export default function BoardMenuDrawer({
             >
               <Star
                 size={15}
-                className={board.starred ? 'text-warning fill-warning' : 'text-text-secondary'}
+                className={
+                  board.starred
+                    ? "text-warning fill-warning"
+                    : "text-text-secondary"
+                }
               />
-              <span className="flex-1">{board.starred ? 'Starred' : 'Star'}</span>
+              <span className="flex-1">
+                {board.starred ? "Starred" : "Star"}
+              </span>
             </button>
           </section>
 
@@ -220,14 +251,22 @@ export default function BoardMenuDrawer({
           {/* ── Group 2 ── */}
           <section className="space-y-0.5">
             {/* Settings */}
-            <button type="button" className={menuItem} onClick={() => setModal('settings')}>
+            <button
+              type="button"
+              className={menuItem}
+              onClick={() => setModal("settings")}
+            >
               <Settings size={15} className="text-text-secondary" />
               <span className="flex-1">Settings</span>
             </button>
 
             {/* Change background */}
             <div className="relative">
-              <button type="button" className={menuItem} onClick={() => setBgOpen((o) => !o)}>
+              <button
+                type="button"
+                className={menuItem}
+                onClick={() => setBgOpen((o) => !o)}
+              >
                 <Palette size={15} className="text-text-secondary" />
                 <span className="flex-1">Change background</span>
               </button>
@@ -245,7 +284,11 @@ export default function BoardMenuDrawer({
           {/* ── Group 3 ── */}
           <section className="space-y-0.5">
             {/* Labels */}
-            <button type="button" className={menuItem} onClick={() => setModal('labels')}>
+            <button
+              type="button"
+              className={menuItem}
+              onClick={() => setModal("labels")}
+            >
               <Tag size={15} className="text-text-secondary" />
               <span className="flex-1">Labels</span>
             </button>
@@ -263,7 +306,8 @@ export default function BoardMenuDrawer({
               {templateConfirm && (
                 <div className="ml-7 mr-2.5 mb-1 rounded-md bg-surface-alt p-2.5">
                   <p className="text-xs text-text-secondary leading-relaxed">
-                    Creates a copy of this board&apos;s lists and labels, without cards.
+                    Creates a copy of this board&apos;s lists and labels,
+                    without cards.
                   </p>
                   <button
                     type="button"
@@ -277,13 +321,21 @@ export default function BoardMenuDrawer({
             </div>
 
             {/* Activity */}
-            <button type="button" className={menuItem} onClick={() => setModal('activity')}>
+            <button
+              type="button"
+              className={menuItem}
+              onClick={() => setModal("activity")}
+            >
               <Activity size={15} className="text-text-secondary" />
               <span className="flex-1">Activity</span>
             </button>
 
             {/* Archived items */}
-            <button type="button" className={menuItem} onClick={() => setModal('archived')}>
+            <button
+              type="button"
+              className={menuItem}
+              onClick={() => setModal("archived")}
+            >
               <Archive size={15} className="text-text-secondary" />
               <span className="flex-1">Archived items</span>
               {(archivedCardCount > 0 || archivedListCount > 0) && (
@@ -319,13 +371,27 @@ export default function BoardMenuDrawer({
         </div>
       </aside>
 
-      {modal === 'share' && <ShareModal board={board} onClose={() => setModal(null)} />}
-      {modal === 'visibility' && <VisibilityModal board={board} onClose={() => setModal(null)} />}
-      {modal === 'labels' && <LabelsModal board={board} onClose={() => setModal(null)} />}
-      {modal === 'archived' && <ArchivedPanel board={board} onClose={() => setModal(null)} />}
-      {modal === 'exportPrint' && <ExportPrintModal board={board} onClose={() => setModal(null)} />}
-      {modal === 'settings' && <SettingsModal board={board} onClose={() => setModal(null)} />}
-      {modal === 'activity' && <BoardActivityPanel board={board} onClose={() => setModal(null)} />}
+      {modal === "share" && (
+        <ShareModal board={board} onClose={() => setModal(null)} />
+      )}
+      {modal === "visibility" && (
+        <VisibilityModal board={board} onClose={() => setModal(null)} />
+      )}
+      {modal === "labels" && (
+        <LabelsModal board={board} onClose={() => setModal(null)} />
+      )}
+      {modal === "archived" && (
+        <ArchivedPanel board={board} onClose={() => setModal(null)} />
+      )}
+      {modal === "exportPrint" && (
+        <ExportPrintModal board={board} onClose={() => setModal(null)} />
+      )}
+      {modal === "settings" && (
+        <SettingsModal board={board} onClose={() => setModal(null)} />
+      )}
+      {modal === "activity" && (
+        <BoardActivityPanel board={board} onClose={() => setModal(null)} />
+      )}
     </>
-  )
+  );
 }
