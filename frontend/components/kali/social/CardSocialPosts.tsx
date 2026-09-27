@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Share2, Plus, X, Clock, CheckCircle2, XCircle, AlertCircle, FileText } from 'lucide-react'
+import { Share2, Plus, X, Clock, CheckCircle2, XCircle, AlertCircle, FileText, Lightbulb, Eye } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import type { SocialPost, SocialPostStatus } from '@/lib/kali/store/schema'
 import { PLATFORM_COLORS } from '@/lib/kali/store/schema'
@@ -9,7 +9,9 @@ import ComposeModal from './ComposeModal'
 import PlatformIcon from './PlatformIcon'
 
 const STATUS_ICONS: Record<SocialPostStatus, typeof Clock> = {
+  idea: Lightbulb,
   draft: FileText,
+  in_review: Eye,
   scheduled: Clock,
   publishing: AlertCircle,
   posted: CheckCircle2,
@@ -19,7 +21,9 @@ const STATUS_ICONS: Record<SocialPostStatus, typeof Clock> = {
 }
 
 const STATUS_COLORS: Record<SocialPostStatus, string> = {
+  idea: 'text-text-muted',
   draft: 'text-text-muted',
+  in_review: 'text-warning-text',
   scheduled: 'text-info-text',
   publishing: 'text-warning-text',
   posted: 'text-success-text',

@@ -1,5 +1,5 @@
-import ContentPlannerView from '@/components/kali/content-planner/ContentPlannerView';
+import ContentPlanner from '@/components/kali/content-planner/ContentPlanner';
 
 export default function ContentPlannerPage() {
-  return <ContentPlannerView />;
+  return <ContentPlanner />;
 }

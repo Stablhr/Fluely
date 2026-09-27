@@ -125,7 +125,12 @@ export interface InboxItem {
 
 export type Platform = 'youtube' | 'facebook' | 'tiktok' | 'instagram'
 
-export type SocialPostStatus = 'draft' | 'scheduled' | 'publishing' | 'posted' | 'partially_published' | 'failed' | 'cancelled'
+/**
+ * Planning stages come first (idea → draft → in_review) because the content
+ * planner's board and table drive off them; the rest are publishing outcomes
+ * that `POST_COLUMN_FOR_STATUS` folds back into the nearest stage.
+ */
+export type SocialPostStatus = 'idea' | 'draft' | 'in_review' | 'scheduled' | 'publishing' | 'posted' | 'partially_published' | 'failed' | 'cancelled'
 
 export type PlatformStatus = 'pending' | 'scheduled' | 'publishing' | 'posted' | 'failed' | 'cancelled'
 
@@ -237,6 +242,7 @@ export interface SocialPost {
   analytics?: SocialAnalytics[]
   aiGeneration?: AIGenerationMeta
   tags: string[]
+  notes?: string
   createdAt: string
   updatedAt: string
 }
