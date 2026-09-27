@@ -1,16 +1,17 @@
 'use client';
 
-import {useEffect, useState} from 'react';
+import {memo, useEffect, useRef, useState} from 'react';
 import Image from 'next/image';
+import {cn} from '@/lib/utils';
 import {LOADING_FRAMES} from '@/lib/loadingFrames';
 
 /**
  * Full-screen loading curtain shown while a sign-in or sign-out request is in
  * flight, and on the first paint of any full page load. The mascot run-cycle is
- * four hand-drawn frames swapped on a timer (option A from the brief: no
- * framer-motion in this project), and the progress bar underneath is a separate
- * CSS animation so it can run at its own rhythm instead of being locked to the
- * frame cycle.
+ * four hand-drawn frames (option A from the brief: no framer-motion in this
+ * project) laid on top of each other and crossfaded, and the progress bar
+ * underneath is a separate CSS animation so it can run at its own rhythm
+ * instead of being locked to the frame cycle.
  *
  * Colors come from the brand tokens in app/kali.css — Ivory background, Drab
  * Dark Brown text, Poppins for the heading.
@@ -21,6 +22,16 @@ import {LOADING_FRAMES} from '@/lib/loadingFrames';
    (lib/auth/loadingCurtain.ts) so a fast response cannot reduce the whole thing
    to a single frame. */
 const FRAME_INTERVAL_MS = 175;
+
+/* How much of each step is spent blending into the next pose. Swapping the src
+   used to cut hard from one drawing to the next, which is what made every
+   transition in the cycle read as a stutter. Fading over the first part of the
+   step interpolates the pose instead of snapping to it.
+
+   Deliberately under half the step: each frame still sits fully opaque for a
+   moment, so the cycle keeps reading as four distinct poses rather than
+   dissolving into one continuous blur. */
+const FRAME_FADE_MS = Math.round(FRAME_INTERVAL_MS * 0.45);
 
 const COPY = {
   login: 'Signing you in...',
@@ -64,17 +75,93 @@ type LoadingScreenProps = {
   mode?: LoadingScreenMode;
 };
 
-export default function LoadingScreen({mode = 'login'}: LoadingScreenProps) {
-  const [frame, setFrame] = useState(0);
+/**
+ * The mascot run-cycle, isolated from the rest of the curtain so a frame change
+ * re-renders four <img> tags and nothing else — the progress bar and the label
+ * are static and have no business repainting four times a second.
+ */
+const MascotRun = memo(function MascotRun() {
+  const [index, setIndex] = useState(0);
+  const [ready, setReady] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  /* All four frames sit in the DOM at once now, so hold on the first pose until
+     every one of them has decoded. Fading into a bitmap that is still decoding
+     puts an empty box on screen for a beat, which is its own kind of stutter.
+     decode() resolves immediately for a cache hit, so on the common path this
+     costs nothing. */
   useEffect(() => {
-    const id = window.setInterval(() => {
-      setFrame((current) => (current + 1) % LOADING_FRAMES.length);
-    }, FRAME_INTERVAL_MS);
+    let cancelled = false;
 
-    return () => window.clearInterval(id);
+    const decoded = Array.from(
+      containerRef.current?.querySelectorAll('img') ?? [],
+      (image) => image.decode().catch(() => undefined)
+    );
+
+    Promise.all(decoded).then(() => {
+      if (!cancelled) setReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  useEffect(() => {
+    if (!ready) return;
+
+    /* Driven off elapsed time on requestAnimationFrame rather than
+       setInterval. A timer that lands in a busy frame is delivered late, so the
+       old loop drifted and the gap between two poses was not always the same —
+       which is the other half of why the cycle felt uneven. Advancing against
+       the clock keeps every step exactly FRAME_INTERVAL_MS wide, and it means
+       the incoming frame is on screen and already fading before it is due. */
+    let raf = 0;
+    let startedAt: number | null = null;
+    let shown = 0;
+
+    const tick = (now: number) => {
+      if (startedAt === null) startedAt = now;
+      const step = Math.floor((now - startedAt) / FRAME_INTERVAL_MS);
+      if (step !== shown) {
+        shown = step;
+        setIndex(step % LOADING_FRAMES.length);
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+
+    raf = window.requestAnimationFrame(tick);
+
+    return () => window.cancelAnimationFrame(raf);
+  }, [ready]);
+
+  return (
+    /* Fixed box with every frame stacked absolutely inside it: all four PNGs
+       share one canvas size, so holding them in the same place and moving only
+       opacity keeps the mascot from shifting as the cycle advances. */
+    <div ref={containerRef} className="relative h-48 w-72">
+      {LOADING_FRAMES.map((src, frame) => (
+        <Image
+          key={src}
+          src={src}
+          alt=""
+          width={288}
+          height={192}
+          unoptimized
+          draggable={false}
+          className={cn(
+            'absolute inset-0 h-full w-full object-contain',
+            'transition-opacity [will-change:opacity]',
+            frame === index ? 'opacity-100' : 'opacity-0'
+          )}
+          style={{transitionDuration: `${FRAME_FADE_MS}ms`}}
+        />
+      ))}
+    </div>
+  );
+});
+
+export default function LoadingScreen({mode = 'login'}: LoadingScreenProps) {
   return (
     <div
       role="status"
@@ -82,19 +169,7 @@ export default function LoadingScreen({mode = 'login'}: LoadingScreenProps) {
       aria-busy="true"
       className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-7 bg-brand-ivory/95 backdrop-blur-[2px]"
     >
-      {/* Fixed box: the four frames differ slightly in size and whitespace, so a
-          fluid container would make the whole stack twitch on every swap. */}
-      <div className="flex h-48 w-72 items-center justify-center">
-        <Image
-          src={LOADING_FRAMES[frame]}
-          alt=""
-          width={288}
-          height={188}
-          unoptimized
-          draggable={false}
-          className="h-full w-full object-contain"
-        />
-      </div>
+      <MascotRun />
 
       <div
         aria-hidden="true"
