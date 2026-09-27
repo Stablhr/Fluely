@@ -22,10 +22,7 @@ exports.authController = {
                 throw new error_1.ApiError(401, errorCodes_1.ErrorCodes.UNAUTHORIZED, 'Invalid token');
             }
             res.status(200).json({
-                user: {
-                    id: req.auth.userId,
-                    type: req.auth.type
-                }
+                user: await auth_service_1.authService.getAccount(req.auth.userId, req.auth.type)
             });
         }
         catch (error) {
@@ -72,11 +69,7 @@ exports.authController = {
                 maxAge: 7 * 24 * 60 * 60 * 1000
             });
             res.status(200).json({
-                user: {
-                    id: user._id.toString(),
-                    email: user.email,
-                    type: userType
-                }
+                user: (0, auth_service_1.toPublicAccount)(user, userType)
             });
         }
         catch (error) {

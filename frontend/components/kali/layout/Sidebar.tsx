@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Inbox, Columns3, CalendarDays, Settings, LogOut, CalendarRange } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
+import { YOU_ID } from '@/lib/kali/store/schema'
 import { useAdaptiveTheme, adaptiveVars } from '@/lib/kali/hooks/useAdaptiveTheme'
 import { useSignOut } from '@/lib/hooks/auth/useSignOut'
 import CaptureBox from '../shared/CaptureBox'
@@ -109,9 +110,9 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave }: SidebarProps) {
-  const { data, members } = useStore()
+  const { data } = useStore()
   const inboxCount = data.inbox.length
-  const you = members.find((m) => m.name === 'You') ?? members[0]
+  const you = data.members[YOU_ID]
 
   const theme = useAdaptiveTheme('#3971b8')
   const sidebarVars = adaptiveVars(theme)
@@ -239,9 +240,9 @@ export default function Sidebar({ collapsed, onMouseEnter, onMouseLeave }: Sideb
           <div className="border-t p-3 space-y-2.5" style={{ borderColor: theme.border }}>
             <CaptureBox />
             {you && (
-              <div className="flex items-center gap-2 rounded-md px-2.5 py-2" style={{ background: themeBg }}>
+              <div className="flex items-center gap-2 rounded-md px-2.5 py-2" style={{ background: themeBg }} title={you.name}>
                 <Avatar member={you} size={22} />
-                <span className="text-[13px] font-semibold" style={{ color: 'var(--color-brand-ivory)' }}>{you.name}</span>
+                <span className="min-w-0 flex-1 truncate text-[13px] font-semibold" style={{ color: 'var(--color-brand-ivory)' }}>{you.name}</span>
               </div>
             )}
             <LogoutButton collapsed={collapsed} />

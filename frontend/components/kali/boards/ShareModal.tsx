@@ -11,6 +11,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import type { Board, ShareRole } from '@/lib/kali/store/schema'
+import { YOU_ID } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import Modal from '../shared/Modal'
 import Avatar from '../shared/Avatar'
@@ -30,9 +31,7 @@ const ROLE_DESCRIPTIONS: Record<ShareRole, string> = {
 }
 
 export default function ShareModal({ board, onClose }: { board: Board; onClose: () => void }) {
-  const { addShare, removeShare, updateShareRole, members, createShareLink } = useStore()
-
-  const currentUser = members.find((m) => m.name === 'You') ?? members[0]
+  const { addShare, removeShare, updateShareRole, createShareLink } = useStore()
 
   const [name, setName] = useState('')
   const [role, setRole] = useState<ShareRole>('member')
@@ -245,7 +244,10 @@ export default function ShareModal({ board, onClose }: { board: Board; onClose: 
                 ) : (
                   <div className="space-y-1">
                     {shares.map((share) => {
-                      const isYou = currentUser && share.name === currentUser.name
+                      /* By id, not by name: two people on a board can share a
+                         name, and the signed-in person's name is now their real
+                         one rather than a fixed placeholder. */
+                      const isYou = share.id === YOU_ID
                       return (
                         <div
                           key={share.id}

@@ -359,6 +359,9 @@ export function emptyData(): AppData {
     cards: {},
     inbox: [],
     members: {
+      // Fallback only. StoreProvider renames this member after the signed-in
+      // person on every mount; "You" is what shows in the window before that, and
+      // what stays if the account somehow arrives without a name.
       [YOU_ID]: { id: YOU_ID, name: 'You', color: MEMBER_COLORS[0] },
     },
     ui: {

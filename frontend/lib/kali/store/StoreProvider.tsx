@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { AppData, Board, Card, List, Label, Share, SocialPost, SocialPostPlatform, SocialMediaAttachment, SocialAnalytics, Platform } from './schema'
-import { BOARD_TEMPLATES, emptyData } from './schema'
+import { BOARD_TEMPLATES, emptyData, YOU_ID } from './schema'
 import { clearData, loadData, saveData } from './storage'
 import { StoreContext } from './useStore'
 import type { Store } from './useStore'
@@ -22,6 +22,26 @@ function patchRecord<T extends { id: string }>(
 }
 
 const now = () => new Date().toISOString()
+
+/**
+ * Stamp the signed-in person's name onto the local "you" member.
+ *
+ * The store is persisted under a single key that is not namespaced per account,
+ * so a name written for one person would otherwise still be sitting there for
+ * whoever signs in next on the same browser. Reapplying it on every mount is
+ * what makes that safe: it corrects the stored name, and it picks up one changed
+ * in settings.
+ *
+ * An empty name is ignored, so a response that somehow lacks one falls back to
+ * the seeded "You" rather than blanking the chip.
+ */
+function withUserName(data: AppData, name: string | undefined): AppData {
+  const trimmed = name?.trim()
+  const member = data.members[YOU_ID]
+  if (!trimmed || !member || member.name === trimmed) return data
+
+  return { ...data, members: { ...data.members, [YOU_ID]: { ...member, name: trimmed } } }
+}
 
 function makeCard(list: List, title: string, extra: Partial<Card> = {}): Card {
   return {
@@ -61,8 +81,25 @@ function withCardAdded(prev: AppData, card: Card): AppData {
   }
 }
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<AppData>(() => loadData())
+interface StoreProviderProps {
+  children: ReactNode
+  /**
+   * The signed-in person's name, e.g. "Aria Chen".
+   *
+   * Injected rather than fetched here so this store stays independent of auth
+   * — it is persisted app data and has no business knowing about tokens or
+   * sessions. See the sync effect below for how it lands.
+   */
+  currentUserName?: string
+}
+
+export function StoreProvider({ children, currentUserName }: StoreProviderProps) {
+  /* Named in the initializer rather than in an effect: the layout only mounts
+     this once it knows who is signed in, so the name is available on the very
+     first render, and the store has no reason to repaint a frame with the wrong
+     name first. Every account change unmounts this — sign-out and sign-in both
+     swap the whole route tree — so a remount always re-reads the name. */
+  const [data, setData] = useState<AppData>(() => withUserName(loadData(), currentUserName))
   const [error, setError] = useState<string | null>(null)
   const dataRef = useRef(data)
 
@@ -819,7 +856,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const resetAll = () => {
     clearData()
-    setData(emptyData())
+    setData(withUserName(emptyData(), currentUserName))
   }
 
   /* ── Social Posts (delegated to useSocialPosts hook) ──────────── */

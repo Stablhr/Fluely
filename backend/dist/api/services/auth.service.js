@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authService = void 0;
+exports.toPublicAccount = toPublicAccount;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const env_1 = require("../config/env");
@@ -20,6 +21,29 @@ function generateVerificationCode() {
 }
 function getVerificationExpiry(minutes) {
     return new Date(Date.now() + minutes * 60 * 1000);
+}
+/**
+ * Look up the signed-in account and reduce it to PublicAccount.
+ *
+ * The access token only carries an id and a type, so GET /auth/me has to hit
+ * the database to say anything about the person: the app renders their name in
+ * the sidebar and the top bar, and the token cannot supply that. Password hash
+ * and the verification and reset codes never leave this function.
+ */
+function toPublicAccount(account, type) {
+    return {
+        id: String(account._id),
+        email: account.email,
+        type,
+        firstName: account.firstName,
+        lastName: account.lastName,
+        username: account.username,
+    };
+}
+async function findAccountById(userId, type) {
+    return type === 'user'
+        ? user_repository_1.userRepository.findById(userId)
+        : admin_repository_1.adminRepository.findById(userId);
 }
 exports.authService = {
     async register(data) {
@@ -190,15 +214,24 @@ exports.authService = {
         const refreshToken = jsonwebtoken_1.default.sign({ userId: account.id, type: userType }, env_1.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
         return { accessToken, refreshToken, user: account, userType };
     },
+    /**
+     * The signed-in account, for GET /auth/me. The JWT only carries an id and a
+     * type, so the name has to come from the database.
+     */
+    async getAccount(userId, type) {
+        const account = await findAccountById(userId, type);
+        if (!account) {
+            throw new error_1.ApiError(401, errorCodes_1.ErrorCodes.UNAUTHORIZED, 'Invalid token');
+        }
+        return toPublicAccount(account, type);
+    },
     async refreshAccessToken(refreshToken) {
         try {
             if (blocklist_service_1.blocklistService.isRevoked(refreshToken)) {
                 throw new error_1.ApiError(401, errorCodes_1.ErrorCodes.UNAUTHORIZED, 'Token revoked');
             }
             const payload = jsonwebtoken_1.default.verify(refreshToken, env_1.env.JWT_REFRESH_SECRET);
-            const account = await (payload.type === 'user'
-                ? user_repository_1.userRepository.findById(payload.userId)
-                : admin_repository_1.adminRepository.findById(payload.userId));
+            const account = await findAccountById(payload.userId, payload.type);
             if (!account) {
                 throw new error_1.ApiError(401, errorCodes_1.ErrorCodes.UNAUTHORIZED, 'Invalid token');
             }

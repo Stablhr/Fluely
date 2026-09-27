@@ -4,6 +4,7 @@ import {useEffect} from 'react';
 import {useRouter} from 'next/navigation';
 import {AlertTriangle, X} from 'lucide-react';
 import {useMeQuery} from '@/lib/hooks/auth/useMeQuery';
+import {getDisplayName, type AuthUser} from '@/lib/api/authApi';
 import {getDashboardPath} from '@/lib/auth/redirects';
 import {StoreProvider} from '@/lib/kali/store/StoreProvider';
 import {useStore} from '@/lib/kali/store/useStore';
@@ -32,7 +33,20 @@ function ErrorToast() {
   );
 }
 
-function AuthGate({children}: {children: React.ReactNode}) {
+/**
+ * Blocks the app until the session is known, and hands the signed-in account to
+ * the tree below.
+ *
+ * A render prop rather than plain children because the name has to reach
+ * StoreProvider, and the query that produced it lives here — the gate is the
+ * only place that knows who is signed in, and the store is deliberately
+ * ignorant of auth.
+ */
+function AuthGate({
+  children,
+}: {
+  children: (user: AuthUser) => React.ReactNode;
+}) {
   const router = useRouter();
   const {data, isLoading, isFetching, isError, isSuccess} = useMeQuery();
 
@@ -51,9 +65,9 @@ function AuthGate({children}: {children: React.ReactNode}) {
     }
   }, [data, isError, isSuccess, router]);
 
-  if (isLoading || isFetching || isRedirecting) return <Loading />;
+  if (isLoading || isFetching || isRedirecting || !data) return <Loading />;
 
-  return <>{children}</>;
+  return <>{children(data.user)}</>;
 }
 
 function AppFrame({children}: {children: React.ReactNode}) {
@@ -70,11 +84,13 @@ function AppFrame({children}: {children: React.ReactNode}) {
 export default function AppLayout({children}: {children: React.ReactNode}) {
   return (
     <AuthGate>
-      <StoreProvider>
-        <ToastProvider>
-          <AppFrame>{children}</AppFrame>
-        </ToastProvider>
-      </StoreProvider>
+      {(user) => (
+        <StoreProvider currentUserName={getDisplayName(user)}>
+          <ToastProvider>
+            <AppFrame>{children}</AppFrame>
+          </ToastProvider>
+        </StoreProvider>
+      )}
     </AuthGate>
   );
 }

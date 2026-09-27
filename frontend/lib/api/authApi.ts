@@ -13,21 +13,47 @@ type RegisterResponse = {
   email: string;
 };
 
+/**
+ * The account shape the auth endpoints return.
+ *
+ * firstName and lastName are required on the user model, so the app can greet
+ * the signed-in person by name — the sidebar chip, the top bar pill and the
+ * avatar initials all read from them. username is optional on the model and is
+ * carried for callers that want a handle rather than a real name.
+ */
+export type AuthUser = {
+  id: string;
+  email: string;
+  type: 'admin' | 'user';
+  firstName: string;
+  lastName: string;
+  username?: string;
+};
+
 type LoginResponse = {
-  user: {
-    id: string;
-    email: string;
-    type: 'admin' | 'user';
-  };
+  user: AuthUser;
 };
 type LogoutResponse = {message: string};
 
 type MeResponse = {
-  user: {
-    id: string;
-    type: 'admin' | 'user';
-  };
+  user: AuthUser;
 };
+
+/**
+ * The person's name as it should appear in the UI: "Aria Chen".
+ *
+ * Falls back through first name to the email local part so the chip is never
+ * blank. A missing name is possible in practice — an account created before
+ * the name fields were required, or a response from an older backend.
+ */
+export function getDisplayName(user: AuthUser | undefined): string {
+  if (!user) return '';
+
+  const full = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
+  if (full) return full;
+
+  return user.firstName?.trim() || user.email?.split('@')[0] || '';
+}
 
 export async function registerCustomer(data: RegisterRequest) {
   const res = await httpClient.post<RegisterResponse>('/auth/register', data);

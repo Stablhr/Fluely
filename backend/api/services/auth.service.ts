@@ -23,6 +23,57 @@ type RefreshTokenPayload = {
   type: 'user' | 'admin';
 };
 
+/**
+ * The public shape of an account. Both the user and the admin model extend
+ * BaseUser, so one shape covers either collection and the client never has to
+ * know which one it was handed.
+ */
+export type PublicAccount = {
+  id: string;
+  email: string;
+  type: 'user' | 'admin';
+  firstName: string;
+  lastName: string;
+  username?: string;
+};
+
+/**
+ * Look up the signed-in account and reduce it to PublicAccount.
+ *
+ * The access token only carries an id and a type, so GET /auth/me has to hit
+ * the database to say anything about the person: the app renders their name in
+ * the sidebar and the top bar, and the token cannot supply that. Password hash
+ * and the verification and reset codes never leave this function.
+ */
+export function toPublicAccount(
+  account: {
+    _id: unknown;
+    email: string;
+    firstName: string;
+    lastName: string;
+    username?: string;
+  },
+  type: 'user' | 'admin'
+): PublicAccount {
+  return {
+    id: String(account._id),
+    email: account.email,
+    type,
+    firstName: account.firstName,
+    lastName: account.lastName,
+    username: account.username,
+  };
+}
+
+async function findAccountById(
+  userId: string,
+  type: 'user' | 'admin'
+) {
+  return type === 'user'
+    ? userRepository.findById(userId)
+    : adminRepository.findById(userId);
+}
+
 export const authService = {
   async register(data: {
     firstName: string;
@@ -248,7 +299,7 @@ export const authService = {
     ]);
 
     const account = user || admin;
-    const userType = user ? 'user' : admin ? 'admin' : null;
+    const userType: 'user' | 'admin' | null = user ? 'user' : admin ? 'admin' : null;
 
     if (!account || !userType) {
       throw new ApiError(
@@ -286,6 +337,20 @@ export const authService = {
     return {accessToken, refreshToken, user: account, userType};
   },
 
+  /**
+   * The signed-in account, for GET /auth/me. The JWT only carries an id and a
+   * type, so the name has to come from the database.
+   */
+  async getAccount(userId: string, type: 'user' | 'admin'): Promise<PublicAccount> {
+    const account = await findAccountById(userId, type);
+
+    if (!account) {
+      throw new ApiError(401, ErrorCodes.UNAUTHORIZED, 'Invalid token');
+    }
+
+    return toPublicAccount(account, type);
+  },
+
   async refreshAccessToken(refreshToken: string) {
     try {
       if (blocklistService.isRevoked(refreshToken)) {
@@ -297,9 +362,7 @@ export const authService = {
         env.JWT_REFRESH_SECRET
       ) as RefreshTokenPayload;
 
-      const account = await (payload.type === 'user'
-        ? userRepository.findById(payload.userId)
-        : adminRepository.findById(payload.userId));
+      const account = await findAccountById(payload.userId, payload.type);
 
       if (!account) {
         throw new ApiError(401, ErrorCodes.UNAUTHORIZED, 'Invalid token');

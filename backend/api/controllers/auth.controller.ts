@@ -1,6 +1,6 @@
 import {Request, Response, NextFunction} from 'express';
 import {CookieOptions} from 'express';
-import {authService} from '../services/auth.service';
+import {authService, toPublicAccount} from '../services/auth.service';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
 import {env} from '../config/env';
@@ -25,10 +25,7 @@ export const authController = {
       }
 
       res.status(200).json({
-        user: {
-          id: req.auth.userId,
-          type: req.auth.type
-        }
+        user: await authService.getAccount(req.auth.userId, req.auth.type)
       });
     } catch (error) {
       next(error);
@@ -79,11 +76,7 @@ export const authController = {
       });
 
       res.status(200).json({
-        user: {
-          id: user._id.toString(),
-          email: user.email,
-          type: userType
-        }
+        user: toPublicAccount(user, userType)
       });
     } catch (error) {
       next(error);

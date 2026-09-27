@@ -16,6 +16,7 @@ import {
   UserPlus,
 } from 'lucide-react'
 import type { Board } from '@/lib/kali/store/schema'
+import { YOU_ID } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import ViewsMenu from './ViewsMenu'
 import FilterPanel from './FilterPanel'
@@ -91,14 +92,14 @@ export default function BoardTopBar({
   onFilterChange,
   onOpenMenu,
 }: BoardTopBarProps) {
-  const { renameBoard, toggleStar, members } = useStore()
+  const { renameBoard, toggleStar, data } = useStore()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(board.name)
   const [searchOpen, setSearchOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [visOpen, setVisOpen] = useState(false)
 
-  const currentUser = members.find((m) => m.name === 'You') ?? members[0]
+  const currentUser = data.members[YOU_ID]
 
   const visIcon = {
     private: Lock,

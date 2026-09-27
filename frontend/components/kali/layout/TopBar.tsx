@@ -3,11 +3,12 @@
 import { Bell, Search } from 'lucide-react'
 import Link from 'next/link'
 import { useStore } from '@/lib/kali/store/useStore'
+import { YOU_ID } from '@/lib/kali/store/schema'
 import Avatar from '../shared/Avatar'
 
 export default function TopBar() {
-  const { data, members } = useStore()
-  const you = members.find((m) => m.name === 'You') ?? members[0]
+  const { data } = useStore()
+  const you = data.members[YOU_ID]
   const inboxCount = data.inbox.length
 
   return (
@@ -37,9 +38,9 @@ export default function TopBar() {
           )}
         </Link>
         {you && (
-          <span className="flex items-center gap-2 rounded-pill bg-base-bg py-1 pr-3 pl-1">
+          <span className="flex items-center gap-2 rounded-pill bg-base-bg py-1 pr-3 pl-1" title={you.name}>
             <Avatar member={you} size={26} />
-            <span className="text-[13px] font-semibold text-ink-900">{you.name}</span>
+            <span className="max-w-40 truncate text-[13px] font-semibold text-ink-900">{you.name}</span>
           </span>
         )}
       </div>
