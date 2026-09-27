@@ -9,6 +9,15 @@ exports.boardCollaboratorRepository = {
         ...data
     }),
     find: (boardId, userId) => BoardCollaborator_model_1.BoardCollaboratorModel.findOne({ boardId, userId }).exec(),
+    /**
+     * By row id, scoped to the board.
+     *
+     * The route param is the collaborator's own id, not their user id, so this
+     * cannot reuse `find`. The boardId in the filter is what stops an id belonging
+     * to some other board from being mutated through a board the caller happens
+     * to own.
+     */
+    findByIdForBoard: (id, boardId) => BoardCollaborator_model_1.BoardCollaboratorModel.findOne({ _id: id, boardId }).exec(),
     /** Scoped to the invitee, so one person can never answer another's invitation. */
     findByIdForUser: (id, userId) => BoardCollaborator_model_1.BoardCollaboratorModel.findOne({ _id: id, userId }).exec(),
     listForBoard: (boardId) => BoardCollaborator_model_1.BoardCollaboratorModel.find({ boardId }).sort({ createdAt: 1 }).exec(),

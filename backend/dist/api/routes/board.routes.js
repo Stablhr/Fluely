@@ -9,7 +9,7 @@ const boardAccess_1 = require("../middleware/boardAccess");
 const rateLimit_1 = require("../middleware/rateLimit");
 const product_dto_1 = require("../dtos/product.dto");
 const router = (0, express_1.Router)();
-router.use(auth_1.requireUser);
+router.use(auth_1.requireAuth, auth_1.requireUser);
 // ── Public by slug ────────────────────────────────────────────────
 // Declared before `/:boardId` so "public" is never read as an id.
 // Still requires a signed-in user account, per the product default.

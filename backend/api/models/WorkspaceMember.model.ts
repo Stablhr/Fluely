@@ -24,7 +24,11 @@ const WorkspaceMemberSchema = new Schema<WorkspaceMemberDocument>(
       required: true,
       index: true
     },
-    role: {type: String, enum: WorkspaceMemberRoles, required: true, default: 'member'}
+    role: {type: String, enum: WorkspaceMemberRoles, required: true, default: 'member'},
+    // Set once, when the membership row is created. `createdAt` from the
+    // timestamps option would also do, but the API promises an explicit
+    // `joinedAt`, and leaving it undeclared made it silently undefined.
+    joinedAt: {type: Date, default: () => new Date()}
   },
   {timestamps: true}
 );

@@ -23,6 +23,17 @@ export const boardCollaboratorRepository = {
   find: (boardId: Types.ObjectId, userId: Types.ObjectId) =>
     BoardCollaboratorModel.findOne({boardId, userId}).exec(),
 
+  /**
+   * By row id, scoped to the board.
+   *
+   * The route param is the collaborator's own id, not their user id, so this
+   * cannot reuse `find`. The boardId in the filter is what stops an id belonging
+   * to some other board from being mutated through a board the caller happens
+   * to own.
+   */
+  findByIdForBoard: (id: string, boardId: Types.ObjectId) =>
+    BoardCollaboratorModel.findOne({_id: id, boardId}).exec(),
+
   /** Scoped to the invitee, so one person can never answer another's invitation. */
   findByIdForUser: (id: string, userId: Types.ObjectId) =>
     BoardCollaboratorModel.findOne({_id: id, userId}).exec(),

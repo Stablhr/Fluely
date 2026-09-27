@@ -1,7 +1,7 @@
 import {Router} from 'express';
 import {workspaceController} from '../controllers/workspace.controller';
 import {validateRequest} from '../middleware/validation';
-import {requireUser} from '../middleware/auth';
+import {requireAuth, requireUser} from '../middleware/auth';
 import {authActionLimiter, authReadLimiter} from '../middleware/rateLimit';
 import {
   workspaceCreateSchema,
@@ -16,7 +16,7 @@ import {
 const router = Router();
 
 // Workspaces are only ever read or written by signed-in user accounts.
-router.use(requireUser);
+router.use(requireAuth, requireUser);
 
 router.get(
   '/',

@@ -2,7 +2,7 @@ import {Router} from 'express';
 import {boardController} from '../controllers/board.controller';
 import {boardCollaboratorController} from '../controllers/boardCollaborator.controller';
 import {validateRequest} from '../middleware/validation';
-import {requireUser} from '../middleware/auth';
+import {requireAuth, requireUser} from '../middleware/auth';
 import {requireBoardAccess} from '../middleware/boardAccess';
 import {authActionLimiter, authReadLimiter} from '../middleware/rateLimit';
 import {
@@ -21,7 +21,7 @@ import {
 
 const router = Router();
 
-router.use(requireUser);
+router.use(requireAuth, requireUser);
 
 // ── Public by slug ────────────────────────────────────────────────
 // Declared before `/:boardId` so "public" is never read as an id.

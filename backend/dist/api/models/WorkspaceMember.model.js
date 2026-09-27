@@ -49,7 +49,11 @@ const WorkspaceMemberSchema = new mongoose_1.Schema({
         required: true,
         index: true
     },
-    role: { type: String, enum: Workspace_model_1.WorkspaceMemberRoles, required: true, default: 'member' }
+    role: { type: String, enum: Workspace_model_1.WorkspaceMemberRoles, required: true, default: 'member' },
+    // Set once, when the membership row is created. `createdAt` from the
+    // timestamps option would also do, but the API promises an explicit
+    // `joinedAt`, and leaving it undeclared made it silently undefined.
+    joinedAt: { type: Date, default: () => new Date() }
 }, { timestamps: true });
 // One membership row per (workspace, user). Doubles as the lookup index for
 // "which workspaces is this person in".

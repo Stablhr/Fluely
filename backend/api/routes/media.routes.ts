@@ -1,7 +1,7 @@
 import {Router} from 'express';
 import {mediaController} from '../controllers/media.controller';
 import {validateRequest} from '../middleware/validation';
-import {requireUser} from '../middleware/auth';
+import {requireAuth, requireUser} from '../middleware/auth';
 import {authActionLimiter, authReadLimiter, uploadLimiter} from '../middleware/rateLimit';
 import {handleUploadErrors, uploadMedia} from '../middleware/upload';
 import {mediaIdParamsSchema, mediaListQuerySchema} from '../dtos/product.dto';
@@ -9,7 +9,7 @@ import {mediaIdParamsSchema, mediaListQuerySchema} from '../dtos/product.dto';
 const router = Router();
 
 // every media route belongs to a user account
-router.use(requireUser);
+router.use(requireAuth, requireUser);
 
 router.post(
   '/',

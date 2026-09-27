@@ -51,9 +51,9 @@ async function findRowOrThrow(board: BoardDocument, collaboratorId: string) {
       'collaboratorId must be a valid ObjectId'
     );
   }
-  const row = await boardCollaboratorRepository.find(
-    board._id,
-    new Types.ObjectId(collaboratorId)
+  const row = await boardCollaboratorRepository.findByIdForBoard(
+    collaboratorId,
+    board._id
   );
   if (!row) {
     throw new ApiError(404, ErrorCodes.COLLABORATOR_NOT_FOUND, 'Collaborator not found');

@@ -27,7 +27,7 @@ async function findRowOrThrow(board, collaboratorId) {
     if (!mongoose_1.Types.ObjectId.isValid(collaboratorId)) {
         throw new error_1.ApiError(400, errorCodes_1.ErrorCodes.VALIDATION_ERROR, 'collaboratorId must be a valid ObjectId');
     }
-    const row = await boardCollaborator_repository_1.boardCollaboratorRepository.find(board._id, new mongoose_1.Types.ObjectId(collaboratorId));
+    const row = await boardCollaborator_repository_1.boardCollaboratorRepository.findByIdForBoard(collaboratorId, board._id);
     if (!row) {
         throw new error_1.ApiError(404, errorCodes_1.ErrorCodes.COLLABORATOR_NOT_FOUND, 'Collaborator not found');
     }
