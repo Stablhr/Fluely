@@ -8,4 +8,7 @@ module.exports = {
   transform: {
     ...tsJestTransformCfg,
   },
+  // `dist/` is committed to this repo, so without this Jest also discovers
+  // compiled copies of the tests and fails on the stale ones.
+  testPathIgnorePatterns: ["/node_modules/", "/dist/"],
 };
