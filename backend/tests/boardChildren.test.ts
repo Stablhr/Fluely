@@ -333,3 +333,91 @@ describe('board structure', () => {
     expect(result.lists).toHaveLength(1);
   });
 });
+
+describe('an order may only name cards that live in the target list', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('rejects a card that is on this board but in another list', async () => {
+    // The case board-ownership checking cannot catch. This card genuinely
+    // belongs to this board, so a board-only check would admit it -- and the
+    // card would then sit in two lists' cardOrder while its listId names one.
+    mockedLists.findByIdForBoard.mockResolvedValue(list());
+    mockedCards.listByBoard.mockResolvedValue([
+      card({_id: OTHER_CARD, listId: OTHER_LIST}) as CardRow,
+    ]);
+
+    await expect(
+      cardService.reorder(board(), LIST.toString(), [OTHER_CARD.toString()]),
+    ).rejects.toMatchObject({code: 'CARD_NOT_FOUND'});
+    expect(mockedLists.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a card from another board', async () => {
+    mockedLists.findByIdForBoard.mockResolvedValue(list());
+    mockedCards.listByBoard.mockResolvedValue([card() as CardRow]);
+
+    await expect(
+      cardService.reorder(board(), LIST.toString(), [OTHER_CARD.toString()]),
+    ).rejects.toMatchObject({code: 'CARD_NOT_FOUND'});
+    expect(mockedLists.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects the same card smuggled in through a list PATCH', async () => {
+    // The PATCH body accepts a cardOrder and so needs the identical guard;
+    // without it any ObjectId could be seeded into a list, including a card id
+    // belonging to a different board.
+    mockedLists.findByIdForBoard.mockResolvedValue(list());
+    mockedCards.listByBoard.mockResolvedValue([card() as CardRow]);
+
+    await expect(
+      listService.update(board(), LIST.toString(), {
+        cardOrder: [OTHER_CARD.toString()],
+      }),
+    ).rejects.toMatchObject({code: 'CARD_NOT_FOUND'});
+    expect(mockedLists.update).not.toHaveBeenCalled();
+  });
+
+  it('accepts an order naming the cards actually in that list', async () => {
+    // The counterpart to the first case: the guard has to reject the wrong list,
+    // not reject everything, or legitimate reordering would be impossible.
+    mockedLists.findByIdForBoard.mockResolvedValue(list());
+    mockedCards.listByBoard.mockResolvedValue([
+      card() as CardRow,
+      card({_id: OTHER_CARD}) as CardRow,
+    ]);
+    mockedLists.update.mockResolvedValue({
+      acknowledged: true,
+      matchedCount: 1,
+      modifiedCount: 1,
+      upsertedId: null,
+      upsertedCount: 0,
+    });
+
+    await cardService.reorder(
+      board(),
+      LIST.toString(),
+      [OTHER_CARD.toString(), CARD.toString()],
+    );
+
+    expect(mockedLists.update).toHaveBeenCalled();
+  });
+
+  it('accepts the card being moved, whose listId is still the source', async () => {
+    // A move is validated before listId changes, so the card in transit has to
+    // be allowed explicitly or every cross-list move would fail.
+    mockedLists.findByIdForBoard.mockResolvedValue(list());
+    mockedCards.findByIdForBoard
+      .mockResolvedValueOnce(card({listId: OTHER_LIST}))
+      .mockResolvedValueOnce(card({listId: LIST}));
+    mockedCards.listByBoard.mockResolvedValue([
+      card({_id: OTHER_CARD}) as CardRow,
+    ]);
+
+    await cardService.move(board(), CARD.toString(), {
+      listId: LIST.toString(),
+      cardOrder: [OTHER_CARD.toString(), CARD.toString()],
+    });
+
+    expect(mockedCards.move).toHaveBeenCalled();
+  });
+});

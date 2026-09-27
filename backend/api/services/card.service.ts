@@ -76,18 +76,38 @@ async function requireListForBoard(listId: string, boardId: Types.ObjectId) {
 }
 
 /**
- * Rejects an order that names cards this board does not own. The alternative is
- * a `cardOrder` array pointing at another board's cards, which the client would
- * then render as someone else's content.
+ * Rejects an order that names cards the target list does not hold.
+ *
+ * Checking board ownership alone is not enough. A card sitting in a different
+ * list of the same board passes such a check, which leaves it in two lists'
+ * `cardOrder` at once while its `listId` still names only one of them: the card
+ * then renders twice, and moving it updates only one of the two. Ids from
+ * another board must be caught by the same guard, since an order is exactly the
+ * place where a stray id from a different board would be smuggled in.
+ *
+ * `alsoAllowed` names cards that legitimately appear in the order despite not
+ * belonging to the list yet — the card being moved, whose `listId` is still the
+ * source list at the moment the new order is validated.
  */
-async function assertCardsAreOurs(boardId: Types.ObjectId, cardOrder: string[]) {
+export async function assertOrderFitsList(
+  boardId: Types.ObjectId,
+  listId: string,
+  order: string[],
+  alsoAllowed: string[] = []
+) {
   const cards = await cardRepository.listByBoard(boardId, true);
-  const allowed = new Set(cards.map(card => card._id.toString()));
-  if (cardOrder.some(id => !allowed.has(id))) {
+  const inList = new Set(
+    cards
+      .filter(card => card.listId.toString() === listId)
+      .map(card => card._id.toString()),
+  );
+  const extra = new Set(alsoAllowed);
+
+  if (order.some(id => !inList.has(id) && !extra.has(id))) {
     throw new ApiError(
       404,
       ErrorCodes.CARD_NOT_FOUND,
-      'One or more cards in that order do not belong to this board'
+      'One or more cards in that order do not belong to this list',
     );
   }
 }
@@ -175,7 +195,12 @@ export const cardService = {
     const targetList = await requireListForBoard(input.listId, board._id);
 
     if (input.cardOrder) {
-      await assertCardsAreOurs(board._id, input.cardOrder);
+      await assertOrderFitsList(
+        board._id,
+        targetList._id.toString(),
+        input.cardOrder,
+        [cardId],
+      );
     }
 
     await bumpBoardRevision(board._id, input.expectedRevision);
@@ -213,7 +238,7 @@ export const cardService = {
     expectedRevision?: number
   ) {
     await requireListForBoard(listId, board._id);
-    await assertCardsAreOurs(board._id, cardOrder);
+    await assertOrderFitsList(board._id, listId, cardOrder);
 
     await bumpBoardRevision(board._id, expectedRevision);
     await listRepository.update(listId, board._id, {

@@ -4,6 +4,7 @@ import {boardRepository} from '../repositories/board.repository';
 import {BoardDocument} from '../models/Board.model';
 import {ListDocument} from '../models/List.model';
 import {bumpBoardRevision} from './boardRevision';
+import {assertOrderFitsList} from './card.service';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
 
@@ -99,6 +100,11 @@ export const listService = {
       patch.assignee = input.assignee ? new Types.ObjectId(input.assignee) : null;
     }
     if (input.cardOrder !== undefined) {
+      // Reordering is a list-level concern, but the ids in it have to be checked
+      // against this list. An order is untrusted input like any other: without
+      // this, a PATCH could seed `cardOrder` with any ObjectId at all, including
+      // a card id belonging to a different board.
+      await assertOrderFitsList(board._id, listId, input.cardOrder);
       patch.cardOrder = input.cardOrder.map(id => new Types.ObjectId(id));
     }
 
