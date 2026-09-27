@@ -1,4 +1,4 @@
-import mongoose, {Schema} from 'mongoose';
+import mongoose, {Schema, Types} from 'mongoose';
 
 export interface BaseUserDocument extends mongoose.Document {
   firstName: string;
@@ -6,6 +6,7 @@ export interface BaseUserDocument extends mongoose.Document {
   email: string;
   passwordHash: string;
   username?: string;
+  workspaceId?: Types.ObjectId | null;
   isVerified: boolean;
   verificationCode?: string | null;
   verificationExpiry?: Date | null;
@@ -29,6 +30,10 @@ export function createBaseUserSchema<T extends BaseUserDocument>() {
       },
       passwordHash: {type: String, required: true},
       username: {type: String, unique: true, sparse: true},
+      // Primary workspace. Membership itself lives in the WorkspaceMember
+      // collection, which is the source of truth; this field is denormalised
+      // for convenience so the UI can resolve a default without a join.
+      workspaceId: {type: Schema.Types.ObjectId, ref: 'Workspace', default: null, index: true},
       isVerified: {type: Boolean, default: false},
       verificationCode: {type: String, default: null},
       verificationExpiry: {type: Date, default: null},

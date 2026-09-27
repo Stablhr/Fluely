@@ -25,6 +25,7 @@ const envSchema = zod_1.z.object({
     MEDIA_MAX_FILE_SIZE_MB: zod_1.z.coerce.number().positive().max(500).optional(),
     MEDIA_QUOTA_MB: zod_1.z.coerce.number().positive().max(100000).optional(),
     MEDIA_ALLOWED_MIME_TYPES: zod_1.z.string().optional(),
+    MEDIA_UPLOAD_DIR: zod_1.z.string().optional(),
     SOCIAL_SIMULATION_FAILURE_RATE: zod_1.z.coerce.number().min(0).max(1).optional()
 });
 const parsed = envSchema.safeParse(process.env);
@@ -45,5 +46,6 @@ exports.env = {
         .split(',')
         .map(value => value.trim().toLowerCase())
         .filter(Boolean),
-    SOCIAL_SIMULATION_FAILURE_RATE: parsed.data.SOCIAL_SIMULATION_FAILURE_RATE ?? 0
+    SOCIAL_SIMULATION_FAILURE_RATE: parsed.data.SOCIAL_SIMULATION_FAILURE_RATE ?? 0,
+    MEDIA_UPLOAD_DIR: parsed.data.MEDIA_UPLOAD_DIR ?? 'uploads'
 };
