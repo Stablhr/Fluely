@@ -9,6 +9,8 @@ import {blocklistService} from './blocklist.service';
 import {ErrorCodes} from '../constants/errorCodes';
 import {verificationCodeEmailTemplate} from '../templates/verificationCodeEmail';
 import {resetPasswordEmailTemplate} from '../templates/resetPasswordEmail';
+import {workspaceService} from './workspace.service';
+import {logger} from '../logging/logger';
 
 function generateVerificationCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -35,6 +37,7 @@ export type PublicAccount = {
   firstName: string;
   lastName: string;
   username?: string;
+  workspaceId: string | null;
 };
 
 /**
@@ -52,6 +55,7 @@ export function toPublicAccount(
     firstName: string;
     lastName: string;
     username?: string;
+    workspaceId?: unknown;
   },
   type: 'user' | 'admin'
 ): PublicAccount {
@@ -62,6 +66,7 @@ export function toPublicAccount(
     firstName: account.firstName,
     lastName: account.lastName,
     username: account.username,
+    workspaceId: account.workspaceId ? String(account.workspaceId) : null
   };
 }
 
@@ -118,6 +123,19 @@ export const authService = {
         text: emailTpl.text,
         html: emailTpl.html
       });
+
+      // Every new account gets a workspace of its own so that
+      // `visibility: 'workspace'` means something from the first board. This
+      // must not fail registration: without a workspace the person simply
+      // cannot use workspace visibility until they create or join one.
+      try {
+        await workspaceService.provisionForUser(user._id, data.firstName);
+      } catch (provisionError) {
+        logger.error(
+          {err: provisionError, userId: String(user._id)},
+          'Could not provision a workspace for the new account'
+        );
+      }
 
       return {id: user.id, email: user.email};
     } catch (err: unknown) {

@@ -57,3 +57,20 @@ export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
 
   return next();
 }
+
+/**
+ * Guards the planner surface. Admins have their own dashboard and the frontend
+ * AuthGate already redirects them away from these routes, but the API has to
+ * hold the line on its own rather than trusting the client.
+ */
+export function requireUser(req: Request, _res: Response, next: NextFunction) {
+  if (!req.auth) {
+    return next(new ApiError(401, ErrorCodes.UNAUTHORIZED, 'Not authenticated'));
+  }
+
+  if (req.auth.type !== 'user') {
+    return next(new ApiError(403, ErrorCodes.FORBIDDEN, 'This area is for user accounts'));
+  }
+
+  return next();
+}

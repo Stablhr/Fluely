@@ -1,15 +1,15 @@
 import {Router} from 'express';
 import {mediaController} from '../controllers/media.controller';
 import {validateRequest} from '../middleware/validation';
-import {requireAuth} from '../middleware/auth';
+import {requireUser} from '../middleware/auth';
 import {authActionLimiter, authReadLimiter, uploadLimiter} from '../middleware/rateLimit';
 import {handleUploadErrors, uploadMedia} from '../middleware/upload';
 import {mediaIdParamsSchema, mediaListQuerySchema} from '../dtos/product.dto';
 
 const router = Router();
 
-// every media route is account-scoped
-router.use(requireAuth);
+// every media route belongs to a user account
+router.use(requireUser);
 
 router.post(
   '/',

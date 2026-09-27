@@ -1,3 +1,4 @@
+import {Types} from 'mongoose';
 import {UserDocument, UserModel} from '../models/User.model';
 
 export const userRepository = {
@@ -22,6 +23,12 @@ export const userRepository = {
 
   updatePassword: (userId: string, passwordHash: string) =>
     UserModel.updateOne({_id: userId}, {passwordHash}).exec(),
+
+  setPrimaryWorkspace: (userId: string, workspaceId: Types.ObjectId | null) =>
+    UserModel.updateOne({_id: userId}, {workspaceId}).exec(),
+
+  findByUsername: (username: string) =>
+    UserModel.findOne({username}).exec(),
 
   setVerificationCode: (email: string, code: string, expiry: Date) =>
     UserModel.updateOne(

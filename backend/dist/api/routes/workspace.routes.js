@@ -1,0 +1,20 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const workspace_controller_1 = require("../controllers/workspace.controller");
+const validation_1 = require("../middleware/validation");
+const auth_1 = require("../middleware/auth");
+const rateLimit_1 = require("../middleware/rateLimit");
+const workspace_dto_1 = require("../dtos/workspace.dto");
+const router = (0, express_1.Router)();
+// Workspaces are only ever read or written by signed-in user accounts.
+router.use(auth_1.requireUser);
+router.get('/', rateLimit_1.authReadLimiter, (0, validation_1.validateRequest)({ query: workspace_dto_1.workspaceListQuerySchema }), workspace_controller_1.workspaceController.list);
+router.post('/join', rateLimit_1.authActionLimiter, (0, validation_1.validateRequest)({ body: workspace_dto_1.workspaceJoinSchema }), workspace_controller_1.workspaceController.join);
+router.post('/', rateLimit_1.authActionLimiter, (0, validation_1.validateRequest)({ body: workspace_dto_1.workspaceCreateSchema }), workspace_controller_1.workspaceController.create);
+router.get('/:workspaceId', rateLimit_1.authReadLimiter, (0, validation_1.validateRequest)({ params: workspace_dto_1.workspaceIdParamsSchema }), workspace_controller_1.workspaceController.detail);
+router.patch('/:workspaceId', rateLimit_1.authActionLimiter, (0, validation_1.validateRequest)({ params: workspace_dto_1.workspaceIdParamsSchema, body: workspace_dto_1.workspacePatchSchema }), workspace_controller_1.workspaceController.rename);
+router.get('/:workspaceId/members', rateLimit_1.authReadLimiter, (0, validation_1.validateRequest)({ params: workspace_dto_1.workspaceIdParamsSchema }), workspace_controller_1.workspaceController.listMembers);
+router.post('/:workspaceId/members', rateLimit_1.authActionLimiter, (0, validation_1.validateRequest)({ params: workspace_dto_1.workspaceIdParamsSchema, body: workspace_dto_1.workspaceMemberCreateSchema }), workspace_controller_1.workspaceController.addMember);
+router.delete('/:workspaceId/members/:userId', rateLimit_1.authActionLimiter, (0, validation_1.validateRequest)({ params: workspace_dto_1.workspaceMemberParamsSchema }), workspace_controller_1.workspaceController.removeMember);
+exports.default = router;
