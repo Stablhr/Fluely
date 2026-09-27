@@ -1,0 +1,17 @@
+{
+  "printWidth": 100,
+  "semi": true,
+  "singleQuote": true,
+  "bracketSpacing": false,
+  "trailingComma": "none",
+  "arrowParens": "always",
+  "endOfLine": "auto",
+  "overrides": [
+    {
+      "files": ["lib/kali/**", "components/kali/**"],
+      "options": {
+        "semi": false
+      }
+    }
+  ]
+}
