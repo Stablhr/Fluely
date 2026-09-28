@@ -1,7 +1,7 @@
 /**
- * The mascot run-cycle, in playback order — the twelve frames of
- * public/assets/Loading, all sharing one square (362x362) canvas so they can be
- * stacked and crossfaded without the drawing shifting between poses.
+ * The mascot run-cycle, in playback order — the four frames of
+ * public/assets/Loading, all sharing one canvas so they can be stacked and
+ * crossfaded without the drawing shifting between poses.
  *
  * This lives in a plain module rather than in components/auth/LoadingScreen.tsx
  * so the root layout, which is a server component, can preload the files with
@@ -10,16 +10,8 @@
  * cache genuinely satisfies it.
  */
 export const LOADING_FRAMES = [
-  '/assets/Loading/loading_frame_01.png',
-  '/assets/Loading/loading_frame_02.png',
-  '/assets/Loading/loading_frame_03.png',
-  '/assets/Loading/loading_frame_04.png',
-  '/assets/Loading/loading_frame_05.png',
-  '/assets/Loading/loading_frame_06.png',
-  '/assets/Loading/loading_frame_07.png',
-  '/assets/Loading/loading_frame_08.png',
-  '/assets/Loading/loading_frame_09.png',
-  '/assets/Loading/loading_frame_10.png',
-  '/assets/Loading/loading_frame_11.png',
-  '/assets/Loading/loading_frame_12.png',
+  '/assets/Loading/fluely_loading_frame_1.png',
+  '/assets/Loading/fluely_loading_frame_2.png',
+  '/assets/Loading/fluely_loading_frame_3.png',
+  '/assets/Loading/fluely_loading_frame_4.png',
 ] as const;

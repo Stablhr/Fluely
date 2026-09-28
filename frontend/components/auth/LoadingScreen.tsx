@@ -9,7 +9,7 @@ import {CURTAIN_FADE_OUT_MS} from '@/lib/auth/loadingCurtain';
 /**
  * Full-screen loading curtain shown while a sign-in or sign-out request is in
  * flight, while a route segment is resolving (app/loading.tsx), and on the
- * first paint of a full page load. The mascot run-cycle is the twelve hand-drawn
+ * first paint of a full page load. The mascot run-cycle is the four hand-drawn
  * frames in public/assets/Loading, laid on top of each other and crossfaded, and
  * the progress bar underneath is a separate CSS animation so it can run at its
  * own rhythm instead of being locked to the frame cycle.
@@ -24,16 +24,14 @@ import {CURTAIN_FADE_OUT_MS} from '@/lib/auth/loadingCurtain';
  * renders as a route fallback outside the app shell.
  */
 
-/* How long one full pass of the cycle takes. 2.5s sits in the middle of the
-   2-3s band; move this one number to retime the whole thing.
+/* How long one full pass of the cycle takes. 1.4s over four frames is 350ms a
+   step, a slower read than a full run cycle but still recognisably animated.
+   Move this one number to retime the whole loop.
 
    The per-frame interval is derived from it rather than hand-tuned, because the
-   two are the same decision: the frame list has twelve entries, so a longer
-   cycle is unavoidably a lower frame rate. At 2.5s that is ~4.8fps, which is
-   well below the ~10fps the frames were first tuned for and would read as
-   steppy on its own — the crossfade below is what covers that, so raising this
-   without also widening FRAME_FADE_RATIO reintroduces the slideshow. */
-const CYCLE_MS = 2500;
+   two are the same decision: the frame list is short, so a long cycle is
+   unavoidably a low frame rate. That is what FRAME_FADE_RATIO below covers. */
+const CYCLE_MS = 1400;
 
 const FRAME_INTERVAL_MS = CYCLE_MS / LOADING_FRAMES.length;
 
@@ -42,17 +40,21 @@ const FRAME_INTERVAL_MS = CYCLE_MS / LOADING_FRAMES.length;
    transition in the cycle read as a stutter. Fading over the first part of the
    step interpolates the pose instead of snapping to it.
 
-   Just under half the step, so each frame still reaches full opacity for a
-   moment and the cycle keeps reading as distinct poses rather than dissolving
-   into one continuous blur. At the low frame rate CYCLE_MS implies, that
-   half-step overlap is also what makes consecutive poses read as motion rather
-   than as twelve separate drawings. */
-const FRAME_FADE_MS = Math.round(FRAME_INTERVAL_MS * 0.45);
+   Under half the step, so each frame still reaches full opacity for a moment
+   and the cycle keeps reading as distinct poses rather than dissolving into one
+   continuous blur. With only four frames this overlap is doing most of the
+   work of making the steps read as motion. */
+const FRAME_FADE_RATIO = 0.45;
+const FRAME_FADE_MS = Math.round(FRAME_INTERVAL_MS * FRAME_FADE_RATIO);
 
-/* The source frames are square (362x362), so the stage is square too. A 3:2 box
-   letterboxed the mascot down to 192px wide in a 288px row — a small drawing
-   centred in a wide gap, which read as an alignment mistake. */
-const MASCOT_SIZE_PX = 224;
+/* Display size of the mascot stage. The images fit themselves to this box with
+   object-contain, so the frame set's own aspect ratio is not baked in here — a
+   re-export at a different shape letterboxes instead of distorting, and since
+   every frame in a set shares one canvas the drawing cannot shift between poses
+   either way. Only one dimension needs to be right: whichever of the two the
+   artwork is narrower in, since that is the axis it will be limited by. */
+const MASCOT_HEIGHT_PX = 224;
+const MASCOT_WIDTH_PX = 336;
 
 const COPY = {
   login: 'Signing you in...',
@@ -164,21 +166,20 @@ const MascotRun = memo(function MascotRun() {
   }, [ready]);
 
   return (
-    /* Fixed box with every frame stacked absolutely inside it: all the PNGs
-       share one square canvas, so holding them in the same place and moving only
-       opacity keeps the mascot from shifting as the cycle advances. */
+    /* Every frame stacked in one box, moving only opacity, so the mascot holds
+       its position as the cycle advances. */
     <div
       ref={containerRef}
       className="relative shrink-0"
-      style={{width: MASCOT_SIZE_PX, height: MASCOT_SIZE_PX}}
+      style={{width: MASCOT_WIDTH_PX, height: MASCOT_HEIGHT_PX}}
     >
       {LOADING_FRAMES.map((src, frame) => (
         <Image
           key={src}
           src={src}
           alt=""
-          width={MASCOT_SIZE_PX}
-          height={MASCOT_SIZE_PX}
+          width={MASCOT_WIDTH_PX}
+          height={MASCOT_HEIGHT_PX}
           unoptimized
           draggable={false}
           className={cn(
