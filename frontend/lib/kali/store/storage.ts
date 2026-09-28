@@ -39,6 +39,9 @@ function migrateBoard(board: Board): void {
   if (board.workspaceId === undefined) board.workspaceId = null;
   if (board.publicSlug === undefined) board.publicSlug = null;
   if (board.revision === undefined) board.revision = null;
+  // Absent rather than null on boards that predate server-backed children; the
+  // distinction is the point, so it must not be collapsed to null here.
+  if (board.childrenSyncedAt === undefined) board.childrenSyncedAt = null;
 }
 
 export function loadData(): AppData {

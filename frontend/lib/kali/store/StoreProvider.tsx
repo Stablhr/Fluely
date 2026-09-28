@@ -42,6 +42,21 @@ import {
   setBoardVisibilityOnServer,
   setCollaboratorRoleOnServer,
 } from "@/lib/kali/api/boards";
+import {
+  createCardOnServer,
+  createListOnServer,
+  deleteCardOnServer,
+  deleteListOnServer,
+  fetchStructure,
+  moveCardOnServer,
+  reorderCardsOnServer,
+  reorderListsOnServer,
+  toCard,
+  toList,
+  updateCardOnServer,
+  updateListOnServer,
+} from "@/lib/kali/api/boardChildren";
+import type {CreateCardInput, StructureDto} from "@/lib/kali/api/boardChildren";
 import { getFriendlyErrorMessage } from "@/lib/api/getFriendlyErrorMessage";
 
 function patchRecord<T extends { id: string }>(
@@ -55,6 +70,43 @@ function patchRecord<T extends { id: string }>(
 }
 
 const now = () => new Date().toISOString();
+
+/**
+ * Whether a board has a server row behind it.
+ *
+ * This is the switch that keeps the app usable while children are being moved
+ * to the server: a board created here, or a template, has no `ownerId` and no
+ * revision, so it keeps working entirely on local mutations. Everything else
+ * goes to the server and is reconciled with what comes back.
+ */
+function isServerBoard(board: Board | undefined): board is Board {
+  return Boolean(board?.ownerId && board.revision !== null);
+}
+
+/**
+ * Translates a store card patch into the server's vocabulary.
+ *
+ * Four card fields never leave the browser -- `cover`, `files`, `comments`, and
+ * `activity` hold base64 image data or notes the server has no column for -- so
+ * they are dropped here rather than sent and rejected. `watching` is a
+ * per-person flag that belongs in the user's own record, not on a shared board
+ * document, so it stays local as well; sending it would let one person's
+ * "watching" state show up on everybody else's board.
+ *
+ * Only fields actually present in the patch are included, so an absent key stays
+ * absent on the wire instead of being sent as null and clearing the column.
+ */
+function toCardPatch(patch: Partial<Card>): Partial<CreateCardInput> {
+  const out: Partial<CreateCardInput> = {};
+  if (patch.title !== undefined) out.title = patch.title;
+  if (patch.desc !== undefined) out.desc = patch.desc;
+  if (patch.dueDate !== undefined) out.dueDate = patch.dueDate;
+  if (patch.startDate !== undefined) out.startDate = patch.startDate;
+  if (patch.location !== undefined) out.location = patch.location;
+  if (patch.labelIds !== undefined) out.labelIds = patch.labelIds;
+  if (patch.memberIds !== undefined) out.memberIds = patch.memberIds;
+  return out;
+}
 
 /**
  * Stamp the signed-in person's name onto the local "you" member.
@@ -187,6 +239,244 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const dismissError = () => setError(null);
 
   const mutate = (fn: (draft: AppData) => AppData) => setData(fn);
+
+  /* ── Board children (lists and cards) ──────────────────────────────
+     A board with a server row is the source of truth for its lists and cards;
+     everything below writes through and reconciles what comes back. A board that
+     only ever existed in this browser has no `ownerId` and no revision, so it
+     keeps working on local mutations alone -- that is what `isServerBoard`
+     decides, and it is why the app stays usable with an un-imported board. */
+
+  /**
+   * Marks a board's children as owned by the server, so the one-time import
+   * never runs again for it.
+   */
+  const markChildrenSynced = useCallback((boardId: string) => {
+    mutate((prev) => {
+      const board = prev.boards[boardId];
+      if (!board) return prev;
+      return {
+        ...prev,
+        boards: {
+          ...prev.boards,
+          [boardId]: { ...board, childrenSyncedAt: now() },
+        },
+      };
+    });
+  }, []);
+
+  /**
+   * Pushes a board's local lists and cards to the server, once.
+   *
+   * Boards created before lists and cards became server-backed have real work
+   * sitting only in the browser. Taking the server's -- empty -- view of them
+   * would blank those boards, so on the first reconcile they are pushed up
+   * instead.
+   *
+   * Matched by position and name rather than through a stored id map, which
+   * makes a re-run complete a half-finished import instead of duplicating it:
+   * each local list is compared with the server list at the same index, and only
+   * the ones that do not line up are created. Once the marker is set this never
+   * runs again, so a board whose lists were deliberately emptied is not
+   * silently refilled from the browser.
+   */
+  const importLocalChildren = useCallback(
+    async (boardId: string, server: StructureDto) => {
+      const data = dataRef.current;
+      const board = data.boards[boardId];
+      if (!board) return;
+
+      const localLists = board.listOrder
+        .map(id => data.lists[id])
+        .filter((list): list is List => Boolean(list));
+
+      if (localLists.length === 0) {
+        markChildrenSynced(boardId);
+        return;
+      }
+
+      let revision: number | undefined = board.revision ?? undefined;
+
+      for (let i = 0; i < localLists.length; i += 1) {
+        const local = localLists[i];
+        const existing = server.lists[i];
+
+        let listId: string;
+        let serverCardOrder: string[] = existing?.cardOrder ?? [];
+
+        if (existing && existing.name === local.name) {
+          listId = existing.id;
+        } else {
+          const created = await createListOnServer(boardId, {
+            name: local.name,
+            backgroundColor: local.backgroundColor || null,
+            position: i,
+            expectedRevision: revision,
+          });
+          listId = created.id;
+          serverCardOrder = [];
+          revision = created.revision;
+        }
+
+        const localCards = local.cardOrder
+          .map(id => data.cards[id])
+          .filter((card): card is Card => Boolean(card));
+
+        for (let j = 0; j < localCards.length; j += 1) {
+          if (serverCardOrder[j]) continue;
+          const card = await createCardOnServer(boardId, {
+            listId,
+            title: localCards[j].title,
+            desc: localCards[j].desc,
+            dueDate: localCards[j].dueDate,
+            startDate: localCards[j].startDate,
+            location: localCards[j].location || null,
+            labelIds: localCards[j].labelIds,
+            memberIds: localCards[j].memberIds,
+            expectedRevision: revision,
+          });
+          revision = card.revision;
+        }
+      }
+
+      markChildrenSynced(boardId);
+    },
+    [markChildrenSynced],
+  );
+
+  /**
+   * Records a board's revision after a child write.
+   *
+   * Every list and card write advances the board's single concurrency counter,
+   * so the local copy has to move with it or the next write would be rejected
+   * as a conflict with this one.
+   */
+  const applyRevision = (boardId: string, revision: number | undefined) => {
+    if (typeof revision !== "number") return;
+    mutate((prev) => {
+      const board = prev.boards[boardId];
+      if (!board) return prev;
+      return {
+        ...prev,
+        boards: {
+          ...prev.boards,
+          [boardId]: { ...board, revision },
+        },
+      };
+    });
+  };
+
+  /**
+   * Pulls a board's lists and cards and merges them in.
+   *
+   * Merge, not replace, and that is the whole subtlety. Four card fields --
+   * `cover`, `files`, `comments`, `activity` -- exist only in the browser: the
+   * first three hold base64 image data too large to put in a board document,
+   * and the fourth is generated locally as a side effect of acting. A wholesale
+   * replace would drop a user's attachments and notes on every sync, so
+   * `toCard` keeps the local copy of those and lets the server own the rest.
+   */
+  const syncBoardStructure = useCallback(async (boardId: string) => {
+    const board = dataRef.current.boards[boardId];
+    if (!isServerBoard(board)) return;
+
+    try {
+      const structure = await fetchStructure(boardId);
+
+      // A board whose children have never been reconciled is holding real work
+      // the server has not seen, so push that up before adopting the server's
+      // view of it. Everything after this point can trust the server's order.
+      if (!board.childrenSyncedAt) {
+        await importLocalChildren(boardId, structure);
+        await syncBoardStructure(boardId);
+        return;
+      }
+
+      mutate((prev) => {
+        const current = prev.boards[boardId];
+        if (!current) return prev;
+
+        const lists: Record<string, List> = {...prev.lists};
+        const cards: Record<string, Card> = {...prev.cards};
+
+        structure.lists.forEach((dto, index) => {
+          lists[dto.id] = toList(dto, index, lists[dto.id]);
+        });
+        structure.cards.forEach((dto) => {
+          cards[dto.id] = toCard(dto, cards[dto.id]);
+        });
+
+        // The board's own list order comes from the server, since that array is
+        // the authority. Local lists the server has never heard of are dropped
+        // from the sequence but left in the records, so nothing is destroyed if
+        // this turns out to be the wrong call.
+        const serverListOrder = structure.lists.map(list => list.id);
+        const serverCardIds = new Set(structure.cards.map(card => card.id));
+
+        // Once the server owns this board's children, a record it does not know
+        // about is a write that failed, not unsaved work -- so it is pruned
+        // rather than left behind as an orphan that nothing will ever render.
+        if (current.childrenSyncedAt) {
+          for (const [id, list] of Object.entries(lists)) {
+            if (list.boardId === boardId && !serverListOrder.includes(id)) {
+              delete lists[id];
+            }
+          }
+          for (const [id, card] of Object.entries(cards)) {
+            if (card.boardId === boardId && !serverCardIds.has(id)) {
+              delete cards[id];
+            }
+          }
+        }
+
+        return {
+          ...prev,
+          lists,
+          cards,
+          boards: {
+            ...prev.boards,
+            [boardId]: {
+              ...current,
+              listOrder: serverListOrder,
+              updatedAt: current.updatedAt,
+            },
+          },
+        };
+      });
+    } catch (err) {
+      setError(
+        getFriendlyErrorMessage(err, "Could not load this board’s contents."),
+      );
+    }
+  }, [importLocalChildren]);
+
+  /**
+   * Sends a child write to the server and adopts the new board revision.
+   *
+   * On rejection the board is re-read rather than rewound to a captured
+   * snapshot. The server is the source of truth for a synced board, so pulling
+   * it again is both simpler than a per-mutation rollback and more honest: it
+   * also picks up anything a collaborator changed in the meantime, which a
+   * rollback to a stale local copy would have silently discarded.
+   */
+  const writeThrough = useCallback(
+    async (
+      boardId: string,
+      send: (revision: number | undefined) => Promise<number | undefined>,
+      failureMessage: string,
+    ) => {
+      try {
+        const revision = await send(
+          dataRef.current.boards[boardId]?.revision ?? undefined,
+        );
+        applyRevision(boardId, revision);
+      } catch (err) {
+        setError(getFriendlyErrorMessage(err, failureMessage));
+        void syncBoardStructure(boardId);
+      }
+    },
+    [applyRevision, syncBoardStructure],
+  );
 
   const getBoard = (id: string) => data.boards[id];
   const getCard = (id: string) => data.cards[id];
@@ -339,6 +629,43 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
   const addList = (boardId: string, name: string) => {
     const id = uid();
+    if (isServerBoard(dataRef.current.boards[boardId])) {
+      void writeThrough(
+        boardId,
+        revision =>
+          createListOnServer(boardId, { name, expectedRevision: revision }).then(
+            created => {
+              // The server names the list, so the optimistic local row is
+              // re-keyed onto the real id rather than left to disagree with it.
+              mutate(prev => {
+                const local = prev.lists[id];
+                if (!local) return prev;
+                const lists = {...prev.lists};
+                delete lists[id];
+                lists[created.id] = {...local, id: created.id, name: created.name};
+                const board = prev.boards[boardId];
+                return {
+                  ...prev,
+                  lists,
+                  boards: board
+                    ? {
+                        ...prev.boards,
+                        [boardId]: {
+                          ...board,
+                          listOrder: board.listOrder.map(x =>
+                            x === id ? created.id : x,
+                          ),
+                        },
+                      }
+                    : prev.boards,
+                };
+              });
+              return created.revision;
+            },
+          ),
+        "Could not add that list.",
+      );
+    }
     mutate((prev) => {
       const board = prev.boards[boardId];
       if (!board) return prev;
@@ -371,7 +698,38 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     });
   };
 
-  const renameList = (id: string, name: string) =>
+  const renameList = (id: string, name: string) => {
+    const list = dataRef.current.lists[id];
+    if (list && isServerBoard(dataRef.current.boards[list.boardId])) {
+      void writeThrough(
+        list.boardId,
+        revision =>
+          updateListOnServer(list.boardId, id, {
+            name,
+            expectedRevision: revision,
+          }).then(updated => {
+            mutate(prev => {
+              const current = prev.lists[id];
+              if (!current) return prev;
+              return {
+                ...prev,
+                lists: {
+                  ...prev.lists,
+                  [id]: {
+                    ...current,
+                    name: updated.name,
+                    collapsed: updated.collapsed,
+                    backgroundColor: updated.backgroundColor ?? "",
+                    cardOrder: updated.cardOrder ?? current.cardOrder,
+                  },
+                },
+              };
+            });
+            return updated.revision;
+          }),
+        "Could not rename that list.",
+      );
+    }
     mutate((prev) => {
       const list = prev.lists[id];
       if (!list) return prev;
@@ -398,20 +756,109 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           : prev.boards,
       };
     });
+  };
 
-  const setListAssignee = (id: string, name: string) =>
+  /**
+   * Sends a list field change to the server when the board has one.
+   *
+   * The three simple list setters below differ only in which field they touch,
+   * so they share this rather than each repeating the write-through and the
+   * reconciliation.
+   */
+  /**
+   * Finds the member id behind a display name.
+   *
+   * The store's list and card `assignee` is a name, while the server's is a
+   * reference to a user. Null means the name belongs to nobody in the member
+   * list -- a leftover from a board this person cannot see the roster of -- and
+   * the caller keeps that value local instead of sending an id that is not
+   * there.
+   */
+  const resolveMemberId = (name: string): string | null => {
+    if (!name) return null;
+    const match = Object.values(dataRef.current.members).find(
+      member => member.name === name,
+    );
+    return match?.id ?? null;
+  };
+
+  const patchListOnServer = (
+    id: string,
+    local: Partial<List>,
+    server: {
+      backgroundColor?: string | null;
+      collapsed?: boolean;
+      assignee?: string | null;
+    },
+    failureMessage: string,
+  ) => {
+    const list = dataRef.current.lists[id];
+    if (!list || !isServerBoard(dataRef.current.boards[list.boardId])) return;
+
+    void writeThrough(
+      list.boardId,
+      revision =>
+        updateListOnServer(list.boardId, id, {
+          ...server,
+          expectedRevision: revision,
+        }).then(updated => {
+          mutate(prev => {
+            const current = prev.lists[id];
+            if (!current) return prev;
+            return {
+              ...prev,
+              lists: {
+                ...prev.lists,
+                [id]: {
+                  ...current,
+                  ...local,
+                  collapsed: updated.collapsed ?? current.collapsed,
+                  backgroundColor:
+                    updated.backgroundColor ?? current.backgroundColor,
+                  cardOrder: updated.cardOrder ?? current.cardOrder,
+                },
+              },
+            };
+          });
+          return updated.revision;
+        }),
+      failureMessage,
+    );
+  };
+
+  const setListAssignee = (id: string, name: string) => {
+    patchListOnServer(
+      id,
+      {assignee: name},
+      // The store keeps a display name where the server keeps a user id, so the
+      // name is resolved against the board's members. A name that matches nobody
+      // is left local rather than sent as a bogus id -- the server would reject
+      // it, and a rejected write is worse than one that never leaves.
+      {assignee: resolveMemberId(name)},
+      "Could not assign that list.",
+    );
     mutate((prev) => ({
       ...prev,
       lists: patchRecord(prev.lists, id, { assignee: name }),
     }));
+  };
 
-  const setListBackgroundColor = (id: string, color: string) =>
+  const setListBackgroundColor = (id: string, color: string) => {
+    patchListOnServer(
+      id,
+      { backgroundColor: color },
+      { backgroundColor: color || null },
+      "Could not change that list’s colour.",
+    );
     mutate((prev) => ({
       ...prev,
       lists: patchRecord(prev.lists, id, { backgroundColor: color }),
     }));
+  };
 
-  const toggleListCollapsed = (id: string) =>
+  const toggleListCollapsed = (id: string) => {
+    const collapsed = !(dataRef.current.lists[id]?.collapsed ?? false);
+    patchListOnServer(id, { collapsed }, { collapsed }, "Could not collapse that list.");
     mutate((prev) => {
       const list = prev.lists[id];
       if (!list) return prev;
@@ -420,6 +867,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         lists: patchRecord(prev.lists, id, { collapsed: !list.collapsed }),
       };
     });
+  };
 
   const archiveList = (id: string) => {
     mutate((prev) => {
@@ -497,6 +945,25 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const moveList = (boardId: string, startIndex: number, endIndex: number) => {
+    // Computed up front from the committed order rather than from inside the
+    // reducer: this is the array that has to be sent, and the reducer's draft is
+    // not available outside it.
+    const current = dataRef.current.boards[boardId];
+    if (current && isServerBoard(current)) {
+      const order = [...current.listOrder];
+      const [moved] = order.splice(startIndex, 1);
+      if (moved) {
+        order.splice(endIndex, 0, moved);
+        void writeThrough(
+          boardId,
+          revision =>
+            reorderListsOnServer(boardId, order, revision).then(
+              result => result.revision,
+            ),
+          "Could not move that list.",
+        );
+      }
+    }
     mutate((prev) => {
       const board = prev.boards[boardId];
       if (!board) return prev;
@@ -516,6 +983,47 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
   const addCard = (listId: string, title: string): string => {
     const id = uid();
+    const list = dataRef.current.lists[listId];
+    if (list && isServerBoard(dataRef.current.boards[list.boardId])) {
+      void writeThrough(
+        list.boardId,
+        revision =>
+          createCardOnServer(list.boardId, {
+            listId,
+            title,
+            expectedRevision: revision,
+          }).then(created => {
+            // Re-key the optimistic card onto the server's id, and drop it from
+            // the list's local order: the server appends it, so leaving the
+            // placeholder in place would show the card twice.
+            mutate(prev => {
+              const local = prev.cards[id];
+              if (!local) return prev;
+              const cards = {...prev.cards};
+              delete cards[id];
+              cards[created.id] = toCard(created, {...local, id: created.id});
+              const target = prev.lists[listId];
+              return {
+                ...prev,
+                cards,
+                lists: target
+                  ? {
+                      ...prev.lists,
+                      [listId]: {
+                        ...target,
+                        cardOrder: target.cardOrder
+                          .filter(x => x !== id)
+                          .concat(created.id),
+                      },
+                    }
+                  : prev.lists,
+              };
+            });
+            return created.revision;
+          }),
+        "Could not add that card.",
+      );
+    }
     mutate((prev) => {
       const list = prev.lists[listId];
       if (!list) return prev;
@@ -546,6 +1054,17 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const deleteCard = (id: string) => {
+    const card = dataRef.current.cards[id];
+    if (card && isServerBoard(dataRef.current.boards[card.boardId])) {
+      void writeThrough(
+        card.boardId,
+        revision =>
+          deleteCardOnServer(card.boardId, id, revision).then(newRevision => {
+            return newRevision;
+          }),
+        "Could not delete that card.",
+      );
+    }
     mutate((prev) => {
       const card = prev.cards[id];
       if (!card) return prev;
@@ -567,13 +1086,63 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     });
   };
 
-  const updateCard = (id: string, patch: Partial<Card>) =>
+  const updateCard = (id: string, patch: Partial<Card>) => {
+    const card = dataRef.current.cards[id];
+    if (card && isServerBoard(dataRef.current.boards[card.boardId])) {
+      void writeThrough(
+        card.boardId,
+        revision =>
+          updateCardOnServer(card.boardId, id, toCardPatch(patch)).then(
+            updated => {
+              mutate(prev => {
+                const current = prev.cards[id];
+                if (!current) return prev;
+                return {
+                  ...prev,
+                  cards: {
+                    ...prev.cards,
+                    [id]: {...toCard(updated, current), ...patch},
+                  },
+                };
+              });
+              return updated.revision;
+            },
+          ),
+        "Could not save that card.",
+      );
+    }
     mutate((prev) => ({
       ...prev,
       cards: patchRecord(prev.cards, id, { ...patch, updatedAt: now() }),
     }));
+  };
 
   const moveCard = (cardId: string, destListId: string, destIndex: number) => {
+    const card = dataRef.current.cards[cardId];
+    const dest = dataRef.current.lists[destListId];
+    if (card && dest && isServerBoard(dataRef.current.boards[card.boardId])) {
+      // The destination's whole new order is computed here rather than sent as
+      // an index: the source list has to be rewritten too, and the two are only
+      // consistent if the client states both sides at once.
+      const srcListId = card.listId;
+      const src = dataRef.current.lists[srcListId];
+      const destOrder =
+        srcListId === destListId
+          ? (src?.cardOrder ?? []).filter(x => x !== cardId)
+          : dest.cardOrder.filter(x => x !== cardId);
+      destOrder.splice(destIndex, 0, cardId);
+
+      void writeThrough(
+        card.boardId,
+        revision =>
+          moveCardOnServer(card.boardId, cardId, {
+            listId: destListId,
+            cardOrder: destOrder,
+            expectedRevision: revision,
+          }).then(result => result.revision),
+        "Could not move that card.",
+      );
+    }
     mutate((prev) => {
       const card = prev.cards[cardId];
       if (!card) return prev;

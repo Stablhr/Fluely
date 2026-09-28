@@ -128,6 +128,16 @@ export interface Board {
   publicSlug: string | null;
   /** Server-side optimistic-concurrency counter; null while local-only. */
   revision: number | null;
+  /**
+   * When this board's lists and cards were last reconciled with the server.
+   *
+   * Set once, and only after the server has taken over this board's children.
+   * Until then the browser still holds lists and cards the server has never
+   * seen, and those get pushed up rather than overwritten -- a board created
+   * before lists became server-backed would otherwise come back from the server
+   * empty and take the user's work with it.
+   */
+  childrenSyncedAt?: string | null;
   settings: BoardSettings;
   activity: ActivityItem[];
   archivedLists: ArchivedList[];
