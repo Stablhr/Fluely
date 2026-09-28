@@ -15,6 +15,7 @@ import LoadingScreen, {
   preloadLoadingFrames,
   type LoadingScreenMode,
 } from '@/components/auth/LoadingScreen';
+import {CURTAIN_FADE_OUT_MS} from '@/lib/auth/loadingCurtain';
 
 type LoadingScreenContextValue = {
   mode: LoadingScreenMode;
@@ -27,82 +28,95 @@ const LoadingScreenContext = createContext<LoadingScreenContextValue | null>(
 );
 
 /**
- * The curtain is up for the very first render, which is also the very first
- * render the server sends. That is what makes a refresh show the mascot
- * instead of a bare ivory page: the HTML arriving before the JS bundle carries
- * the overlay with it, so there is no blank gap while the chunk parses and
- * React hydrates.
- */
-const BOOT_MODE: LoadingScreenMode = 'load';
-
-/**
- * Upper bound on how long the boot curtain will wait for the mascot frames. The
- * curtain would rather lift on an empty box than never lift at all.
- */
-const BOOT_CURTAIN_MAX_MS = 1200;
-
-/**
- * Owns the one loading curtain so the sign-in form, both sign-out buttons, and
- * the initial page load can share it. Mounted in the root layout because the
- * trigger lives in the (auth) group but sign-out lives in (app) and (admin).
+ * Owns the one loading curtain used for the auth requests — the sign-in form,
+ * both sign-out buttons, and the redirect that follows either. Mounted in the
+ * root layout because the trigger lives in the (auth) group but sign-out lives
+ * in (app) and (admin).
  *
  * The curtain is mounted only while active rather than hidden with CSS, so the
  * frame interval starts fresh on every show and nothing is left ticking behind
  * a hidden overlay.
+ *
+ * It is NOT raised for the initial page load. That case belongs to
+ * app/loading.tsx, which renders the same curtain as the route's Suspense
+ * fallback. The provider used to open its own curtain on mount as well, and
+ * during the overlap the two mascots ran at independent offsets — so on screen
+ * there were two drawings crossfading at half opacity on top of each other,
+ * which reads as a blur rather than a run cycle. One curtain at a time fixes
+ * that, and app/loading.tsx is in the server HTML too, so a refresh still shows
+ * the mascot in the first flush rather than a bare ivory page.
  */
 export default function LoadingScreenProvider({
   children,
 }: {
   children: ReactNode;
 }) {
-  const [active, setActive] = useState<LoadingScreenMode | null>(BOOT_MODE);
+  const [active, setActive] = useState<LoadingScreenMode | null>(null);
+  const [exiting, setExiting] = useState(false);
   const pathname = usePathname();
+
   /* Which route the current curtain was raised on, so a navigation can retire
      it. Null while no curtain is up. */
   const raisedOn = useRef<string | null>(null);
+  /* Timer for the fade-out, so a curtain that is reopened mid-fade snaps back
+     instead of unmounting underneath the new request. Doubles as the guard
+     against scheduling a second retirement while one is counting down. */
+  const exitTimer = useRef<number | null>(null);
+
+  const cancelExit = useCallback(() => {
+    if (exitTimer.current === null) return;
+    window.clearTimeout(exitTimer.current);
+    exitTimer.current = null;
+    setExiting(false);
+  }, []);
 
   /* Warm the mascot frames on app mount so the curtain never opens on an empty
      box, however slow the connection is when the user hits sign in. The root
      layout also preloads them via <link rel="preload">; this is the belt to
-     that braces, and it doubles as the signal for when the mascot is ready. */
+     that braces. Fire-and-forget — the boot curtain that used to wait on this
+     promise is gone, and nothing else needs the result. */
   useEffect(() => {
-    let settled = false;
+    void preloadLoadingFrames();
+  }, []);
 
-    const retire = () => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(cap);
-      // The guard matters: a real request can claim the curtain during the
-      // boot window, and this must not cancel it.
-      setActive((current) => (current === BOOT_MODE ? null : current));
-    };
-
-    const cap = window.setTimeout(retire, BOOT_CURTAIN_MAX_MS);
-
-    preloadLoadingFrames().then(() => {
-      /* Wait for the first client render as well, so the real page is on screen
-         before the overlay lifts rather than flashing curtain-then-content. */
-      window.setTimeout(retire, 0);
-    });
-
+  useEffect(() => {
     return () => {
-      settled = true;
-      window.clearTimeout(cap);
+      if (exitTimer.current !== null) {
+        window.clearTimeout(exitTimer.current);
+      }
     };
+  }, []);
+
+  /**
+   * Start the fade-out and unmount once it has run. The curtain stays mounted
+   * for the length of the transition, so `hide()` is still synchronous and the
+   * auth callers keep their existing shape.
+   */
+  const dismiss = useCallback(() => {
+    /* A retirement is already counting down. */
+    if (exitTimer.current !== null) return;
+
+    setExiting(true);
+    exitTimer.current = window.setTimeout(() => {
+      exitTimer.current = null;
+      setExiting(false);
+      setActive(null);
+    }, CURTAIN_FADE_OUT_MS);
   }, []);
 
   const show = useCallback(
     (mode: LoadingScreenMode) => {
+      cancelExit();
       raisedOn.current = pathname;
       setActive(mode);
     },
-    [pathname]
+    [pathname, cancelExit]
   );
 
   const hide = useCallback(() => {
     raisedOn.current = null;
-    setActive(null);
-  }, []);
+    dismiss();
+  }, [dismiss]);
 
   /* Sign-in deliberately leaves the curtain up across its redirect so the
      dashboard cannot flash in behind it. That only works if something retires
@@ -115,14 +129,13 @@ export default function LoadingScreenProvider({
      inside useSignOut (hold, then hide) and must not be second-guessed here: the
      (app) auth gate replaces to /sign-in the moment the session goes stale,
      which lands while that hold is still counting, and retiring the curtain
-     there would cut the sign-out animation short. The boot curtain likewise
-     belongs to its own effect above. */
+     there would cut the sign-out animation short. */
   useEffect(() => {
     if (raisedOn.current && raisedOn.current !== pathname) {
       raisedOn.current = null;
-      setActive((current) => (current === 'login' ? null : current));
+      dismiss();
     }
-  }, [pathname]);
+  }, [pathname, dismiss]);
 
   const value = useMemo<LoadingScreenContextValue>(
     () => ({mode: active ?? 'login', show, hide}),
@@ -132,7 +145,7 @@ export default function LoadingScreenProvider({
   return (
     <LoadingScreenContext.Provider value={value}>
       {children}
-      {active && <LoadingScreen mode={active} />}
+      {active && <LoadingScreen mode={active} exiting={exiting} />}
     </LoadingScreenContext.Provider>
   );
 }

@@ -7,10 +7,21 @@
  * this long; the constant lives here so the two flows cannot drift apart.
  *
  * The frame swap rate is deliberately NOT part of this module — the animation
- * itself still runs at 175ms per frame (see components/auth/LoadingScreen.tsx).
- * Only the minimum time the curtain is visible is governed here.
+ * itself still runs at its own per-frame interval (see
+ * components/auth/LoadingScreen.tsx). Only the curtain's own timings live here.
  */
 export const MIN_CURTAIN_MS = 1000;
+
+/**
+ * How long the curtain takes to fade out once the page it is covering is ready.
+ *
+ * The number is consumed in two places — as the CSS transition-duration on the
+ * overlay and as the timer the provider waits out before unmounting — so it
+ * lives here rather than being inlined at each site. If the two disagree the
+ * curtain is either unmounted mid-fade (a visible cut) or left on screen fully
+ * transparent, briefly swallowing clicks.
+ */
+export const CURTAIN_FADE_OUT_MS = 420;
 
 const wait = (ms: number) =>
   new Promise<void>((resolve) => {
