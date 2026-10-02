@@ -1,8 +1,26 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import {env} from './env';
 
-const uploadDirAbs = path.resolve(process.cwd(), env.MEDIA_UPLOAD_DIR);
+const isServerless =
+  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+  Boolean(process.env.LAMBDA_TASK_ROOT) ||
+  Boolean(process.env.AWS_EXECUTION_ENV) ||
+  Boolean(process.env.VERCEL) ||
+  Boolean(process.env.VERCEL_ENV) ||
+  Boolean(process.env.SERVERLESS) ||
+  process.env.NODE_ENV === 'production' && process.platform !== 'win32';
+
+const defaultUploadDir = isServerless
+  ? path.join(os.tmpdir(), 'uploads')
+  : path.resolve(process.cwd(), env.MEDIA_UPLOAD_DIR);
+
+const uploadDirAbs = env.MEDIA_UPLOAD_DIR
+  ? (path.isAbsolute(env.MEDIA_UPLOAD_DIR)
+      ? env.MEDIA_UPLOAD_DIR
+      : path.resolve(process.cwd(), env.MEDIA_UPLOAD_DIR))
+  : defaultUploadDir;
 
 export const mediaConfig = {
   uploadDirAbs,
