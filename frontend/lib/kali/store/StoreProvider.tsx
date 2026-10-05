@@ -381,15 +381,18 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     if (!isServerBoard(board)) return;
 
     try {
-      const structure = await fetchStructure(boardId);
+      let structure = await fetchStructure(boardId);
 
       // A board whose children have never been reconciled is holding real work
       // the server has not seen, so push that up before adopting the server's
       // view of it. Everything after this point can trust the server's order.
+      //
+      // The push is followed by a second read rather than a recursive call:
+      // `importLocalChildren` sets the synced marker, so one more fetch is all
+      // it takes to reach the state the recursion was re-entering to get.
       if (!board.childrenSyncedAt) {
         await importLocalChildren(boardId, structure);
-        await syncBoardStructure(boardId);
-        return;
+        structure = await fetchStructure(boardId);
       }
 
       mutate((prev) => {
@@ -448,7 +451,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         getFriendlyErrorMessage(err, "Could not load this board’s contents."),
       );
     }
-  }, [importLocalChildren]);
+  }, [importLocalChildren, mutate, setError]);
 
   /**
    * Sends a child write to the server and adopts the new board revision.
@@ -475,7 +478,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         void syncBoardStructure(boardId);
       }
     },
-    [applyRevision, syncBoardStructure],
+    [applyRevision, syncBoardStructure, setError],
   );
 
   const getBoard = (id: string) => data.boards[id];
@@ -1091,10 +1094,10 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     if (card && isServerBoard(dataRef.current.boards[card.boardId])) {
       void writeThrough(
         card.boardId,
-        revision =>
+            () =>
           updateCardOnServer(card.boardId, id, toCardPatch(patch)).then(
-            updated => {
-              mutate(prev => {
+            (updated) => {
+              mutate((prev) => {
                 const current = prev.cards[id];
                 if (!current) return prev;
                 return {

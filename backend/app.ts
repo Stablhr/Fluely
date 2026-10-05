@@ -16,7 +16,7 @@ const app = express();
 
 const allowedOrigins = env.CORS_ORIGINS
   ? env.CORS_ORIGINS.split(',').map(o => o.trim().replace(/\/+$/, ''))
-  : ['http://localhost:3000'];
+  : ['http://localhost:3000', 'https://fluely-zf47.vercel.app'];
 
 app.use(helmet());
 app.use(httpsRedirect);
