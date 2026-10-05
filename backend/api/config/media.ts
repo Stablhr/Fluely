@@ -12,15 +12,22 @@ const isServerless =
   Boolean(process.env.SERVERLESS) ||
   process.env.NODE_ENV === 'production' && process.platform !== 'win32';
 
-const defaultUploadDir = isServerless
-  ? path.join(os.tmpdir(), 'uploads')
-  : path.resolve(process.cwd(), env.MEDIA_UPLOAD_DIR);
+const explicitAbsoluteDir =
+  env.MEDIA_UPLOAD_DIR && path.isAbsolute(env.MEDIA_UPLOAD_DIR)
+    ? env.MEDIA_UPLOAD_DIR
+    : null;
 
-const uploadDirAbs = env.MEDIA_UPLOAD_DIR
-  ? (path.isAbsolute(env.MEDIA_UPLOAD_DIR)
-      ? env.MEDIA_UPLOAD_DIR
-      : path.resolve(process.cwd(), env.MEDIA_UPLOAD_DIR))
-  : defaultUploadDir;
+const dirRelativeToCwd = env.MEDIA_UPLOAD_DIR
+  ? path.resolve(process.cwd(), env.MEDIA_UPLOAD_DIR)
+  : null;
+
+// Serverless bundles ship a read-only filesystem apart from the temp dir, so a
+// relative MEDIA_UPLOAD_DIR (including the `'uploads'` default) cannot be
+// created there. Only an explicit absolute path overrides the temp dir.
+const uploadDirAbs =
+  explicitAbsoluteDir ??
+  (isServerless ? null : dirRelativeToCwd) ??
+  path.join(os.tmpdir(), 'uploads');
 
 export const mediaConfig = {
   uploadDirAbs,

@@ -1,0 +1,6 @@
+# Vercel CLI link state
+.vercel
+
+# Local env files, but keep the tracked .env.example templates
+.env*
+!.env.example
