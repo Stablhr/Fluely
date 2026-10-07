@@ -56,7 +56,7 @@ import {
   updateCardOnServer,
   updateListOnServer,
 } from "@/lib/kali/api/boardChildren";
-import type {CreateCardInput, StructureDto} from "@/lib/kali/api/boardChildren";
+import type {CreateCardInput, ListDto, StructureDto} from "@/lib/kali/api/boardChildren";
 import {
   fetchNotifications,
   markAllNotificationsRead as markAllNotificationsReadOnServer,
@@ -135,6 +135,17 @@ function withUserName(data: AppData, name: string | undefined): AppData {
     ...data,
     members: { ...data.members, [YOU_ID]: { ...member, name: trimmed } },
   };
+}
+
+/**
+ * Structural comparison for polled payloads.
+ *
+ * A poll that comes back with nothing new must not change state identity: a
+ * fresh array every ten seconds would re-render every `useStore()` consumer —
+ * the entire board — and that re-render lands mid-drag as a visible hitch.
+ */
+function samePayload<T>(prev: T, next: T): boolean {
+  return JSON.stringify(prev) === JSON.stringify(next);
 }
 
 function makeCard(list: List, title: string, extra: Partial<Card> = {}): Card {
@@ -220,7 +231,9 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const social = useSocialPosts();
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    let idleHandle: number | null = null;
+    const write = () => {
+      idleHandle = null;
       try {
         saveData(dataRef.current);
       } catch (err) {
@@ -228,8 +241,26 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           err instanceof Error ? err.message : "Could not save your changes.",
         );
       }
+    };
+    const timer = window.setTimeout(() => {
+      // Serializing the whole store — base64 image covers included — can take
+      // long enough to be felt. The idle queue keeps it off the frame where a
+      // drop animation is still settling.
+      if (typeof window.requestIdleCallback === "function") {
+        idleHandle = window.requestIdleCallback(write, { timeout: 1000 });
+      } else {
+        write();
+      }
     }, 400);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      if (
+        idleHandle !== null &&
+        typeof window.cancelIdleCallback === "function"
+      ) {
+        window.cancelIdleCallback(idleHandle);
+      }
+    };
   }, [data]);
 
   useEffect(() => {
@@ -246,7 +277,16 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
   const dismissError = () => setError(null);
 
-  const mutate = (fn: (draft: AppData) => AppData) => setData(fn);
+  const mutate = useCallback((fn: (draft: AppData) => AppData) => {
+    // Applied eagerly against `dataRef` instead of queued as a state updater:
+    // callers in this file read the store back synchronously (the repair-then-
+    // import sequence, consecutive write-throughs), and waiting for the render
+    // pass would hand them the previous state. Every write goes through here,
+    // so the ref stays authoritative for those reads.
+    const next = fn(dataRef.current);
+    dataRef.current = next;
+    setData(next);
+  }, []);
 
   /* ── Board children (lists and cards) ──────────────────────────────
      A board with a server row is the source of truth for its lists and cards;
@@ -271,7 +311,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         },
       };
     });
-  }, []);
+  }, [mutate]);
 
   /**
    * Pushes a board's local lists and cards to the server, once.
@@ -294,9 +334,18 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       const board = data.boards[boardId];
       if (!board) return;
 
+      // Lists the server already has are skipped by id: after a repair they
+      // sit in the same `listOrder` as the local-only lists, and the positional
+      // matching below would otherwise create a duplicate of each one.
+      const serverIds = new Set(server.lists.map((list) => list.id));
       const localLists = board.listOrder
         .map(id => data.lists[id])
-        .filter((list): list is List => Boolean(list));
+        .filter(
+          (list): list is List =>
+            Boolean(list) &&
+            Boolean(list.id) &&
+            !serverIds.has(list.id),
+        );
 
       if (localLists.length === 0) {
         markChildrenSynced(boardId);
@@ -359,20 +408,135 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
    * so the local copy has to move with it or the next write would be rejected
    * as a conflict with this one.
    */
-  const applyRevision = (boardId: string, revision: number | undefined) => {
-    if (typeof revision !== "number") return;
-    mutate((prev) => {
-      const board = prev.boards[boardId];
-      if (!board) return prev;
-      return {
-        ...prev,
-        boards: {
-          ...prev.boards,
-          [boardId]: { ...board, revision },
-        },
-      };
-    });
-  };
+  const applyRevision = useCallback(
+    (boardId: string, revision: number | undefined) => {
+      if (typeof revision !== "number") return;
+      mutate((prev) => {
+        const board = prev.boards[boardId];
+        if (!board) return prev;
+        return {
+          ...prev,
+          boards: {
+            ...prev.boards,
+            [boardId]: { ...board, revision },
+          },
+        };
+      });
+    },
+    [mutate],
+  );
+
+  /**
+   * Heals a board damaged by the old create-response bug.
+   *
+   * The write helpers used to read the server's `{list, revision}` envelope as
+   * if it were the list itself, so every successful create re-keyed the
+   * optimistic row onto an undefined id: `listOrder` ended up with undefined
+   * holes, all of them resolving to one shared record under the string key
+   * "undefined" -- which is why every hole rendered the same list -- and card
+   * orders picked up undefined slots of their own. The server has the real
+   * lists and cards all along; this folds them back into place.
+   *
+   * Each broken slot is paired with the next server list no healthy slot has
+   * claimed. Creation order lines up with slot order because creates append on
+   * both sides, and lists the server has never heard of keep their slots
+   * untouched -- `importLocalChildren` below still has to push those. Slots the
+   * server has no list for are dropped: their content was unreachable anyway,
+   * every one of them resolving to the same corrupted record.
+   *
+   * Runs before the import so the import only ever sees lists with real ids.
+   */
+  const repairBoardChildren = useCallback(
+    (boardId: string, structure: StructureDto) => {
+      mutate((prev) => {
+        const current = prev.boards[boardId];
+        if (!current) return prev;
+
+        const lists = { ...prev.lists };
+        const cards = { ...prev.cards };
+
+        const hasCorruptSlot = current.listOrder.some((id) => {
+          const record = lists[id];
+          return !record || !record.id;
+        });
+        const hasCorruptCardSlot = Object.values(lists).some(
+          (list) =>
+            list.boardId === boardId &&
+            list.cardOrder.some((id) => !id),
+        );
+
+        if (
+          !hasCorruptSlot &&
+          !hasCorruptCardSlot &&
+          !lists["undefined"] &&
+          !cards["undefined"]
+        ) {
+          return prev;
+        }
+
+        const serverIds = new Set(structure.lists.map((list) => list.id));
+        const claimed = new Set<string>();
+        const adoptions: Array<{
+          id: string;
+          dto: ListDto;
+          record: List | undefined;
+        }> = [];
+        const listOrder: Array<string | null> = [];
+
+        for (const id of current.listOrder) {
+          const record = lists[id];
+          if (record?.id && serverIds.has(record.id)) {
+            claimed.add(record.id);
+            listOrder.push(record.id);
+          } else if (record?.id) {
+            // A local-only list; the import below owns it, not the repair.
+            listOrder.push(id);
+          } else {
+            const dto = structure.lists.find((list) => !claimed.has(list.id));
+            if (dto) {
+              claimed.add(dto.id);
+              adoptions.push({ id: dto.id, dto, record });
+              listOrder.push(dto.id);
+            } else {
+              listOrder.push(null);
+            }
+          }
+        }
+
+        const finalOrder = listOrder.filter((id): id is string => id !== null);
+        for (const [index, id] of finalOrder.entries()) {
+          const adoption = adoptions.find((entry) => entry.id === id);
+          if (adoption) {
+            lists[id] = toList(adoption.dto, index, adoption.record);
+          }
+        }
+
+        for (const list of Object.values(lists)) {
+          if (!list.id || list.boardId !== boardId) continue;
+          if (list.cardOrder.some((id) => !id)) {
+            lists[list.id] = {
+              ...list,
+              cardOrder: list.cardOrder.filter(Boolean),
+            };
+          }
+        }
+
+        delete lists["undefined"];
+        delete cards["undefined"];
+
+        return {
+          ...prev,
+          lists,
+          cards,
+          boards: {
+            ...prev.boards,
+            [boardId]: { ...current, listOrder: finalOrder },
+          },
+        };
+      });
+    },
+    [mutate],
+  );
 
   /**
    * Pulls a board's lists and cards and merges them in.
@@ -390,6 +554,11 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
     try {
       let structure = await fetchStructure(boardId);
+
+      // Undo create-response damage before anything else reads the ordering
+      // arrays: repair pairs the broken slots with the server lists that were
+      // created for them, and the import below must only see real ids.
+      repairBoardChildren(boardId, structure);
 
       // A board whose children have never been reconciled is holding real work
       // the server has not seen, so push that up before adopting the server's
@@ -420,9 +589,17 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         // The board's own list order comes from the server, since that array is
         // the authority. Local lists the server has never heard of are dropped
         // from the sequence but left in the records, so nothing is destroyed if
-        // this turns out to be the wrong call.
-        const serverListOrder = structure.lists.map(list => list.id);
-        const serverCardIds = new Set(structure.cards.map(card => card.id));
+        // this turns out to be the wrong call. Locally archived lists are the
+        // exception: archiving never reaches the server, so the server still
+        // lists them and adopting its order wholesale would resurrect them on
+        // every open.
+        const archivedIds = new Set(
+          (current.archivedLists ?? []).map((entry) => entry.list.id),
+        );
+        const serverListOrder = structure.lists
+          .map((list) => list.id)
+          .filter((id) => !archivedIds.has(id));
+        const serverCardIds = new Set(structure.cards.map((card) => card.id));
 
         // Once the server owns this board's children, a record it does not know
         // about is a write that failed, not unsaved work -- so it is pruned
@@ -459,7 +636,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         getFriendlyErrorMessage(err, "Could not load this board’s contents."),
       );
     }
-  }, [importLocalChildren, mutate, setError]);
+  }, [importLocalChildren, mutate, repairBoardChildren, setError]);
 
   /**
    * Sends a child write to the server and adopts the new board revision.
@@ -1765,7 +1942,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     } catch (err) {
       setError(getFriendlyErrorMessage(err, "Could not load your boards."));
     }
-  }, []);
+  }, [mutate]);
 
   // One pull per mount. The layout remounts this on every account change, so
   // there is no need to watch for a user switch here.
@@ -1820,11 +1997,19 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         (n) => !keptIds.has(n.id) && !n.read,
       ).length;
 
-      setNotifications(notifications);
-      setUnreadNotificationCount(
-        Math.max(0, list.unreadCount - staleUnread),
+      const nextUnread = Math.max(0, list.unreadCount - staleUnread);
+
+      // Identity-preserving writes: React bails out of the re-render when the
+      // updater returns the previous value, so an unchanged poll costs nothing.
+      setNotifications((prev) =>
+        samePayload(prev, notifications) ? prev : notifications,
       );
-      setPendingInvitations(invitationsResult.data);
+      setUnreadNotificationCount((prev) =>
+        prev === nextUnread ? prev : nextUnread,
+      );
+      setPendingInvitations((prev) =>
+        samePayload(prev, invitationsResult.data) ? prev : invitationsResult.data,
+      );
     } catch {
       // Quiet on purpose — see above. The next tick retries.
     }
@@ -1878,7 +2063,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         ),
       );
     }
-  }, []);
+  }, [mutate]);
 
   const inviteCollaborator = async (
     boardId: string,
@@ -2169,7 +2354,9 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
   const resetAll = () => {
     clearData();
-    setData(withUserName(emptyData(), currentUser?.name));
+    // Through `mutate`, not `setData`, so `dataRef` swaps with it -- a later
+    // mutation against the stale ref would resurrect the cleared store.
+    mutate(() => withUserName(emptyData(), currentUser?.name));
   };
 
   /* ── Social Posts (delegated to useSocialPosts hook) ──────────── */
@@ -2315,6 +2502,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
     /* Collaboration */
     syncBoards,
+    syncBoardStructure,
     pendingBoardId,
     currentUserId: currentUser?.id ?? null,
     canWrite,

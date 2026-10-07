@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { Draggable } from '@hello-pangea/dnd'
 import { Paperclip, MessageSquare, Eye, Check } from 'lucide-react'
 import type { Card } from '@/lib/kali/store/schema'
@@ -83,7 +84,7 @@ function DoneToggle({ card }: { card: Card }) {
   )
 }
 
-export default function CardFace({ card, index, onOpenCard }: CardFaceProps) {
+function CardFace({ card, index, onOpenCard }: CardFaceProps) {
   const { data } = useStore()
   const board = data.boards[card.boardId]
   const labels = (card.labelIds
@@ -166,3 +167,8 @@ export default function CardFace({ card, index, onOpenCard }: CardFaceProps) {
     </Draggable>
   )
 }
+
+// Props are stable across renders (store-held card objects, index, the board's
+// setOpenCardId), so a list re-rendering for an unrelated reason — a droppable
+// snapshot change mid-drag, say — skips the card entirely.
+export default memo(CardFace)

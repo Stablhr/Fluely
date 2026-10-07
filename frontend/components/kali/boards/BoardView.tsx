@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
@@ -26,6 +26,10 @@ export default function BoardView() {
   const rawBoardId = params.boardId
   const boardId = Array.isArray(rawBoardId) ? (rawBoardId[0] ?? '') : (rawBoardId ?? '')
   const store = useStore()
+  // Destructured so the effect below can depend on the function alone. The
+  // `store` object itself is new on every render; depending on it would fetch
+  // the board structure forever.
+  const { syncBoardStructure } = store
   const board = store.data.boards[boardId]
   const [search, setSearch] = useState('')
   const [openCardId, setOpenCardId] = useState<string | null>(null)
@@ -34,6 +38,16 @@ export default function BoardView() {
   const [filterOpen, setFilterOpen] = useState(false)
   const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER)
   const [activeView, setActiveView] = useState<BoardViewType>('board')
+  // A boolean rather than `board` itself: merges hand back a fresh board
+  // object every sync, and depending on it would refetch forever. This flips
+  // once when the board appears -- right after sign-in, when the boards query
+  // resolves -- which is exactly when a pull is needed.
+  const hasBoard = Boolean(board)
+
+  useEffect(() => {
+    if (!hasBoard) return
+    void syncBoardStructure(boardId)
+  }, [boardId, hasBoard, syncBoardStructure])
 
   if (!board) {
     return (

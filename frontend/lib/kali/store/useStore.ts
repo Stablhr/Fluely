@@ -107,6 +107,11 @@ export interface Store {
 
   /** Re-pulls boards the signed-in person can reach, plus pending invitations. */
   syncBoards: () => Promise<void>;
+  /**
+   * Re-pulls one board's lists and cards, repairing a board damaged by the
+   * old create-response bug on the way. Called when the board is opened.
+   */
+  syncBoardStructure: (boardId: string) => Promise<void>;
   /** The board id whose visibility or members are mid-request, if any. */
   pendingBoardId: string | null;
   /** The signed-in account id, for spotting "you" in a people list. */

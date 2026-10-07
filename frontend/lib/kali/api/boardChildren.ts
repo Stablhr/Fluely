@@ -21,6 +21,11 @@ import type { Card, List } from "@/lib/kali/store/schema";
  * `comments`/`activity` at all: those hold base64 attachments and per-card
  * notes that live only in the browser for now. `toList` and `toCard` below are
  * the single place that difference is reconciled.
+ *
+ * Response shapes are the server's, not the store's: a write comes back as
+ * `{list, revision}` or `{card, revision}` and structure as `{lists, cards}`.
+ * Each function below unwraps its envelope so callers always receive a plain
+ * DTO with `revision` merged on top -- never the raw wrapper.
  */
 
 /** Mirrors `serializeList` in `backend/api/services/list.service.ts`. */
@@ -100,7 +105,7 @@ export function toList(
     collapsed: dto.collapsed,
     order: index,
     cardOrder: dto.cardOrder ?? [],
-    backgroundColor: dto.backgroundColor ?? "",
+    backgroundColor: dto.backgroundColor ?? existing?.backgroundColor ?? "",
   };
 }
 
@@ -161,21 +166,21 @@ export interface WriteResult<T> {
 }
 
 export async function fetchStructure(boardId: string): Promise<StructureDto> {
-  const { data } = await httpClient.get<{ structure: StructureDto }>(
+  const { data } = await httpClient.get<StructureDto>(
     `/boards/${boardId}/structure`,
   );
-  return data.structure;
+  return data;
 }
 
 export async function createListOnServer(
   boardId: string,
   input: CreateListInput,
 ): Promise<ListDto & WriteResult<ListDto>> {
-  const { data } = await httpClient.post<ListDto & WriteResult<ListDto>>(
-    `/boards/${boardId}/lists`,
-    input,
-  );
-  return data;
+  const { data } = await httpClient.post<{
+    list: ListDto;
+    revision: number;
+  }>(`/boards/${boardId}/lists`, input);
+  return { ...data.list, revision: data.revision };
 }
 
 export async function updateListOnServer(
@@ -186,11 +191,11 @@ export async function updateListOnServer(
     archivedAt?: string | null;
   },
 ): Promise<ListDto & WriteResult<ListDto>> {
-  const { data } = await httpClient.patch<ListDto & WriteResult<ListDto>>(
-    `/boards/${boardId}/lists/${listId}`,
-    patch,
-  );
-  return data;
+  const { data } = await httpClient.patch<{
+    list: ListDto;
+    revision: number;
+  }>(`/boards/${boardId}/lists/${listId}`, patch);
+  return { ...data.list, revision: data.revision };
 }
 
 export async function deleteListOnServer(
@@ -242,11 +247,11 @@ export async function createCardOnServer(
   boardId: string,
   input: CreateCardInput,
 ): Promise<CardDto & WriteResult<CardDto>> {
-  const { data } = await httpClient.post<CardDto & WriteResult<CardDto>>(
-    `/boards/${boardId}/cards`,
-    input,
-  );
-  return data;
+  const { data } = await httpClient.post<{
+    card: CardDto;
+    revision: number;
+  }>(`/boards/${boardId}/cards`, input);
+  return { ...data.card, revision: data.revision };
 }
 
 export async function updateCardOnServer(
@@ -254,11 +259,11 @@ export async function updateCardOnServer(
   cardId: string,
   patch: Partial<Omit<CreateCardInput, "listId">>,
 ): Promise<CardDto & WriteResult<CardDto>> {
-  const { data } = await httpClient.patch<CardDto & WriteResult<CardDto>>(
-    `/boards/${boardId}/cards/${cardId}`,
-    patch,
-  );
-  return data;
+  const { data } = await httpClient.patch<{
+    card: CardDto;
+    revision: number;
+  }>(`/boards/${boardId}/cards/${cardId}`, patch);
+  return { ...data.card, revision: data.revision };
 }
 
 export async function deleteCardOnServer(
