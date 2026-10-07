@@ -1,15 +1,14 @@
 'use client'
 
-import { Bell, Search } from 'lucide-react'
-import Link from 'next/link'
+import { Search } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import { YOU_ID } from '@/lib/kali/store/schema'
 import Avatar from '../shared/Avatar'
+import NotificationsPopover from './NotificationsPopover'
 
 export default function TopBar() {
   const { data } = useStore()
   const you = data.members[YOU_ID]
-  const inboxCount = data.inbox.length
 
   return (
     <header data-topbar className="hidden h-14 shrink-0 items-center gap-3 border-b border-border bg-base-surface px-8 md:flex">
@@ -24,19 +23,7 @@ export default function TopBar() {
       </div>
 
       <div className="ml-auto flex items-center gap-3">
-        <Link
-          href="/inbox"
-          aria-label="Inbox"
-          title="Inbox"
-          className="relative flex h-9 w-9 items-center justify-center rounded-full text-ink-500 transition-colors duration-150 hover:bg-base-surface-alt hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          <Bell size={17} />
-          {inboxCount > 0 && (
-            <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[9px] font-semibold leading-none text-primary-foreground">
-              {inboxCount}
-            </span>
-          )}
-        </Link>
+        <NotificationsPopover />
         {you && (
           <span className="flex items-center gap-2 rounded-pill bg-base-bg py-1 pr-3 pl-1" title={you.name}>
             <Avatar member={you} size={26} />

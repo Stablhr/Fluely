@@ -64,7 +64,9 @@ export function getFriendlyErrorMessage(
       case "EXPIRED_CODE":
         return "Verification code expired or invalid. Please request a new code.";
       case "USER_NOT_FOUND":
-        return "User not found.";
+        // Matches the backend's deliberately vague wording on invite flows:
+        // never confirm whether an address is registered.
+        return "No account matches that email.";
       case "ACCOUNT_EXISTS":
         return "An account already exists with this information.";
       case "RATE_LIMIT_EXCEEDED":

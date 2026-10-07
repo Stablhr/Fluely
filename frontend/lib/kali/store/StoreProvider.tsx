@@ -57,6 +57,12 @@ import {
   updateListOnServer,
 } from "@/lib/kali/api/boardChildren";
 import type {CreateCardInput, StructureDto} from "@/lib/kali/api/boardChildren";
+import {
+  fetchNotifications,
+  markAllNotificationsRead as markAllNotificationsReadOnServer,
+  markNotificationRead as markNotificationReadOnServer,
+} from "@/lib/kali/api/notifications";
+import type { AppNotificationDto } from "@/lib/kali/api/notifications";
 import { getFriendlyErrorMessage } from "@/lib/api/getFriendlyErrorMessage";
 
 function patchRecord<T extends { id: string }>(
@@ -202,6 +208,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const [pendingInvitations, setPendingInvitations] = useState<
     PendingInvitation[]
   >([]);
+  const [notifications, setNotifications] = useState<AppNotificationDto[]>([]);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const dataRef = useRef(data);
 
   useEffect(() => {
@@ -1776,6 +1784,57 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     void load();
   }, [syncBoards]);
 
+  /**
+   * Pulls the notification bell and the pending-invitation list together —
+   * they describe the same feature from two angles (the card and the badge),
+   * so they are refreshed as one.
+   *
+   * Background polls never write to the error slot: a dropped connection would
+   * otherwise leave a stale banner sitting on screen with nothing to clear it.
+   */
+  const syncNotifications = useCallback(async () => {
+    try {
+      const [list, invitations] = await Promise.all([
+        fetchNotifications(),
+        fetchPendingInvitations().catch(() => [] as PendingInvitation[]),
+      ]);
+      setNotifications(list.notifications);
+      setUnreadNotificationCount(list.unreadCount);
+      setPendingInvitations(invitations as PendingInvitation[]);
+    } catch {
+      // Quiet on purpose — see above. The next tick retries.
+    }
+  }, []);
+
+  // The poll itself: every 20 seconds while the tab is visible, plus an
+  // immediate pull when it comes back into focus, so an invitation or an
+  // acceptance shows up without a reload.
+  useEffect(() => {
+    // Wrapped in an inner async function rather than called inline, matching
+    // the mount sync above: the state updates then happen after an await
+    // rather than during the effect body itself.
+    async function firstPull() {
+      await syncNotifications();
+    }
+    void firstPull();
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void syncNotifications();
+    }, 20_000);
+
+    const onFocus = () => void syncNotifications();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void syncNotifications();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [syncNotifications]);
+
   const loadCollaborators = useCallback(async (boardId: string) => {
     try {
       const collaborators = await fetchCollaborators(boardId);
@@ -1972,12 +2031,70 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       setPendingInvitations((prev) =>
         prev.filter((i) => i.id !== invitationId),
       );
+      // The "you were invited" card behind this invitation has been answered,
+      // so it must not linger in the bell as if a decision were still pending.
+      const hadUnreadCard = notifications.some(
+        (n) => n.collaboratorId === invitationId && !n.read,
+      );
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.collaboratorId === invitationId && !n.read
+            ? { ...n, read: true, readAt: now() }
+            : n,
+        ),
+      );
+      if (hadUnreadCard) {
+        setUnreadNotificationCount((prev) => Math.max(0, prev - 1));
+      }
       if (decision === "accepted") await syncBoards();
     } catch (err) {
       setError(
         getFriendlyErrorMessage(err, "Could not answer that invitation."),
       );
       throw err;
+    }
+  };
+
+  const markNotificationRead = async (notificationId: string) => {
+    const target = notifications.find((n) => n.id === notificationId);
+    if (!target || target.read) return;
+    setNotifications((prev) =>
+      prev.map((n) =>
+        n.id === notificationId ? { ...n, read: true, readAt: now() } : n,
+      ),
+    );
+    setUnreadNotificationCount((prev) => Math.max(0, prev - 1));
+    try {
+      await markNotificationReadOnServer(notificationId);
+    } catch (err) {
+      // Roll back so the badge cannot drift away from the server's count.
+      setNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notificationId ? { ...n, read: false, readAt: null } : n,
+        ),
+      );
+      setUnreadNotificationCount((prev) => prev + 1);
+      setError(
+        getFriendlyErrorMessage(err, "Could not update that notification."),
+      );
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    const previous = notifications;
+    if (!notifications.some((n) => !n.read)) return;
+    setNotifications((prev) =>
+      prev.map((n) => (n.read ? n : { ...n, read: true, readAt: now() })),
+    );
+    setUnreadNotificationCount(0);
+    try {
+      await markAllNotificationsReadOnServer();
+    } catch (err) {
+      setNotifications(previous);
+      setUnreadNotificationCount(previous.filter((n) => !n.read).length);
+      setError(
+        getFriendlyErrorMessage(err, "Could not update your notifications."),
+      );
     }
   };
 
@@ -2180,6 +2297,11 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     removeCollaborator,
     pendingInvitations,
     respondToInvitation,
+    notifications,
+    unreadNotificationCount,
+    syncNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
 
     resetAll,
     socialPosts: social.posts,

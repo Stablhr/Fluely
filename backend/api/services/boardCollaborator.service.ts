@@ -1,5 +1,6 @@
 import {Types} from 'mongoose';
 import {boardCollaboratorRepository} from '../repositories/boardCollaborator.repository';
+import {notificationRepository} from '../repositories/notification.repository';
 import {userRepository} from '../repositories/user.repository';
 import {boardRepository} from '../repositories/board.repository';
 import {ApiError} from '../utils/error';
@@ -7,6 +8,7 @@ import {ErrorCodes} from '../constants/errorCodes';
 import {Actor} from '../utils/actor';
 import {BoardDocument} from '../models/Board.model';
 import {CollaboratorRole, CollaboratorStatus} from '../constants/product';
+import {notificationService} from './notification.service';
 import {logger} from '../logging/logger';
 
 type Person = {
@@ -125,6 +127,20 @@ export const boardCollaboratorService = {
       'Board invitation sent'
     );
 
+    await notificationService.notifyInvitationSent({
+      inviteeId: invitee._id,
+      invitee: {
+        firstName: invitee.firstName,
+        lastName: invitee.lastName,
+        email: invitee.email
+      },
+      inviterId: actor.actorId,
+      boardId: board._id,
+      collaboratorId: row!._id,
+      boardName: board.name,
+      role
+    });
+
     return serializeCollaborator(row!, invitee);
   },
 
@@ -201,6 +217,18 @@ export const boardCollaboratorService = {
       {boardId: row.boardId.toString(), userId: actor.actorId.toString(), decision},
       'Board invitation answered'
     );
+
+    // The invitee's own "you were invited" card has served its purpose, and
+    // the inviter now learns what happened. Emails are best-effort inside.
+    await notificationRepository.markByCollaboratorRead(row._id);
+    await notificationService.notifyInvitationAnswered({
+      inviterId: row.invitedBy,
+      inviteeId: actor.actorId,
+      boardId: row.boardId,
+      collaboratorId: row._id,
+      boardName: board?.name ?? '',
+      decision: decision === 'declined' ? 'declined' : 'accepted'
+    });
 
     return {
       id: row._id.toString(),

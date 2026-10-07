@@ -28,6 +28,7 @@ export const cardIdParamsSchema = z.object({boardId: objectId, cardId: objectId}
 export const labelIdParamsSchema = z.object({boardId: objectId, labelId: requiredText(80)});
 export const memberIdParamsSchema = z.object({boardId: objectId, memberId: objectId});
 export const invitationIdParamsSchema = z.object({invitationId: objectId});
+export const notificationIdParamsSchema = z.object({notificationId: objectId});
 export const shareIdParamsSchema = z.object({shareId: objectId});
 export const tokenParamsSchema = z.object({token: requiredText(32)});export const mediaIdParamsSchema = z.object({mediaId: objectId});
 export const inboxIdParamsSchema = z.object({inboxId: objectId});

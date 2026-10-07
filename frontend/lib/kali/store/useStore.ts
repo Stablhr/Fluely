@@ -42,6 +42,12 @@ export interface PendingInvitation {
   invitedByName: string;
 }
 
+export type {
+  AppNotificationDto as AppNotification,
+  AppNotificationType,
+} from "@/lib/kali/api/notifications";
+import type { AppNotificationDto } from "@/lib/kali/api/notifications";
+
 export interface Store {
   data: AppData;
   error: string | null;
@@ -135,6 +141,16 @@ export interface Store {
     invitationId: string,
     decision: "accepted" | "declined",
   ) => Promise<void>;
+
+  /* ── Notifications ─────────────────────────────────────────────
+     The bell: in-app notifications polled from the server, with the
+     unread count the badge shows. */
+  notifications: AppNotificationDto[];
+  unreadNotificationCount: number;
+  /** Re-pulls notifications and pending invitations; called on a timer. */
+  syncNotifications: () => Promise<void>;
+  markNotificationRead: (notificationId: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
 
   // Social Posts
   socialPosts: SocialPost[];

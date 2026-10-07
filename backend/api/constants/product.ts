@@ -55,3 +55,14 @@ export type RepeatFrequency = (typeof RepeatFrequencies)[number];
 
 export const MediaKinds = ['image', 'video', 'audio', 'document'] as const;
 export type MediaKind = (typeof MediaKinds)[number];
+
+/**
+ * In-app notifications. Each type names the event, not the wording: the copy
+ * lives with the consumer so it can change without a data migration.
+ */
+export const NotificationTypes = [
+  'board_invitation',
+  'board_invitation_accepted',
+  'board_invitation_declined'
+] as const;
+export type NotificationType = (typeof NotificationTypes)[number];

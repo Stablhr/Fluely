@@ -88,6 +88,18 @@ export default function ShareModal({
     void loadCollaborators(board.id);
   }, [board.id, loadCollaborators]);
 
+  // While the modal is open the invitee may answer, so the pending rows are
+  // re-pulled on the same cadence as the bell — otherwise "Waiting on them"
+  // would sit stale until the owner closes and reopens the dialog.
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadCollaborators(board.id);
+      }
+    }, 20_000);
+    return () => window.clearInterval(interval);
+  }, [board.id, loadCollaborators]);
+
   useEffect(() => {
     if (!openRoleId) return;
     const handler = (e: MouseEvent) => {
