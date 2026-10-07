@@ -1794,19 +1794,43 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
    */
   const syncNotifications = useCallback(async () => {
     try {
-      const [list, invitations] = await Promise.all([
+      const [list, invitationsResult] = await Promise.all([
         fetchNotifications(),
-        fetchPendingInvitations().catch(() => [] as PendingInvitation[]),
+        fetchPendingInvitations()
+          .then((data) => ({ ok: true as const, data }))
+          .catch(() => ({ ok: false as const, data: [] as PendingInvitation[] })),
       ]);
-      setNotifications(list.notifications);
-      setUnreadNotificationCount(list.unreadCount);
-      setPendingInvitations(invitations as PendingInvitation[]);
+
+      // An invitation card is only actionable while its invitation is still
+      // pending, so rows without a matching pending invitation are dropped.
+      // That is what stops a poll that started before an answer arrived from
+      // resurrecting the row the store just removed optimistically. Skipped
+      // when the invitations fetch failed, so one dropped request cannot wipe
+      // every invitation card from the bell.
+      const pendingIds = new Set(invitationsResult.data.map((i) => i.id));
+      const notifications = invitationsResult.ok
+        ? list.notifications.filter(
+            (n) =>
+              n.type !== "board_invitation" ||
+              (n.collaboratorId !== null && pendingIds.has(n.collaboratorId)),
+          )
+        : list.notifications;
+      const keptIds = new Set(notifications.map((n) => n.id));
+      const staleUnread = list.notifications.filter(
+        (n) => !keptIds.has(n.id) && !n.read,
+      ).length;
+
+      setNotifications(notifications);
+      setUnreadNotificationCount(
+        Math.max(0, list.unreadCount - staleUnread),
+      );
+      setPendingInvitations(invitationsResult.data);
     } catch {
       // Quiet on purpose — see above. The next tick retries.
     }
   }, []);
 
-  // The poll itself: every 20 seconds while the tab is visible, plus an
+  // The poll itself: every 10 seconds while the tab is visible, plus an
   // immediate pull when it comes back into focus, so an invitation or an
   // acceptance shows up without a reload.
   useEffect(() => {
@@ -1820,7 +1844,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") void syncNotifications();
-    }, 20_000);
+    }, 10_000);
 
     const onFocus = () => void syncNotifications();
     const onVisibility = () => {
@@ -2024,30 +2048,36 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     invitationId: string,
     decision: "accepted" | "declined",
   ) => {
+    // Optimistic: the invitation row and its bell card vanish on click, before
+    // any round-trip. The snapshots let a failed request restore both exactly.
+    const prevPending = pendingInvitations;
+    const prevNotifications = notifications;
+    const hadUnreadCard = notifications.some(
+      (n) => n.collaboratorId === invitationId && !n.read,
+    );
+
+    setPendingInvitations((prev) =>
+      prev.filter((i) => i.id !== invitationId),
+    );
+    setNotifications((prev) =>
+      prev.filter((n) => n.collaboratorId !== invitationId),
+    );
+    if (hadUnreadCard) {
+      setUnreadNotificationCount((prev) => Math.max(0, prev - 1));
+    }
+
     try {
       await respondToInvitationOnServer(invitationId, decision);
-      // Accepting grants access, so the new board has to be pulled in; either
-      // way the invitation is gone from this person's list.
-      setPendingInvitations((prev) =>
-        prev.filter((i) => i.id !== invitationId),
-      );
-      // The "you were invited" card behind this invitation has been answered,
-      // so it must not linger in the bell as if a decision were still pending.
-      const hadUnreadCard = notifications.some(
-        (n) => n.collaboratorId === invitationId && !n.read,
-      );
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.collaboratorId === invitationId && !n.read
-            ? { ...n, read: true, readAt: now() }
-            : n,
-        ),
-      );
-      if (hadUnreadCard) {
-        setUnreadNotificationCount((prev) => Math.max(0, prev - 1));
-      }
+      // Accepting grants access, so the new board has to be pulled in; then a
+      // refresh reconciles counts with the server's now-authoritative state.
       if (decision === "accepted") await syncBoards();
+      void syncNotifications();
     } catch (err) {
+      setPendingInvitations(prevPending);
+      setNotifications(prevNotifications);
+      if (hadUnreadCard) {
+        setUnreadNotificationCount((prev) => prev + 1);
+      }
       setError(
         getFriendlyErrorMessage(err, "Could not answer that invitation."),
       );

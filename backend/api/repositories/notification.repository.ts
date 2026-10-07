@@ -34,25 +34,23 @@ export const notificationRepository = {
     ).exec(),
 
   /**
-   * Clears the invitee's "you were invited" card once they have answered it.
-   * Filtered by collaboratorId rather than by (userId, boardId) so an earlier
-   * invitation to the same board can't swallow a newer one.
+   * An answered invitation is deleted rather than marked read: the card's only
+   * purpose is to collect a decision, and a lingering "Accept/Decline" row is
+   * worse than no row at all.
    */
-  markByCollaboratorRead: (collaboratorId: Types.ObjectId) =>
-    NotificationModel.updateMany(
-      {collaboratorId, read: false},
-      {read: true, readAt: new Date()}
-    ).exec(),
+  deleteByCollaboratorId: (collaboratorId: Types.ObjectId) =>
+    NotificationModel.deleteMany({collaboratorId}).exec(),
 
   /**
    * A re-invite supersedes whatever the invitee was looking at, so the stale
-   * card is retired rather than left to stack with the new one.
+   * card is deleted rather than left to stack with the new one.
    */
-  markInvitationReadForBoard: (userId: Types.ObjectId, boardId: Types.ObjectId) =>
-    NotificationModel.updateMany(
-      {userId, boardId, type: 'board_invitation', read: false},
-      {read: true, readAt: new Date()}
-    ).exec()
+  deleteInvitationsForBoard: (userId: Types.ObjectId, boardId: Types.ObjectId) =>
+    NotificationModel.deleteMany({
+      userId,
+      boardId,
+      type: 'board_invitation'
+    }).exec()
 };
 
 export type NotificationRow = NotificationDocument;

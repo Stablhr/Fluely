@@ -218,9 +218,10 @@ export const boardCollaboratorService = {
       'Board invitation answered'
     );
 
-    // The invitee's own "you were invited" card has served its purpose, and
-    // the inviter now learns what happened. Emails are best-effort inside.
-    await notificationRepository.markByCollaboratorRead(row._id);
+    // The invitee's "you were invited" card has served its purpose — it is
+    // deleted so no stale Accept/Decline row can survive the answer — and the
+    // inviter now learns what happened. Emails are best-effort inside.
+    await notificationRepository.deleteByCollaboratorId(row._id);
     await notificationService.notifyInvitationAnswered({
       inviterId: row.invitedBy,
       inviteeId: actor.actorId,

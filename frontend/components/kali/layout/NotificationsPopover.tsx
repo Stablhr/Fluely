@@ -73,6 +73,7 @@ export default function NotificationsPopover() {
   const {
     notifications,
     unreadNotificationCount,
+    pendingInvitations,
     markNotificationRead,
     markAllNotificationsRead,
     respondToInvitation,
@@ -110,8 +111,10 @@ export default function NotificationsPopover() {
     if (!notification.collaboratorId || answeringId) return
     setAnsweringId(notification.id)
     try {
+      // The store removes the row optimistically, so it is already gone by the
+      // time this resolves; no separate mark-read call is needed — the server
+      // deletes the card when the invitation is answered.
       await respondToInvitation(notification.collaboratorId, decision)
-      await markNotificationRead(notification.id)
       toast(
         decision === 'accepted'
           ? `You joined ${notification.boardName || 'the board'}.`
@@ -119,7 +122,8 @@ export default function NotificationsPopover() {
         decision === 'accepted' ? 'success' : 'info',
       )
     } catch {
-      // The store has already surfaced the reason in the error slot.
+      // The store has already surfaced the reason in the error slot and put
+      // the row back.
     } finally {
       setAnsweringId(null)
     }
@@ -179,6 +183,16 @@ export default function NotificationsPopover() {
               const Icon = ICONS[notification.type]
               const isInvitation = notification.type === 'board_invitation'
               const isAnswering = answeringId === notification.id
+              // The pending list is the source of truth: buttons only render
+              // while the invitation itself is unanswered, so a stale row (an
+              // in-flight poll, or data from before the delete-on-answer change)
+              // can never offer Accept/Decline for a decision already made.
+              const isStillPending =
+                isInvitation &&
+                notification.collaboratorId !== null &&
+                pendingInvitations.some(
+                  (p) => p.id === notification.collaboratorId,
+                )
               return (
                 <div
                   key={notification.id}
@@ -205,7 +219,7 @@ export default function NotificationsPopover() {
                       {relativeTime(notification.createdAt)}
                     </p>
 
-                    {isInvitation && notification.collaboratorId && (
+                    {isStillPending && notification.collaboratorId && (
                       <div className="mt-2 flex gap-2">
                         <button
                           type="button"
@@ -240,7 +254,9 @@ export default function NotificationsPopover() {
                     )}
                   </div>
 
-                  {!notification.read && (
+                  {/* Invitation rows are only actionable via Accept/Decline,
+                      so the mark-as-read affordance is for the rest. */}
+                  {!notification.read && !isInvitation && (
                     <button
                       type="button"
                       onClick={() => void markNotificationRead(notification.id)}

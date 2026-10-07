@@ -108,7 +108,7 @@ export const notificationService = {
     const inviter = await userRepository.findById(params.inviterId.toString());
     const inviterName = displayName(inviter) || 'Someone';
 
-    await notificationRepository.markInvitationReadForBoard(
+    await notificationRepository.deleteInvitationsForBoard(
       params.inviteeId,
       params.boardId
     );
