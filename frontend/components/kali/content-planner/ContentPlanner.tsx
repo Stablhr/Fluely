@@ -101,7 +101,7 @@ export default function ContentPlanner() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2.5 sm:px-4">
-        <h1 className="font-heading text-lg font-semibold text-text-primary sm:text-xl">Content Planner</h1>
+        <h1 className="font-heading text-lg font-semibold text-text-primary sm:text-xl">Social Posting</h1>
 
         <nav aria-label="Planner view" className="ml-2 flex items-center gap-0.5 rounded-lg bg-surface-alt p-0.5">
           {VIEWS.map(({ id, label, Icon }) => (

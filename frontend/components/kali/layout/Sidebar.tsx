@@ -59,7 +59,7 @@ const NAV = [
   { to: "/inbox", label: "Inbox", icon: Inbox },
   { to: "/boards", label: "Boards", icon: Columns3 },
   { to: "/schedule", label: "Schedule", icon: CalendarDays },
-  { to: "/content-planner", label: "Content Planner", icon: CalendarRange },
+  { to: "/content-planner", label: "Social Posting", icon: CalendarRange },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
