@@ -55,3 +55,11 @@ export const defaultLimiter = makeLimiter({
   legacyHeaders: false,
   handler: rateLimitHandler
 });
+
+export const pollLimiter = makeLimiter({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler
+});

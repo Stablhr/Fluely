@@ -10,7 +10,7 @@ import {BoardDocument} from '../models/Board.model';
 import {CollaboratorRole, CollaboratorStatus} from '../constants/product';
 import {notificationService} from './notification.service';
 import {activityService} from './activity.service';
-import {realtimeService} from './realtime.service';
+import {bumpBoardRevision} from './boardRevision';
 import {withProductTransaction, ProductSession} from '../utils/transaction';
 import {logger} from '../logging/logger';
 
@@ -144,7 +144,8 @@ export const boardCollaboratorService = {
         actionType: 'collaborator.invited',
         targetType: 'collaborator',
         targetId: row!._id.toString(),
-        metadata: {email, role, userId: invitee._id.toString()}
+        metadata: {email, role, userId: invitee._id.toString()},
+        revision: board.revision
       });
 
       return {row: row!, activity};
@@ -154,13 +155,6 @@ export const boardCollaboratorService = {
       {boardId: board._id.toString(), userId: invitee._id.toString(), role},
       'Board invitation sent'
     );
-
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      type: 'collaborator.invited',
-      payload: {userId: invitee._id.toString(), role, status: 'pending'},
-      activity: result.activity
-    });
 
     await notificationService.notifyInvitationSent({
       inviteeId: invitee._id,
@@ -209,21 +203,11 @@ export const boardCollaboratorService = {
           userId: row.userId.toString(),
           from: row.role,
           to: role
-        }
+        },
+        revision: board.revision
       });
 
       return {row, activity};
-    });
-
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      type: 'collaborator.role_changed',
-      payload: {
-        userId: result.row.userId.toString(),
-        role,
-        collaboratorId: result.row._id.toString()
-      },
-      activity: result.activity
     });
 
     return {id: result.row._id.toString(), userId: result.row.userId.toString(), role};
@@ -255,23 +239,11 @@ export const boardCollaboratorService = {
           userId: row.userId.toString(),
           email: person?.email ?? '',
           role: row.role
-        }
+        },
+        revision: board.revision
       });
 
       return {row, activity};
-    });
-
-    // The removed person is still subscribed to the board's channel; the event
-    // names their own userId so their client can drop the board at once instead
-    // of waiting for the next subscribe to be refused.
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      type: 'collaborator.removed',
-      payload: {
-        userId: result.row.userId.toString(),
-        collaboratorId: result.row._id.toString()
-      },
-      activity: result.activity
     });
 
     return {message: 'Collaborator removed'};
@@ -317,21 +289,24 @@ export const boardCollaboratorService = {
       );
 
       // A decline grants no access and changes no board state worth an audit
-      // line; an acceptance does both.
-      const activity =
-        decision === 'accepted'
-          ? await activityService.log(session, {
-              boardId: row.boardId,
-              actor,
-              actionType: 'collaborator.accepted',
-              targetType: 'collaborator',
-              targetId: row._id.toString(),
-              metadata: {
-                userId: actor.actorId.toString(),
-                role: row.role
-              }
-            })
-          : null;
+      // line; an acceptance does both, and bumps the board revision so the
+      // activity entry gets a cursor the poll can find.
+      let activity = null;
+      if (decision === 'accepted') {
+        const revision = await bumpBoardRevision(row.boardId, undefined, session);
+        activity = await activityService.log(session, {
+          boardId: row.boardId,
+          actor,
+          actionType: 'collaborator.accepted',
+          targetType: 'collaborator',
+          targetId: row._id.toString(),
+          metadata: {
+            userId: actor.actorId.toString(),
+            role: row.role
+          },
+          revision
+        });
+      }
 
       return {row, activity};
     });
@@ -355,18 +330,7 @@ export const boardCollaboratorService = {
       decision: decision === 'declined' ? 'declined' : 'accepted'
     });
 
-    if (result.activity) {
-      await realtimeService.broadcast({
-        boardId: result.row.boardId.toString(),
-        type: 'collaborator.accepted',
-        payload: {
-          userId: actor.actorId.toString(),
-          role: result.row.role,
-          collaboratorId: result.row._id.toString()
-        },
-        activity: result.activity
-      });
-    }
+    
 
     return {
       id: result.row._id.toString(),

@@ -27,6 +27,7 @@ import {
 import { clearData, loadData, saveData } from "./storage";
 import { StoreContext } from "./useStore";
 import type {
+  KickSignal,
   PendingInvitation,
   PresenceMember,
   Store,
@@ -35,7 +36,7 @@ import type {
 import { uid } from "@/lib/kali/utils/id";
 import { formatDate } from "@/lib/kali/utils/dates";
 import { useSocialPosts } from "@/lib/kali/feature-hooks/useSocialPosts";
-import type { BoardActivityDto, BoardDto } from "@/lib/kali/api/boards";
+import type { BoardActivityDto, BoardDto, BoardPollResponse } from "@/lib/kali/api/boards";
 import {
   createBoardOnServer,
   fetchBoardActivity,
@@ -63,20 +64,13 @@ import {
   updateCardOnServer,
   updateListOnServer,
 } from "@/lib/kali/api/boardChildren";
-import type {CreateCardInput, CardDto, ListDto, StructureDto} from "@/lib/kali/api/boardChildren";
+import type { CreateCardInput, CardDto, ListDto, StructureDto } from "@/lib/kali/api/boardChildren";
 import {
   fetchNotifications,
   markAllNotificationsRead as markAllNotificationsReadOnServer,
   markNotificationRead as markNotificationReadOnServer,
 } from "@/lib/kali/api/notifications";
 import type { AppNotificationDto } from "@/lib/kali/api/notifications";
-import type { RemoteBoardEvent } from "@/lib/kali/realtime/events";
-import {
-  asNumber,
-  asRecord,
-  asString,
-  asStringArray,
-} from "@/lib/kali/realtime/events";
 import { getFriendlyErrorMessage } from "@/lib/api/getFriendlyErrorMessage";
 
 function patchRecord<T extends { id: string }>(
@@ -111,14 +105,14 @@ function isServerBoard(board: Board | undefined): board is Board {
  * rather than writing a half-formed record into the store.
  */
 function isListDto(value: unknown): value is ListDto {
-  const rec = asRecord(value);
+  const rec = value as Record<string, unknown> | null;
   return Boolean(
     rec && typeof rec.id === "string" && typeof rec.boardId === "string",
   );
 }
 
 function isCardDto(value: unknown): value is CardDto {
-  const rec = asRecord(value);
+  const rec = value as Record<string, unknown> | null;
   return Boolean(
     rec &&
       typeof rec.id === "string" &&
@@ -128,7 +122,7 @@ function isCardDto(value: unknown): value is CardDto {
 }
 
 function isBoardDto(value: unknown): value is BoardDto {
-  const rec = asRecord(value);
+  const rec = value as Record<string, unknown> | null;
   return Boolean(
     rec &&
       typeof rec.id === "string" &&
@@ -2230,307 +2224,50 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     [mergeActivity],
   );
 
-  const applyRemoteBoardEvent = useCallback(
-    (boardId: string, event: RemoteBoardEvent) => {
-      // The audit entry rides every event, so the feed keeps moving even when
-      // the payload below is routed to a re-pull instead of a merge.
-      if (event.activity) mergeActivity(boardId, [event.activity]);
+  const applyBoardPoll = useCallback(
+    (boardId: string, response: BoardPollResponse): KickSignal => {
+      // Merge activity entries from the poll response
+      if (response.activity.length > 0) {
+        mergeActivity(boardId, response.activity);
+      }
 
-      const body = asRecord(event.payload) ?? {};
-      const payloadRevision =
-        asNumber(body.revision) ?? asNumber(event.revision) ?? undefined;
+      // Replace presence roster
+      replacePresence(boardId, response.presence);
 
-      switch (event.type) {
-        /* ── Lists ─────────────────────────────────────────────── */
-        case "list.created": {
-          const list = body.list;
-          if (!isListDto(list)) {
-            scheduleStructureSync(boardId);
-            break;
-          }
-          mutate((prev) => {
-            const board = prev.boards[boardId];
-            if (!board) return prev;
-            const known = board.listOrder.includes(list.id);
-            const index = known
-              ? board.listOrder.indexOf(list.id)
-              : board.listOrder.length;
-            return {
-              ...prev,
-              lists: {
-                ...prev.lists,
-                [list.id]: toList(list, index, prev.lists[list.id]),
-              },
-              boards: {
-                ...prev.boards,
-                [boardId]: known
-                  ? board
-                  : { ...board, listOrder: [...board.listOrder, list.id] },
-              },
-            };
-          });
-          applyRevision(boardId, payloadRevision);
-          break;
-        }
-
-        case "list.updated":
-        case "list.archived": {
-          const list = body.list;
-          if (!isListDto(list) || !dataRef.current.lists[list.id]) {
-            scheduleStructureSync(boardId);
-            break;
-          }
-          mutate((prev) => {
-            const current = prev.lists[list.id];
-            if (!current) return prev;
-            return {
-              ...prev,
-              lists: {
-                ...prev.lists,
-                [list.id]: toList(list, current.order, current),
-              },
-            };
-          });
-          applyRevision(boardId, payloadRevision);
-          break;
-        }
-
-        case "list.deleted": {
-          const listId = asString(body.listId);
-          if (!listId) {
-            scheduleStructureSync(boardId);
-            break;
-          }
-          mutate((prev) => {
-            const board = prev.boards[boardId];
-            if (!board) return prev;
-            // Already gone locally — nothing to change, keep state identity.
-            if (!prev.lists[listId] && !board.listOrder.includes(listId)) {
-              return prev;
-            }
-            const lists = { ...prev.lists };
-            delete lists[listId];
-            const cards: Record<string, Card> = {};
-            for (const [id, card] of Object.entries(prev.cards)) {
-              if (card.listId !== listId) cards[id] = card;
-            }
-            return {
-              ...prev,
-              lists,
-              cards,
-              boards: {
-                ...prev.boards,
-                [boardId]: {
-                  ...board,
-                  listOrder: board.listOrder.filter((id) => id !== listId),
-                  archivedLists: board.archivedLists.filter(
-                    (entry) => entry.list.id !== listId,
-                  ),
-                },
-              },
-            };
-          });
-          applyRevision(boardId, payloadRevision);
-          break;
-        }
-
-        /* ── Cards ─────────────────────────────────────────────── */
-        case "card.created": {
-          const card = body.card;
-          if (!isCardDto(card) || !dataRef.current.lists[card.listId]) {
-            scheduleStructureSync(boardId);
-            break;
-          }
-          mutate((prev) => {
-            const list = prev.lists[card.listId];
-            if (!list) return prev;
-            return {
-              ...prev,
-              cards: {
-                ...prev.cards,
-                [card.id]: toCard(card, prev.cards[card.id]),
-              },
-              lists: {
-                ...prev.lists,
-                [card.listId]: list.cardOrder.includes(card.id)
-                  ? list
-                  : { ...list, cardOrder: [...list.cardOrder, card.id] },
-              },
-            };
-          });
-          applyRevision(boardId, payloadRevision);
-          break;
-        }
-
-        case "card.updated":
-        case "card.status_changed":
-        case "card.assigned":
-        case "card.archived": {
-          const card = body.card;
-          if (!isCardDto(card) || !dataRef.current.cards[card.id]) {
-            scheduleStructureSync(boardId);
-            break;
-          }
-          mutate((prev) => {
-            const existing = prev.cards[card.id];
-            if (!existing) return prev;
-            return {
-              ...prev,
-              cards: { ...prev.cards, [card.id]: toCard(card, existing) },
-            };
-          });
-          applyRevision(boardId, payloadRevision);
-          break;
-        }
-
-        case "card.moved": {
-          // The mover's chosen landing index is not in the payload, and our
-          // own move has already been applied optimistically — so this is
-          // always a re-pull rather than a merge, debounced so a burst of
-          // moves costs a single GET.
-          applyRevision(boardId, payloadRevision);
-          scheduleStructureSync(boardId);
-          break;
-        }
-
-        case "card.deleted": {
-          const cardId = asString(body.cardId);
-          if (!cardId) {
-            scheduleStructureSync(boardId);
-            break;
-          }
-          mutate((prev) => {
-            const card = prev.cards[cardId];
-            if (!card) return prev;
-            const cards = { ...prev.cards };
-            delete cards[cardId];
-            const lists = { ...prev.lists };
-            for (const [id, list] of Object.entries(lists)) {
-              if (list.cardOrder.includes(cardId)) {
-                lists[id] = {
-                  ...list,
-                  cardOrder: list.cardOrder.filter((x) => x !== cardId),
-                };
-              }
-            }
-            return { ...prev, cards, lists };
-          });
-          applyRevision(boardId, payloadRevision);
-          break;
-        }
-
-        /* ── Board ─────────────────────────────────────────────── */
-        case "board.updated":
-        case "board.visibility_changed": {
-          const listOrder = asStringArray(body.listOrder);
-          const boardDto = isBoardDto(body.board) ? body.board : null;
-
-          if (listOrder) {
-            // A reorder: the server's array is the authority. Lists this
-            // browser created but has not pushed yet keep their slots after
-            // it until the board's first structural sync claims them.
-            mutate((prev) => {
-              const current = prev.boards[boardId];
-              if (!current) return prev;
-              const localOnly = current.childrenSyncedAt
-                ? []
-                : current.listOrder.filter(
-                    (id) => !listOrder.includes(id) && Boolean(prev.lists[id]),
-                  );
-              return {
-                ...prev,
-                boards: {
-                  ...prev.boards,
-                  [boardId]: {
-                    ...current,
-                    listOrder: [...listOrder, ...localOnly],
-                  },
-                },
-              };
-            });
-            applyRevision(boardId, payloadRevision);
-            break;
-          }
-
-          if (boardDto) {
-            mutate((prev) => {
-              const current = prev.boards[boardId];
-              if (!current) return prev;
-              return {
-                ...prev,
-                boards: {
-                  ...prev.boards,
-                  [boardId]: {
-                    ...current,
-                    ...mergeServerBoard(current, boardDto),
-                    // The payload's `access` describes the person who made the
-                    // change, not this viewer — keep ours, and with it our
-                    // local list sequence (mergeServerBoard omits it).
-                    access: current.access,
-                    listOrder: current.listOrder,
-                  },
-                },
-              };
-            });
-            applyRevision(
-              boardId,
-              boardDto.revision ?? payloadRevision,
-            );
-            break;
-          }
-
-          scheduleStructureSync(boardId);
-          break;
-        }
-
-        case "board.deleted": {
+      // Check for kick signals from activity entries
+      for (const entry of response.activity) {
+        if (entry.actionType === "board.deleted") {
           deleteBoard(boardId);
           forgetBoard(boardId);
-          break;
+          return "deleted";
         }
-
-        /* ── People ────────────────────────────────────────────── */
-        case "collaborator.invited":
-        case "collaborator.role_changed":
-        case "collaborator.removed":
-        case "collaborator.accepted": {
-          const targetUserId = asString(body.userId);
-          const isSelf =
-            targetUserId !== null && targetUserId === currentUser?.id;
-
-          if (event.type === "collaborator.removed" && isSelf) {
-            // Access is gone: drop the board outright rather than leave a row
-            // the UI would keep rendering as though it were still ours.
-            deleteBoard(boardId);
-            forgetBoard(boardId);
-            setError("Your access to this board was removed.");
-            break;
-          }
-
-          void loadCollaborators(boardId);
-          // My own role or acceptance changed → the boards list has to see it.
-          if (isSelf) void syncBoards();
-          break;
-        }
-
-        default: {
-          // An unknown type (or one this client predates) is still a change:
-          // re-pull rather than silently ignore it.
-          scheduleStructureSync(boardId);
+        if (
+          entry.actionType === "collaborator.removed" &&
+          entry.metadata.userId === currentUser?.id
+        ) {
+          deleteBoard(boardId);
+          forgetBoard(boardId);
+          setError("Your access to this board was removed.");
+          return "removed";
         }
       }
+
+      // If server revision is newer than our board's, schedule a structure sync
+      const board = dataRef.current.boards[boardId];
+      if (board && board.revision !== null && response.revision > board.revision) {
+        scheduleStructureSync(boardId);
+      }
+
+      return "ok";
     },
     [
-      applyRevision,
       currentUser?.id,
       deleteBoard,
       forgetBoard,
-      loadCollaborators,
       mergeActivity,
-      mutate,
+      replacePresence,
       scheduleStructureSync,
       setError,
-      syncBoards,
     ],
   );
 
@@ -2993,7 +2730,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     /* Realtime */
     presenceByBoard,
     activityByBoard,
-    applyRemoteBoardEvent,
+    applyBoardPoll,
     replacePresence,
     loadBoardActivity,
 

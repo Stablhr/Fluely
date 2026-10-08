@@ -5,7 +5,6 @@ import {BoardDocument} from '../models/Board.model';
 import {CardCoverSize, CardDocument} from '../models/Card.model';
 import {bumpBoardRevision} from './boardRevision';
 import {activityService} from './activity.service';
-import {realtimeService} from './realtime.service';
 import {withProductTransaction, ProductSession} from '../utils/transaction';
 import {ActivityActionType} from '../constants/product';
 import {Actor} from '../utils/actor';
@@ -182,21 +181,14 @@ export const cardService = {
         actionType: 'card.created',
         targetType: 'card',
         targetId: card._id.toString(),
-        metadata: {title: card.title, listId: input.listId}
+        metadata: {title: card.title, listId: input.listId},
+        revision
       });
 
       return {card, revision, activity};
     });
 
     const body = {card: serializeCard(result.card), revision: result.revision};
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.revision,
-      type: 'card.created',
-      payload: body,
-      activity: result.activity
-    });
-
     return body;
   },
 
@@ -257,21 +249,14 @@ export const cardService = {
         actionType,
         targetType: 'card',
         targetId: cardId,
-        metadata
+        metadata,
+        revision
       });
 
       return {updated, revision, activity};
     });
 
     const body = {card: serializeCard(result.updated), revision: result.revision};
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.revision,
-      type: result.activity.actionType,
-      payload: body,
-      activity: result.activity
-    });
-
     return body;
   },
 
@@ -329,7 +314,8 @@ export const cardService = {
           title: moved.title,
           fromListId: card.listId.toString(),
           toListId: targetList._id.toString()
-        }
+        },
+        revision
       });
 
       return {
@@ -345,14 +331,6 @@ export const cardService = {
       listId: result.listId,
       revision: result.revision
     };
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.revision,
-      type: 'card.moved',
-      payload: body,
-      activity: result.activity
-    });
-
     return body;
   },
 
@@ -380,7 +358,8 @@ export const cardService = {
         actionType: 'list.updated',
         targetType: 'list',
         targetId: listId,
-        metadata: {fields: ['cardOrder'], name: updated.name}
+        metadata: {fields: ['cardOrder'], name: updated.name},
+        revision
       });
 
       return {updated, revision, activity};
@@ -391,14 +370,6 @@ export const cardService = {
       list: serializeListSummary(result.updated),
       revision: result.revision
     };
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.revision,
-      type: 'list.updated',
-      payload: body,
-      activity: result.activity
-    });
-
     return {cardOrder, revision: result.revision};
   },
 
@@ -429,21 +400,14 @@ export const cardService = {
         actionType: 'card.deleted',
         targetType: 'card',
         targetId: cardId,
-        metadata: {title: doomed.title, listId: doomed.listId.toString()}
+        metadata: {title: doomed.title, listId: doomed.listId.toString()},
+        revision
       });
 
       return {revision, activity};
     });
 
     const body = {message: 'Card deleted', revision: result.revision};
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.revision,
-      type: 'card.deleted',
-      payload: {cardId, revision: result.revision},
-      activity: result.activity
-    });
-
     return body;
   }
 };

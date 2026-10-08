@@ -22,6 +22,7 @@ export type SerializedActivity = {
   metadata: Record<string, unknown>;
   actor: {id: string; name: string};
   createdAt: Date;
+  revision: number;
 };
 
 function displayName(
@@ -40,7 +41,8 @@ function serialize(entry: ActivityLogDocument, actorName: string): SerializedAct
     targetId: entry.targetId ?? null,
     metadata: (entry.metadata ?? {}) as Record<string, unknown>,
     actor: {id: entry.userId.toString(), name: actorName},
-    createdAt: entry.createdAt
+    createdAt: entry.createdAt,
+    revision: entry.revision
   };
 }
 
@@ -74,6 +76,7 @@ export const activityService = {
       targetType: ActivityTargetType;
       targetId?: string | null;
       metadata?: Record<string, unknown>;
+      revision: number;
     }
   ): Promise<SerializedActivity> {
     const entry = await activityLogRepository.create(
@@ -83,7 +86,8 @@ export const activityService = {
         actionType: params.actionType,
         targetType: params.targetType,
         targetId: params.targetId ?? null,
-        metadata: params.metadata
+        metadata: params.metadata,
+        revision: params.revision
       },
       session
     );
@@ -99,6 +103,26 @@ export const activityService = {
       limit: options.limit,
       actionType: options.actionType
     });
+
+    const actorIds = [...new Set(entries.map(entry => entry.userId.toString()))];
+    const actors = await Promise.all(actorIds.map(id => userRepository.findById(id)));
+    const nameById = new Map<string, string>(
+      actors
+        .filter((user): user is NonNullable<typeof user> => user !== null)
+        .map(user => [user._id.toString(), displayName(user)])
+    );
+
+    return entries.map(entry =>
+      serialize(entry, nameById.get(entry.userId.toString()) ?? '')
+    );
+  },
+
+  /**
+   * Returns activity entries with revision > since, oldest first, capped at 50.
+   * Used by the polling endpoint to stream new events since the client's cursor.
+   */
+  async since(boardId: Types.ObjectId, since: number) {
+    const entries = await activityLogRepository.listSince(boardId, since);
 
     const actorIds = [...new Set(entries.map(entry => entry.userId.toString()))];
     const actors = await Promise.all(actorIds.map(id => userRepository.findById(id)));

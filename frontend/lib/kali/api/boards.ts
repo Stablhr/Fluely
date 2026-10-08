@@ -370,3 +370,25 @@ export async function fetchBoardActivity(
   );
   return data.activity;
 }
+
+/**
+ * Poll response for board sync + presence.
+ * Mirrors `PollResult` in `backend/api/services/poll.service.ts`.
+ */
+export interface BoardPollResponse {
+  revision: number;
+  presence: { id: string; name: string }[];
+  activity: BoardActivityDto[];
+}
+
+/** Fetches new activity and current presence since the given revision. */
+export async function fetchBoardPoll(
+  boardId: string,
+  since: number | undefined,
+): Promise<BoardPollResponse> {
+  const { data } = await httpClient.get<{ data: BoardPollResponse }>(
+    `/boards/${boardId}/poll`,
+    { params: { since } },
+  );
+  return data.data;
+}

@@ -4,3 +4,5 @@
 # Local env files, but keep the tracked .env.example templates
 .env*
 !.env.example
+.vercel
+.env*

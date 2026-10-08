@@ -13,7 +13,6 @@ import {cardRepository} from '../repositories/card.repository';
 import {listService} from './list.service';
 import {cardService} from './card.service';
 import {activityService} from './activity.service';
-import {realtimeService} from './realtime.service';
 import {withProductTransaction} from '../utils/transaction';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
@@ -317,21 +316,14 @@ export const boardService = {
           ...(input.name !== undefined && input.name !== board.name
             ? {before: {name: board.name}}
             : {})
-        }
+        },
+        revision: result.updated.revision
       });
 
       return {updated: updated!, activity};
     });
 
     const serialized = serializeBoard(toRow(result.updated, level));
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.updated.revision,
-      type: 'board.updated',
-      payload: {board: serialized},
-      activity: result.activity
-    });
-
     return serialized;
   },
 
@@ -373,21 +365,14 @@ export const boardService = {
         actionType: 'board.visibility_changed',
         targetType: 'board',
         targetId: board._id.toString(),
-        metadata: {from: board.visibility, to: visibility}
+        metadata: {from: board.visibility, to: visibility},
+        revision: result.updated.revision
       });
 
       return {updated: updated!, activity};
     });
 
     const serialized = serializeBoard(toRow(result.updated, 'owner'));
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.updated.revision,
-      type: 'board.visibility_changed',
-      payload: {board: serialized},
-      activity: result.activity
-    });
-
     return serialized;
   },
 
@@ -402,19 +387,11 @@ export const boardService = {
         actionType: 'board.deleted',
         targetType: 'board',
         targetId: board._id.toString(),
-        metadata: {name: board.name}
+        metadata: {name: board.name},
+        revision: board.revision
       });
 
       return {activity};
-    });
-
-    // Sent after the delete commits so open clients drop the board immediately
-    // instead of discovering it on their next refresh.
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      type: 'board.deleted',
-      payload: {boardId: board._id.toString()},
-      activity: result.activity
     });
 
     logger.info({boardId: board._id.toString()}, 'Board deleted');

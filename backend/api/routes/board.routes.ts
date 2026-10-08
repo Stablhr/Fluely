@@ -4,10 +4,11 @@ import {boardCollaboratorController} from '../controllers/boardCollaborator.cont
 import {listController} from '../controllers/list.controller';
 import {cardController} from '../controllers/card.controller';
 import {activityController} from '../controllers/activity.controller';
+import {pollController} from '../controllers/poll.controller';
 import {validateRequest} from '../middleware/validation';
 import {requireAuth, requireUser} from '../middleware/auth';
 import {requireBoardAccess} from '../middleware/boardAccess';
-import {authActionLimiter, authReadLimiter} from '../middleware/rateLimit';
+import {authActionLimiter, authReadLimiter, pollLimiter} from '../middleware/rateLimit';
 import {
   activityQuerySchema,
   boardCreateSchema,
@@ -29,7 +30,8 @@ import {
   listCreateSchema,
   listIdParamsSchema,
   listPatchSchema,
-  listReorderSchema
+  listReorderSchema,
+  pollQuerySchema
 } from '../dtos/product.dto';
 
 const router = Router();
@@ -128,6 +130,15 @@ router.get(
   validateRequest({params: boardIdParamsSchema, query: activityQuerySchema}),
   requireBoardAccess('read'),
   activityController.list
+);
+
+// ── Poll (board sync + presence) ──────────────────────────────────
+router.get(
+  '/:boardId/poll',
+  pollLimiter,
+  validateRequest({params: boardIdParamsSchema, query: pollQuerySchema}),
+  requireBoardAccess('read'),
+  pollController.poll
 );
 
 // ── Lists ─────────────────────────────────────────────────────────

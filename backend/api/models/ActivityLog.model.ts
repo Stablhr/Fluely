@@ -14,6 +14,9 @@ import {
  * The metadata carries the structured diff — field changes, titles, roles — so
  * the client can build a human-readable sentence without a join, and so the
  * trail survives copy changes.
+ *
+ * `revision` is the board's revision after the write, enabling cursor-based
+ * polling without clock-skew issues.
  */
 export interface ActivityLogDocument extends mongoose.Document {
   boardId: Types.ObjectId;
@@ -24,6 +27,8 @@ export interface ActivityLogDocument extends mongoose.Document {
   /** The id of the row this is about; a plain string because the shape varies. */
   targetId: string | null;
   metadata: Record<string, unknown>;
+  /** The board revision after this change was applied. */
+  revision: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,7 +45,8 @@ const ActivityLogSchema = new Schema<ActivityLogDocument>(
     actionType: {type: String, enum: ActivityActionTypes, required: true},
     targetType: {type: String, enum: ActivityTargetTypes, required: true},
     targetId: {type: String, default: null},
-    metadata: {type: Schema.Types.Mixed, default: {}}
+    metadata: {type: Schema.Types.Mixed, default: {}},
+    revision: {type: Number, required: true, index: true}
   },
   {timestamps: true}
 );
@@ -48,6 +54,8 @@ const ActivityLogSchema = new Schema<ActivityLogDocument>(
 // The activity feed: newest first for one board, with a type filter.
 ActivityLogSchema.index({boardId: 1, createdAt: -1});
 ActivityLogSchema.index({boardId: 1, actionType: 1, createdAt: -1});
+// Cursor-based polling: entries after a given revision, oldest first.
+ActivityLogSchema.index({boardId: 1, revision: 1});
 
 export const ActivityLogModel = mongoose.model<ActivityLogDocument>(
   'ActivityLog',

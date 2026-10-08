@@ -6,7 +6,6 @@ import {ListDocument} from '../models/List.model';
 import {bumpBoardRevision} from './boardRevision';
 import {assertOrderFitsList} from './card.service';
 import {activityService} from './activity.service';
-import {realtimeService} from './realtime.service';
 import {withProductTransaction, ProductSession} from '../utils/transaction';
 import {Actor} from '../utils/actor';
 import {ApiError} from '../utils/error';
@@ -104,21 +103,14 @@ export const listService = {
         actionType: 'list.created',
         targetType: 'list',
         targetId: list._id.toString(),
-        metadata: {name: list.name}
+        metadata: {name: list.name},
+        revision
       });
 
       return {list, revision, activity};
     });
 
     const body = {list: serializeList(result.list), revision: result.revision};
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.revision,
-      type: 'list.created',
-      payload: body,
-      activity: result.activity
-    });
-
     return body;
   },
 
@@ -171,7 +163,8 @@ export const listService = {
           ...(input.name !== undefined && input.name !== before.name
             ? {before: {name: before.name}}
             : {})
-        }
+        },
+        revision
       });
 
       return {updated, revision, activity};
@@ -181,14 +174,6 @@ export const listService = {
       list: serializeList(result.updated),
       revision: result.revision
     };
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.revision,
-      type: result.activity.actionType,
-      payload: body,
-      activity: result.activity
-    });
-
     return body;
   },
 
@@ -229,21 +214,14 @@ export const listService = {
         actionType: 'list.updated',
         targetType: 'board',
         targetId: board._id.toString(),
-        metadata: {fields: ['listOrder']}
+        metadata: {fields: ['listOrder']},
+        revision
       });
 
       return {revision, activity};
     });
 
     const body = {listOrder: ids.map(id => id.toString()), revision: result.revision};
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.revision,
-      type: 'board.updated',
-      payload: body,
-      activity: result.activity
-    });
-
     return body;
   },
 
@@ -275,21 +253,14 @@ export const listService = {
         actionType: 'list.deleted',
         targetType: 'list',
         targetId: listId,
-        metadata: {name: doomed.name}
+        metadata: {name: doomed.name},
+        revision
       });
 
       return {revision, activity};
     });
 
     const body = {message: 'List deleted', revision: result.revision};
-    await realtimeService.broadcast({
-      boardId: board._id.toString(),
-      revision: result.revision,
-      type: 'list.deleted',
-      payload: {listId, revision: result.revision},
-      activity: result.activity
-    });
-
     return body;
   }
 };

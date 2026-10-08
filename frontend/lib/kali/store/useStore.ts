@@ -47,14 +47,16 @@ export type {
   AppNotificationType,
 } from "@/lib/kali/api/notifications";
 import type { AppNotificationDto } from "@/lib/kali/api/notifications";
-import type { BoardActivityDto } from "@/lib/kali/api/boards";
-import type { RemoteBoardEvent } from "@/lib/kali/realtime/events";
+import type { BoardActivityDto, BoardPollResponse } from "@/lib/kali/api/boards";
 
 /** One person on a board right now, from the presence channel. */
 export interface PresenceMember {
   id: string;
   name: string;
 }
+
+/** Result of applying a poll response that may require navigation. */
+export type KickSignal = "ok" | "removed" | "deleted";
 
 export interface Store {
   data: AppData;
@@ -163,8 +165,8 @@ export interface Store {
   presenceByBoard: Record<string, PresenceMember[]>;
   /** The board's activity feed, newest first, keyed by board id. */
   activityByBoard: Record<string, BoardActivityDto[]>;
-  /** Applies one `board.event` broadcast from this or another session. */
-  applyRemoteBoardEvent: (boardId: string, event: RemoteBoardEvent) => void;
+  /** Applies a poll response (activity + presence + revision) for this board. */
+  applyBoardPoll: (boardId: string, response: BoardPollResponse) => KickSignal;
   /** Swaps in a board's presence roster; keeps identity when unchanged. */
   replacePresence: (boardId: string, members: PresenceMember[]) => void;
   /**

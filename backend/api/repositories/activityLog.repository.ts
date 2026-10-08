@@ -10,6 +10,7 @@ type CreateActivityInput = {
   targetType: ActivityTargetType;
   targetId?: string | null;
   metadata?: Record<string, unknown>;
+  revision: number;
 };
 
 export const activityLogRepository = {
@@ -36,5 +37,15 @@ export const activityLogRepository = {
       .skip(options.skip)
       .limit(options.limit)
       .exec();
-  }
+  },
+
+  /**
+   * Returns activity entries with revision > since, oldest first, capped at 50.
+   * Used by the polling endpoint to stream new events since the client's cursor.
+   */
+  listSince: (boardId: Types.ObjectId, since: number) =>
+    ActivityLogModel.find({boardId, revision: {$gt: since}})
+      .sort({revision: 1, createdAt: 1})
+      .limit(50)
+      .exec()
 };

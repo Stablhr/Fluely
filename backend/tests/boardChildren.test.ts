@@ -31,10 +31,9 @@ jest.mock('../api/repositories/board.repository', () => ({
 }));
 
 // The mutation services run their writes inside `withProductTransaction` and
-// tee an activity entry + a realtime broadcast alongside them. The transaction
-// helper is replaced with its documented standalone-Mongo fallback (session
-// undefined), and the collaborators are faked so nothing here needs a database
-// or Pusher credentials.
+// tee an activity entry alongside them. The transaction helper is replaced with
+// its documented standalone-Mongo fallback (session undefined), so nothing here
+// needs a database.
 jest.mock('../api/utils/transaction', () => ({
   withProductTransaction: (work: (session: undefined) => Promise<unknown>) =>
     work(undefined)
@@ -43,20 +42,10 @@ jest.mock('../api/utils/transaction', () => ({
 jest.mock('../api/services/activity.service', () => ({
   activityService: {
     // The implementation is re-installed in `beforeEach` — `resetAllMocks`
-    // wipes factory-defined implementations, and the services read
-    // `activity.actionType` to name the realtime broadcast.
+    // wipes factory-defined implementations.
     log: jest.fn(),
     list: jest.fn(async () => [])
   }
-}));
-
-jest.mock('../api/services/realtime.service', () => ({
-  realtimeService: {
-    enabled: false,
-    authorize: jest.fn(),
-    broadcast: jest.fn(async () => undefined)
-  },
-  parseChannel: jest.fn()
 }));
 
 import {listRepository} from '../api/repositories/list.repository';
@@ -65,7 +54,6 @@ import {boardRepository} from '../api/repositories/board.repository';
 import {listService} from '../api/services/list.service';
 import {cardService} from '../api/services/card.service';
 import {activityService} from '../api/services/activity.service';
-import {realtimeService} from '../api/services/realtime.service';
 
 const BOARD = new Types.ObjectId('ccccccccccccccccccccccc1');
 const OTHER_BOARD = new Types.ObjectId('ccccccccccccccccccccccc2');
@@ -84,7 +72,6 @@ const mockedLists = listRepository as jest.Mocked<typeof listRepository>;
 const mockedCards = cardRepository as jest.Mocked<typeof cardRepository>;
 const mockedBoards = boardRepository as jest.Mocked<typeof boardRepository>;
 const mockedActivity = activityService as jest.Mocked<typeof activityService>;
-const mockedRealtime = realtimeService as jest.Mocked<typeof realtimeService>;
 
 // Derived from the real signatures, so a change to a repository's return type
 // breaks these fakes instead of quietly drifting.
@@ -153,7 +140,8 @@ function installActivityLog() {
     targetId: params.targetId ?? null,
     metadata: (params.metadata ?? {}) as Record<string, unknown>,
     actor: {id: params.actor.actorId.toString(), name: 'Test Actor'},
-    createdAt: new Date()
+    createdAt: new Date(),
+    revision: params.revision ?? 0
   }));
 }
 
@@ -519,8 +507,8 @@ describe('an order may only name cards that live in the target list', () => {
   });
 });
 
-describe('every write records who did it and tells everyone else', () => {
-  it('logs the activity entry and broadcasts it with the write', async () => {
+describe('every write records who did it', () => {
+  it('logs the activity entry with the write', async () => {
     mockedLists.create.mockResolvedValue(list());
 
     await listService.create(ACTOR, board(4, [OTHER_LIST]), {name: 'To do'});
@@ -536,18 +524,9 @@ describe('every write records who did it and tells everyone else', () => {
         targetId: LIST.toString()
       })
     );
-
-    expect(mockedRealtime.broadcast).toHaveBeenCalledTimes(1);
-    expect(mockedRealtime.broadcast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        boardId: BOARD.toString(),
-        type: 'list.created',
-        activity: expect.objectContaining({actionType: 'list.created'})
-      })
-    );
   });
 
-  it('names the broadcast after the facet that changed', async () => {
+  it('names the activity after the facet that changed', async () => {
     mockedCards.findByIdForBoard.mockResolvedValue(card({done: false}));
     mockedLists.findByIdForBoard.mockResolvedValue(list());
 
@@ -557,12 +536,9 @@ describe('every write records who did it and tells everyone else', () => {
       undefined,
       expect.objectContaining({actionType: 'card.status_changed', targetType: 'card'})
     );
-    expect(mockedRealtime.broadcast).toHaveBeenCalledWith(
-      expect.objectContaining({type: 'card.status_changed'})
-    );
   });
 
-  it('logs nothing and broadcasts nothing when the write is refused', async () => {
+  it('logs nothing when the write is refused', async () => {
     mockedLists.findByIdForBoard.mockResolvedValue(null);
 
     await expect(
@@ -570,10 +546,9 @@ describe('every write records who did it and tells everyone else', () => {
     ).rejects.toMatchObject({statusCode: 404, code: 'LIST_NOT_FOUND'});
 
     expect(mockedActivity.log).not.toHaveBeenCalled();
-    expect(mockedRealtime.broadcast).not.toHaveBeenCalled();
   });
 
-  it('does not announce a write that lost the revision race', async () => {
+  it('does not record a write that lost the revision race', async () => {
     mockedBoards.bumpRevision.mockResolvedValue(null as never);
     mockedLists.create.mockResolvedValue(list());
 
@@ -582,6 +557,5 @@ describe('every write records who did it and tells everyone else', () => {
     ).rejects.toMatchObject({statusCode: 409, code: 'REVISION_CONFLICT'});
 
     expect(mockedActivity.log).not.toHaveBeenCalled();
-    expect(mockedRealtime.broadcast).not.toHaveBeenCalled();
   });
 });
