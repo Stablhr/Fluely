@@ -22,7 +22,14 @@ const envSchema = z.object({
   MEDIA_QUOTA_MB: z.coerce.number().positive().max(100000).optional(),
   MEDIA_ALLOWED_MIME_TYPES: z.string().optional(),
   MEDIA_UPLOAD_DIR: z.string().optional(),
-  SOCIAL_SIMULATION_FAILURE_RATE: z.coerce.number().min(0).max(1).optional()
+  SOCIAL_SIMULATION_FAILURE_RATE: z.coerce.number().min(0).max(1).optional(),
+  // Realtime. All four must be set for board sync/presence to be live; when any
+  // is missing the server silently skips broadcasts and channel auth, so the
+  // app degrades to refresh-to-see rather than failing to boot.
+  PUSHER_APP_ID: z.string().optional(),
+  PUSHER_KEY: z.string().optional(),
+  PUSHER_SECRET: z.string().optional(),
+  PUSHER_CLUSTER: z.string().optional()
 });
 
 const parsed = envSchema.safeParse(process.env);

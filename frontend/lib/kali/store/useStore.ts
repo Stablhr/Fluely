@@ -47,6 +47,14 @@ export type {
   AppNotificationType,
 } from "@/lib/kali/api/notifications";
 import type { AppNotificationDto } from "@/lib/kali/api/notifications";
+import type { BoardActivityDto } from "@/lib/kali/api/boards";
+import type { RemoteBoardEvent } from "@/lib/kali/realtime/events";
+
+/** One person on a board right now, from the presence channel. */
+export interface PresenceMember {
+  id: string;
+  name: string;
+}
 
 export interface Store {
   data: AppData;
@@ -146,6 +154,25 @@ export interface Store {
     invitationId: string,
     decision: "accepted" | "declined",
   ) => Promise<void>;
+
+  /* ── Realtime ─────────────────────────────────────────────────
+     Live board sync pushed over Pusher, plus the presence roster and
+     server-backed activity feed that ride alongside it. */
+
+  /** Who is on this board right now, keyed by board id. */
+  presenceByBoard: Record<string, PresenceMember[]>;
+  /** The board's activity feed, newest first, keyed by board id. */
+  activityByBoard: Record<string, BoardActivityDto[]>;
+  /** Applies one `board.event` broadcast from this or another session. */
+  applyRemoteBoardEvent: (boardId: string, event: RemoteBoardEvent) => void;
+  /** Swaps in a board's presence roster; keeps identity when unchanged. */
+  replacePresence: (boardId: string, members: PresenceMember[]) => void;
+  /**
+   * Pulls page 1 of the server activity feed and merges it with anything
+   * realtime has already delivered. Rejects on failure so the panel can fall
+   * back to the local entries.
+   */
+  loadBoardActivity: (boardId: string) => Promise<void>;
 
   /* ── Notifications ─────────────────────────────────────────────
      The bell: in-app notifications polled from the server, with the

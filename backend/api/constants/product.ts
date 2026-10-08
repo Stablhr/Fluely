@@ -57,6 +57,45 @@ export const MediaKinds = ['image', 'video', 'audio', 'document'] as const;
 export type MediaKind = (typeof MediaKinds)[number];
 
 /**
+ * The audit trail's vocabulary. Names the event, not the wording — the sentence
+ * shown in the activity feed is assembled by the client from the type plus the
+ * metadata recorded with it, so copy can change without a data migration.
+ *
+ * Adapted to the boards domain (lists and cards rather than generic tasks).
+ * Every value here must also exist in the ActivityLog model's enum.
+ */
+export const ActivityActionTypes = [
+  'board.updated',
+  'board.visibility_changed',
+  'board.deleted',
+  'list.created',
+  'list.updated',
+  'list.archived',
+  'list.deleted',
+  'card.created',
+  'card.updated',
+  'card.status_changed',
+  'card.assigned',
+  'card.moved',
+  'card.archived',
+  'card.deleted',
+  'collaborator.invited',
+  'collaborator.role_changed',
+  'collaborator.removed',
+  'collaborator.accepted'
+] as const;
+export type ActivityActionType = (typeof ActivityActionTypes)[number];
+
+/** What an activity entry points at. Free-form ids, so the target is a string. */
+export const ActivityTargetTypes = [
+  'board',
+  'list',
+  'card',
+  'collaborator'
+] as const;
+export type ActivityTargetType = (typeof ActivityTargetTypes)[number];
+
+/**
  * In-app notifications. Each type names the event, not the wording: the copy
  * lives with the consumer so it can change without a data migration.
  */

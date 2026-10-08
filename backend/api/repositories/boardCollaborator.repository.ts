@@ -4,24 +4,36 @@ import {
   BoardCollaboratorModel
 } from '../models/BoardCollaborator.model';
 import {CollaboratorRole, CollaboratorStatus} from '../constants/product';
+import {ProductSession} from '../utils/transaction';
 
+/** Optional session on writes and post-write reads: see `list.repository`. */
 export const boardCollaboratorRepository = {
-  create: (data: {
-    boardId: Types.ObjectId;
-    userId: Types.ObjectId;
-    role: CollaboratorRole;
-    status?: CollaboratorStatus;
-    invitedBy: Types.ObjectId;
-    invitedAt?: Date;
-  }) =>
-    BoardCollaboratorModel.create({
-      status: 'pending',
-      invitedAt: new Date(),
-      ...data
-    }),
+  create: (
+    data: {
+      boardId: Types.ObjectId;
+      userId: Types.ObjectId;
+      role: CollaboratorRole;
+      status?: CollaboratorStatus;
+      invitedBy: Types.ObjectId;
+      invitedAt?: Date;
+    },
+    session?: ProductSession
+  ) =>
+    BoardCollaboratorModel.create(
+      [
+        {
+          status: 'pending',
+          invitedAt: new Date(),
+          ...data
+        }
+      ],
+      {session}
+    ).then(([created]) => created),
 
-  find: (boardId: Types.ObjectId, userId: Types.ObjectId) =>
-    BoardCollaboratorModel.findOne({boardId, userId}).exec(),
+  find: (boardId: Types.ObjectId, userId: Types.ObjectId, session?: ProductSession) =>
+    session
+      ? BoardCollaboratorModel.findOne({boardId, userId}).session(session).exec()
+      : BoardCollaboratorModel.findOne({boardId, userId}).exec(),
 
   /**
    * By row id, scoped to the board.
@@ -31,12 +43,20 @@ export const boardCollaboratorRepository = {
    * to some other board from being mutated through a board the caller happens
    * to own.
    */
-  findByIdForBoard: (id: string, boardId: Types.ObjectId) =>
-    BoardCollaboratorModel.findOne({_id: id, boardId}).exec(),
+  findByIdForBoard: (id: string, boardId: Types.ObjectId, session?: ProductSession) =>
+    session
+      ? BoardCollaboratorModel.findOne({_id: id, boardId})
+          .session(session)
+          .exec()
+      : BoardCollaboratorModel.findOne({_id: id, boardId}).exec(),
 
   /** Scoped to the invitee, so one person can never answer another's invitation. */
-  findByIdForUser: (id: string, userId: Types.ObjectId) =>
-    BoardCollaboratorModel.findOne({_id: id, userId}).exec(),
+  findByIdForUser: (id: string, userId: Types.ObjectId, session?: ProductSession) =>
+    session
+      ? BoardCollaboratorModel.findOne({_id: id, userId})
+          .session(session)
+          .exec()
+      : BoardCollaboratorModel.findOne({_id: id, userId}).exec(),
 
   listForBoard: (boardId: Types.ObjectId) =>
     BoardCollaboratorModel.find({boardId}).sort({createdAt: 1}).exec(),
@@ -54,19 +74,32 @@ export const boardCollaboratorRepository = {
   countAcceptedForBoard: (boardId: Types.ObjectId) =>
     BoardCollaboratorModel.countDocuments({boardId, status: 'accepted'}).exec(),
 
-  update: (id: string, data: Partial<BoardCollaboratorDocument>) =>
-    BoardCollaboratorModel.updateOne({_id: id}, data).exec(),
+  update: (
+    id: string,
+    data: Partial<BoardCollaboratorDocument>,
+    session?: ProductSession
+  ) => BoardCollaboratorModel.updateOne({_id: id}, data, {session}).exec(),
 
-  setStatus: (id: string, status: CollaboratorStatus, respondedAt: Date) =>
-    BoardCollaboratorModel.updateOne({_id: id}, {status, respondedAt}).exec(),
+  setStatus: (
+    id: string,
+    status: CollaboratorStatus,
+    respondedAt: Date,
+    session?: ProductSession
+  ) =>
+    BoardCollaboratorModel.updateOne(
+      {_id: id},
+      {status, respondedAt},
+      {session}
+    ).exec(),
 
-  setRole: (id: string, role: CollaboratorRole) =>
-    BoardCollaboratorModel.updateOne({_id: id}, {role}).exec(),
+  setRole: (id: string, role: CollaboratorRole, session?: ProductSession) =>
+    BoardCollaboratorModel.updateOne({_id: id}, {role}, {session}).exec(),
 
-  delete: (id: string) => BoardCollaboratorModel.deleteOne({_id: id}).exec(),
+  delete: (id: string, session?: ProductSession) =>
+    BoardCollaboratorModel.deleteOne({_id: id}, {session}).exec(),
 
-  deleteForBoard: (boardId: Types.ObjectId) =>
-    BoardCollaboratorModel.deleteMany({boardId}).exec(),
+  deleteForBoard: (boardId: Types.ObjectId, session?: ProductSession) =>
+    BoardCollaboratorModel.deleteMany({boardId}, {session}).exec(),
 
   deleteForBoardAndUser: (boardId: Types.ObjectId, userId: Types.ObjectId) =>
     BoardCollaboratorModel.deleteOne({boardId, userId}).exec()

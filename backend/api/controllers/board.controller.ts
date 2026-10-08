@@ -66,7 +66,10 @@ export const boardController = {
   async update(req: Request, res: Response, next: NextFunction) {
     try {
       const {board, level} = requireBoard(req);
-      res.status(200).json({board: await boardService.update(board, req.body, level)});
+      const actor = actorFromRequest(req);
+      res
+        .status(200)
+        .json({board: await boardService.update(actor, board, req.body, level)});
     } catch (error) {
       next(error);
     }
@@ -76,12 +79,14 @@ export const boardController = {
   async setVisibility(req: Request, res: Response, next: NextFunction) {
     try {
       const {board} = requireBoard(req);
+      const actor = actorFromRequest(req);
       res.status(200).json({
         board: await boardService.setVisibility(
-        board,
-        req.body.visibility,
-        req.body.expectedRevision
-      )
+          actor,
+          board,
+          req.body.visibility,
+          req.body.expectedRevision
+        )
       });
     } catch (error) {
       next(error);
@@ -91,7 +96,8 @@ export const boardController = {
   async remove(req: Request, res: Response, next: NextFunction) {
     try {
       const {board} = requireBoard(req);
-      res.status(200).json(await boardService.remove(board));
+      const actor = actorFromRequest(req);
+      res.status(200).json(await boardService.remove(actor, board));
     } catch (error) {
       next(error);
     }

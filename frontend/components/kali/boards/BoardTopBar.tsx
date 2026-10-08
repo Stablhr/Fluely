@@ -14,9 +14,10 @@ import {
   Globe,
   Users,
   UserPlus,
+  Clock,
 } from 'lucide-react'
 import type { Board } from '@/lib/kali/store/schema'
-import { YOU_ID } from '@/lib/kali/store/schema'
+import { MEMBER_COLORS, YOU_ID } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import ViewsMenu from './ViewsMenu'
 import FilterPanel from './FilterPanel'
@@ -24,7 +25,18 @@ import type { BoardFilter } from './FilterPanel'
 import type { BoardViewType } from './BoardView'
 import ShareModal from './ShareModal'
 import VisibilityModal from './VisibilityModal'
+import BoardActivityPanel from './BoardActivityPanel'
 import Avatar from '../shared/Avatar'
+
+/**
+ * Deterministic presence-chip colour, so a person's avatar keeps the same
+ * tint across sessions without storing one anywhere.
+ */
+function presenceColor(id: string): string {
+  let total = 0
+  for (let i = 0; i < id.length; i += 1) total += id.charCodeAt(i)
+  return MEMBER_COLORS[total % MEMBER_COLORS.length]
+}
 
 interface BoardTopBarProps {
   board: Board
@@ -92,14 +104,16 @@ export default function BoardTopBar({
   onFilterChange,
   onOpenMenu,
 }: BoardTopBarProps) {
-  const { renameBoard, toggleStar, data } = useStore()
+  const { renameBoard, toggleStar, data, presenceByBoard } = useStore()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(board.name)
   const [searchOpen, setSearchOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [visOpen, setVisOpen] = useState(false)
+  const [activityOpen, setActivityOpen] = useState(false)
 
   const currentUser = data.members[YOU_ID]
+  const presence = presenceByBoard[board.id] ?? []
 
   const visIcon = {
     private: Lock,
@@ -247,6 +261,11 @@ export default function BoardTopBar({
           </TB>
         </div>
 
+        {/* ── Activity ── */}
+        <TB title="Board activity" onClick={() => setActivityOpen(true)}>
+          <Clock size={17} />
+        </TB>
+
         {/* ── Mobile: Search + More ── */}
         <TB
           title="Search board"
@@ -268,6 +287,30 @@ export default function BoardTopBar({
         >
           <MoreHorizontal size={17} />
         </TB>
+
+        {/* ── Presence: who is on this board right now ── */}
+        {presence.length > 1 && (
+          <span
+            className="ml-1 hidden shrink-0 items-center sm:inline-flex"
+            title={`${presence.length} people on this board`}
+          >
+            <span className="flex -space-x-1">
+              {presence.slice(0, 3).map((person) => (
+                <Avatar
+                  key={person.id}
+                  member={{ ...person, color: presenceColor(person.id) }}
+                  size={24}
+                  stacked
+                />
+              ))}
+            </span>
+            {presence.length > 3 && (
+              <span className="ml-1 rounded-full bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold text-text-muted">
+                +{presence.length - 3}
+              </span>
+            )}
+          </span>
+        )}
 
         {/* ── Desktop: Share + More ── */}
         <button
@@ -321,6 +364,7 @@ export default function BoardTopBar({
       {/* ── Modals ── */}
       {shareOpen && <ShareModal board={board} onClose={() => setShareOpen(false)} />}
       {visOpen && <VisibilityModal board={board} onClose={() => setVisOpen(false)} />}
+      {activityOpen && <BoardActivityPanel board={board} onClose={() => setActivityOpen(false)} />}
     </div>
   )
 }

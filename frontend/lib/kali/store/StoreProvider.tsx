@@ -26,12 +26,19 @@ import {
 } from "./schema";
 import { clearData, loadData, saveData } from "./storage";
 import { StoreContext } from "./useStore";
-import type { PendingInvitation, Store, StoreUser } from "./useStore";
+import type {
+  PendingInvitation,
+  PresenceMember,
+  Store,
+  StoreUser,
+} from "./useStore";
 import { uid } from "@/lib/kali/utils/id";
 import { formatDate } from "@/lib/kali/utils/dates";
 import { useSocialPosts } from "@/lib/kali/feature-hooks/useSocialPosts";
+import type { BoardActivityDto, BoardDto } from "@/lib/kali/api/boards";
 import {
   createBoardOnServer,
+  fetchBoardActivity,
   fetchBoards,
   fetchCollaborators,
   fetchPendingInvitations,
@@ -56,13 +63,20 @@ import {
   updateCardOnServer,
   updateListOnServer,
 } from "@/lib/kali/api/boardChildren";
-import type {CreateCardInput, ListDto, StructureDto} from "@/lib/kali/api/boardChildren";
+import type {CreateCardInput, CardDto, ListDto, StructureDto} from "@/lib/kali/api/boardChildren";
 import {
   fetchNotifications,
   markAllNotificationsRead as markAllNotificationsReadOnServer,
   markNotificationRead as markNotificationReadOnServer,
 } from "@/lib/kali/api/notifications";
 import type { AppNotificationDto } from "@/lib/kali/api/notifications";
+import type { RemoteBoardEvent } from "@/lib/kali/realtime/events";
+import {
+  asNumber,
+  asRecord,
+  asString,
+  asStringArray,
+} from "@/lib/kali/realtime/events";
 import { getFriendlyErrorMessage } from "@/lib/api/getFriendlyErrorMessage";
 
 function patchRecord<T extends { id: string }>(
@@ -87,6 +101,40 @@ const now = () => new Date().toISOString();
  */
 function isServerBoard(board: Board | undefined): board is Board {
   return Boolean(board?.ownerId && board.revision !== null);
+}
+
+/**
+ * Payload guards for realtime events.
+ *
+ * An event is cross-origin input, so the identity fields each converter needs
+ * are checked before use — anything else falls back to a structure re-pull
+ * rather than writing a half-formed record into the store.
+ */
+function isListDto(value: unknown): value is ListDto {
+  const rec = asRecord(value);
+  return Boolean(
+    rec && typeof rec.id === "string" && typeof rec.boardId === "string",
+  );
+}
+
+function isCardDto(value: unknown): value is CardDto {
+  const rec = asRecord(value);
+  return Boolean(
+    rec &&
+      typeof rec.id === "string" &&
+      typeof rec.boardId === "string" &&
+      typeof rec.listId === "string",
+  );
+}
+
+function isBoardDto(value: unknown): value is BoardDto {
+  const rec = asRecord(value);
+  return Boolean(
+    rec &&
+      typeof rec.id === "string" &&
+      typeof rec.name === "string" &&
+      typeof rec.visibility === "string",
+  );
 }
 
 /**
@@ -221,6 +269,12 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   >([]);
   const [notifications, setNotifications] = useState<AppNotificationDto[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [presenceByBoard, setPresenceByBoard] = useState<
+    Record<string, PresenceMember[]>
+  >({});
+  const [activityByBoard, setActivityByBoard] = useState<
+    Record<string, BoardActivityDto[]>
+  >({});
   const dataRef = useRef(data);
 
   useEffect(() => {
@@ -765,7 +819,10 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     return boardId;
   };
 
-  const deleteBoard = (id: string) => {
+  // A useCallback rather than a plain function: the realtime handler below
+  // depends on it, and re-creating it every render would churn that callback's
+  // identity — and with it the Pusher subscription bound to it.
+  const deleteBoard = useCallback((id: string) => {
     mutate((prev) => {
       const board = prev.boards[id];
       if (!board) return prev;
@@ -794,7 +851,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         },
       };
     });
-  };
+  }, [mutate]);
 
   const renameBoard = (id: string, name: string) =>
     mutate((prev) => ({
@@ -840,9 +897,16 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
                         ...prev.boards,
                         [boardId]: {
                           ...board,
-                          listOrder: board.listOrder.map(x =>
-                            x === id ? created.id : x,
-                          ),
+                          // The realtime `list.created` event for this same
+                          // write may already hold the server id — mapping the
+                          // placeholder onto it can therefore produce the id
+                          // twice, so the first occurrence wins.
+                          listOrder: board.listOrder
+                            .map(x => (x === id ? created.id : x))
+                            .filter(
+                              (x, i, arr) =>
+                                x !== created.id || arr.indexOf(x) === i,
+                            ),
                         },
                       }
                     : prev.boards,
@@ -1199,8 +1263,13 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
                       ...prev.lists,
                       [listId]: {
                         ...target,
+                        // The realtime `card.created` event for this same
+                        // write may already hold the server id, so the
+                        // placeholder is dropped along with any duplicate
+                        // before the real id is appended — otherwise the card
+                        // would render twice when the event lands first.
                         cardOrder: target.cardOrder
-                          .filter(x => x !== id)
+                          .filter(x => x !== id && x !== created.id)
                           .concat(created.id),
                       },
                     }
@@ -2065,6 +2134,406 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }
   }, [mutate]);
 
+  /* ── Realtime ────────────────────────────────────────────────────
+     One `board.event` per server mutation, pushed over Pusher from
+     `useBoardRealtime`. Every event also carries its audit entry, so the
+     activity feed advances even when the payload itself is handed to a
+     re-pull instead of a direct merge.
+
+     The split is deliberate: direct merges cover payloads this client can
+     replay exactly (a created card, a field patch), while anything whose
+     final server-side shape depends on ordering — a move's landing index, a
+     delete's cascade — falls back to a short debounced structure read, so a
+     remote write can never leave this copy subtly wrong. */
+
+  const structureSyncTimers = useRef(new Map<string, number>());
+
+  // The timers outlive nothing: clear them on unmount so a pending pull
+  // cannot fire into a torn-down store.
+  useEffect(() => {
+    const timers = structureSyncTimers.current;
+    return () => {
+      for (const timer of timers.values()) window.clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
+
+  /** Debounced re-pull — one GET per burst of events, not one per event. */
+  const scheduleStructureSync = useCallback(
+    (boardId: string) => {
+      const pending = structureSyncTimers.current.get(boardId);
+      if (pending !== undefined) window.clearTimeout(pending);
+      structureSyncTimers.current.set(
+        boardId,
+        window.setTimeout(() => {
+          structureSyncTimers.current.delete(boardId);
+          void syncBoardStructure(boardId);
+        }, 150),
+      );
+    },
+    [syncBoardStructure],
+  );
+
+  /** Drops a board's live roster and feed once the board itself is gone. */
+  const forgetBoard = useCallback((boardId: string) => {
+    setPresenceByBoard((prev) => {
+      if (!(boardId in prev)) return prev;
+      const next = { ...prev };
+      delete next[boardId];
+      return next;
+    });
+    setActivityByBoard((prev) => {
+      if (!(boardId in prev)) return prev;
+      const next = { ...prev };
+      delete next[boardId];
+      return next;
+    });
+  }, []);
+
+  /**
+   * Folds audit entries into a board's feed: newest first, de-duplicated by
+   * id, capped so a busy board cannot grow the persisted store without bound.
+   * (The feed itself lives in component state, not in `AppData`.)
+   */
+  const mergeActivity = useCallback(
+    (boardId: string, incoming: BoardActivityDto[]) => {
+      if (incoming.length === 0) return;
+      setActivityByBoard((prev) => {
+        const local = prev[boardId] ?? [];
+        const seen = new Set(local.map((entry) => entry.id));
+        const fresh = incoming.filter((entry) => !seen.has(entry.id));
+        if (fresh.length === 0) return prev;
+        const merged = [...local, ...fresh]
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 100);
+        return { ...prev, [boardId]: merged };
+      });
+    },
+    [],
+  );
+
+  const replacePresence = useCallback(
+    (boardId: string, members: PresenceMember[]) => {
+      setPresenceByBoard((prev) =>
+        samePayload(prev[boardId], members)
+          ? prev
+          : { ...prev, [boardId]: members },
+      );
+    },
+    [],
+  );
+
+  const loadBoardActivity = useCallback(
+    async (boardId: string) => {
+      mergeActivity(boardId, await fetchBoardActivity(boardId, 1, 30));
+    },
+    [mergeActivity],
+  );
+
+  const applyRemoteBoardEvent = useCallback(
+    (boardId: string, event: RemoteBoardEvent) => {
+      // The audit entry rides every event, so the feed keeps moving even when
+      // the payload below is routed to a re-pull instead of a merge.
+      if (event.activity) mergeActivity(boardId, [event.activity]);
+
+      const body = asRecord(event.payload) ?? {};
+      const payloadRevision =
+        asNumber(body.revision) ?? asNumber(event.revision) ?? undefined;
+
+      switch (event.type) {
+        /* ── Lists ─────────────────────────────────────────────── */
+        case "list.created": {
+          const list = body.list;
+          if (!isListDto(list)) {
+            scheduleStructureSync(boardId);
+            break;
+          }
+          mutate((prev) => {
+            const board = prev.boards[boardId];
+            if (!board) return prev;
+            const known = board.listOrder.includes(list.id);
+            const index = known
+              ? board.listOrder.indexOf(list.id)
+              : board.listOrder.length;
+            return {
+              ...prev,
+              lists: {
+                ...prev.lists,
+                [list.id]: toList(list, index, prev.lists[list.id]),
+              },
+              boards: {
+                ...prev.boards,
+                [boardId]: known
+                  ? board
+                  : { ...board, listOrder: [...board.listOrder, list.id] },
+              },
+            };
+          });
+          applyRevision(boardId, payloadRevision);
+          break;
+        }
+
+        case "list.updated":
+        case "list.archived": {
+          const list = body.list;
+          if (!isListDto(list) || !dataRef.current.lists[list.id]) {
+            scheduleStructureSync(boardId);
+            break;
+          }
+          mutate((prev) => {
+            const current = prev.lists[list.id];
+            if (!current) return prev;
+            return {
+              ...prev,
+              lists: {
+                ...prev.lists,
+                [list.id]: toList(list, current.order, current),
+              },
+            };
+          });
+          applyRevision(boardId, payloadRevision);
+          break;
+        }
+
+        case "list.deleted": {
+          const listId = asString(body.listId);
+          if (!listId) {
+            scheduleStructureSync(boardId);
+            break;
+          }
+          mutate((prev) => {
+            const board = prev.boards[boardId];
+            if (!board) return prev;
+            // Already gone locally — nothing to change, keep state identity.
+            if (!prev.lists[listId] && !board.listOrder.includes(listId)) {
+              return prev;
+            }
+            const lists = { ...prev.lists };
+            delete lists[listId];
+            const cards: Record<string, Card> = {};
+            for (const [id, card] of Object.entries(prev.cards)) {
+              if (card.listId !== listId) cards[id] = card;
+            }
+            return {
+              ...prev,
+              lists,
+              cards,
+              boards: {
+                ...prev.boards,
+                [boardId]: {
+                  ...board,
+                  listOrder: board.listOrder.filter((id) => id !== listId),
+                  archivedLists: board.archivedLists.filter(
+                    (entry) => entry.list.id !== listId,
+                  ),
+                },
+              },
+            };
+          });
+          applyRevision(boardId, payloadRevision);
+          break;
+        }
+
+        /* ── Cards ─────────────────────────────────────────────── */
+        case "card.created": {
+          const card = body.card;
+          if (!isCardDto(card) || !dataRef.current.lists[card.listId]) {
+            scheduleStructureSync(boardId);
+            break;
+          }
+          mutate((prev) => {
+            const list = prev.lists[card.listId];
+            if (!list) return prev;
+            return {
+              ...prev,
+              cards: {
+                ...prev.cards,
+                [card.id]: toCard(card, prev.cards[card.id]),
+              },
+              lists: {
+                ...prev.lists,
+                [card.listId]: list.cardOrder.includes(card.id)
+                  ? list
+                  : { ...list, cardOrder: [...list.cardOrder, card.id] },
+              },
+            };
+          });
+          applyRevision(boardId, payloadRevision);
+          break;
+        }
+
+        case "card.updated":
+        case "card.status_changed":
+        case "card.assigned":
+        case "card.archived": {
+          const card = body.card;
+          if (!isCardDto(card) || !dataRef.current.cards[card.id]) {
+            scheduleStructureSync(boardId);
+            break;
+          }
+          mutate((prev) => {
+            const existing = prev.cards[card.id];
+            if (!existing) return prev;
+            return {
+              ...prev,
+              cards: { ...prev.cards, [card.id]: toCard(card, existing) },
+            };
+          });
+          applyRevision(boardId, payloadRevision);
+          break;
+        }
+
+        case "card.moved": {
+          // The mover's chosen landing index is not in the payload, and our
+          // own move has already been applied optimistically — so this is
+          // always a re-pull rather than a merge, debounced so a burst of
+          // moves costs a single GET.
+          applyRevision(boardId, payloadRevision);
+          scheduleStructureSync(boardId);
+          break;
+        }
+
+        case "card.deleted": {
+          const cardId = asString(body.cardId);
+          if (!cardId) {
+            scheduleStructureSync(boardId);
+            break;
+          }
+          mutate((prev) => {
+            const card = prev.cards[cardId];
+            if (!card) return prev;
+            const cards = { ...prev.cards };
+            delete cards[cardId];
+            const lists = { ...prev.lists };
+            for (const [id, list] of Object.entries(lists)) {
+              if (list.cardOrder.includes(cardId)) {
+                lists[id] = {
+                  ...list,
+                  cardOrder: list.cardOrder.filter((x) => x !== cardId),
+                };
+              }
+            }
+            return { ...prev, cards, lists };
+          });
+          applyRevision(boardId, payloadRevision);
+          break;
+        }
+
+        /* ── Board ─────────────────────────────────────────────── */
+        case "board.updated":
+        case "board.visibility_changed": {
+          const listOrder = asStringArray(body.listOrder);
+          const boardDto = isBoardDto(body.board) ? body.board : null;
+
+          if (listOrder) {
+            // A reorder: the server's array is the authority. Lists this
+            // browser created but has not pushed yet keep their slots after
+            // it until the board's first structural sync claims them.
+            mutate((prev) => {
+              const current = prev.boards[boardId];
+              if (!current) return prev;
+              const localOnly = current.childrenSyncedAt
+                ? []
+                : current.listOrder.filter(
+                    (id) => !listOrder.includes(id) && Boolean(prev.lists[id]),
+                  );
+              return {
+                ...prev,
+                boards: {
+                  ...prev.boards,
+                  [boardId]: {
+                    ...current,
+                    listOrder: [...listOrder, ...localOnly],
+                  },
+                },
+              };
+            });
+            applyRevision(boardId, payloadRevision);
+            break;
+          }
+
+          if (boardDto) {
+            mutate((prev) => {
+              const current = prev.boards[boardId];
+              if (!current) return prev;
+              return {
+                ...prev,
+                boards: {
+                  ...prev.boards,
+                  [boardId]: {
+                    ...current,
+                    ...mergeServerBoard(current, boardDto),
+                    // The payload's `access` describes the person who made the
+                    // change, not this viewer — keep ours, and with it our
+                    // local list sequence (mergeServerBoard omits it).
+                    access: current.access,
+                    listOrder: current.listOrder,
+                  },
+                },
+              };
+            });
+            applyRevision(
+              boardId,
+              boardDto.revision ?? payloadRevision,
+            );
+            break;
+          }
+
+          scheduleStructureSync(boardId);
+          break;
+        }
+
+        case "board.deleted": {
+          deleteBoard(boardId);
+          forgetBoard(boardId);
+          break;
+        }
+
+        /* ── People ────────────────────────────────────────────── */
+        case "collaborator.invited":
+        case "collaborator.role_changed":
+        case "collaborator.removed":
+        case "collaborator.accepted": {
+          const targetUserId = asString(body.userId);
+          const isSelf =
+            targetUserId !== null && targetUserId === currentUser?.id;
+
+          if (event.type === "collaborator.removed" && isSelf) {
+            // Access is gone: drop the board outright rather than leave a row
+            // the UI would keep rendering as though it were still ours.
+            deleteBoard(boardId);
+            forgetBoard(boardId);
+            setError("Your access to this board was removed.");
+            break;
+          }
+
+          void loadCollaborators(boardId);
+          // My own role or acceptance changed → the boards list has to see it.
+          if (isSelf) void syncBoards();
+          break;
+        }
+
+        default: {
+          // An unknown type (or one this client predates) is still a change:
+          // re-pull rather than silently ignore it.
+          scheduleStructureSync(boardId);
+        }
+      }
+    },
+    [
+      applyRevision,
+      currentUser?.id,
+      deleteBoard,
+      forgetBoard,
+      loadCollaborators,
+      mergeActivity,
+      mutate,
+      scheduleStructureSync,
+      setError,
+      syncBoards,
+    ],
+  );
+
   const inviteCollaborator = async (
     boardId: string,
     email: string,
@@ -2520,6 +2989,13 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     syncNotifications,
     markNotificationRead,
     markAllNotificationsRead,
+
+    /* Realtime */
+    presenceByBoard,
+    activityByBoard,
+    applyRemoteBoardEvent,
+    replacePresence,
+    loadBoardActivity,
 
     resetAll,
     socialPosts: social.posts,

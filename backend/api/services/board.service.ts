@@ -12,6 +12,9 @@ import {listRepository} from '../repositories/list.repository';
 import {cardRepository} from '../repositories/card.repository';
 import {listService} from './list.service';
 import {cardService} from './card.service';
+import {activityService} from './activity.service';
+import {realtimeService} from './realtime.service';
+import {withProductTransaction} from '../utils/transaction';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
 import {createPublicSlug} from '../utils/slug';
@@ -274,7 +277,12 @@ export const boardService = {
     };
   },
 
-  async update(board: BoardDocument, input: UpdateBoardInput, level: BoardAccessLevel) {
+  async update(
+    actor: Actor,
+    board: BoardDocument,
+    input: UpdateBoardInput,
+    level: BoardAccessLevel
+  ) {
     assertRevision(board, input.expectedRevision);
 
     const patch: Record<string, unknown> = {};
@@ -288,12 +296,43 @@ export const boardService = {
       patch.listOrder = input.listOrder.map(id => new Types.ObjectId(id));
     }
 
-    if (Object.keys(patch).length > 0) {
-      await boardRepository.update(board._id.toString(), patch);
+    if (Object.keys(patch).length === 0) {
+      const current = await boardRepository.findById(board._id.toString());
+      return serializeBoard(toRow(current!, level));
     }
 
-    const updated = await boardRepository.findById(board._id.toString());
-    return serializeBoard(toRow(updated!, level));
+    const result = await withProductTransaction(async session => {
+      await boardRepository.update(board._id.toString(), patch, true, session);
+      const updated = await boardRepository.findById(board._id.toString(), session);
+
+      const activity = await activityService.log(session, {
+        boardId: board._id,
+        actor,
+        actionType: 'board.updated',
+        targetType: 'board',
+        targetId: board._id.toString(),
+        metadata: {
+          fields: Object.keys(patch),
+          name: updated!.name,
+          ...(input.name !== undefined && input.name !== board.name
+            ? {before: {name: board.name}}
+            : {})
+        }
+      });
+
+      return {updated: updated!, activity};
+    });
+
+    const serialized = serializeBoard(toRow(result.updated, level));
+    await realtimeService.broadcast({
+      boardId: board._id.toString(),
+      revision: result.updated.revision,
+      type: 'board.updated',
+      payload: {board: serialized},
+      activity: result.activity
+    });
+
+    return serialized;
   },
 
   /**
@@ -303,6 +342,7 @@ export const boardService = {
    * visibility is still 'public', which is what revokes them.
    */
   async setVisibility(
+    actor: Actor,
     board: BoardDocument,
     visibility: BoardVisibility,
     expectedRevision?: number
@@ -322,16 +362,61 @@ export const boardService = {
       patch.publicSlug = await allocatePublicSlug();
     }
 
-    // One update, so the revision only moves once.
-    await boardRepository.update(board._id.toString(), patch);
+    const result = await withProductTransaction(async session => {
+      // One update, so the revision only moves once.
+      await boardRepository.update(board._id.toString(), patch, true, session);
+      const updated = await boardRepository.findById(board._id.toString(), session);
 
-    const updated = await boardRepository.findById(board._id.toString());
-    return serializeBoard(toRow(updated!, 'owner'));
+      const activity = await activityService.log(session, {
+        boardId: board._id,
+        actor,
+        actionType: 'board.visibility_changed',
+        targetType: 'board',
+        targetId: board._id.toString(),
+        metadata: {from: board.visibility, to: visibility}
+      });
+
+      return {updated: updated!, activity};
+    });
+
+    const serialized = serializeBoard(toRow(result.updated, 'owner'));
+    await realtimeService.broadcast({
+      boardId: board._id.toString(),
+      revision: result.updated.revision,
+      type: 'board.visibility_changed',
+      payload: {board: serialized},
+      activity: result.activity
+    });
+
+    return serialized;
   },
 
-  async remove(board: BoardDocument) {
-    await boardCollaboratorRepository.deleteForBoard(board._id);
-    await boardRepository.delete(board._id.toString());
+  async remove(actor: Actor, board: BoardDocument) {
+    const result = await withProductTransaction(async session => {
+      await boardCollaboratorRepository.deleteForBoard(board._id, session);
+      await boardRepository.delete(board._id.toString(), session);
+
+      const activity = await activityService.log(session, {
+        boardId: board._id,
+        actor,
+        actionType: 'board.deleted',
+        targetType: 'board',
+        targetId: board._id.toString(),
+        metadata: {name: board.name}
+      });
+
+      return {activity};
+    });
+
+    // Sent after the delete commits so open clients drop the board immediately
+    // instead of discovering it on their next refresh.
+    await realtimeService.broadcast({
+      boardId: board._id.toString(),
+      type: 'board.deleted',
+      payload: {boardId: board._id.toString()},
+      activity: result.activity
+    });
+
     logger.info({boardId: board._id.toString()}, 'Board deleted');
     return {message: 'Board deleted'};
   },

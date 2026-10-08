@@ -9,6 +9,9 @@ import {Actor} from '../utils/actor';
 import {BoardDocument} from '../models/Board.model';
 import {CollaboratorRole, CollaboratorStatus} from '../constants/product';
 import {notificationService} from './notification.service';
+import {activityService} from './activity.service';
+import {realtimeService} from './realtime.service';
+import {withProductTransaction, ProductSession} from '../utils/transaction';
 import {logger} from '../logging/logger';
 
 type Person = {
@@ -45,7 +48,11 @@ function serializeCollaborator(
   };
 }
 
-async function findRowOrThrow(board: BoardDocument, collaboratorId: string) {
+async function findRowOrThrow(
+  board: BoardDocument,
+  collaboratorId: string,
+  session?: ProductSession
+) {
   if (!Types.ObjectId.isValid(collaboratorId)) {
     throw new ApiError(
       400,
@@ -55,7 +62,8 @@ async function findRowOrThrow(board: BoardDocument, collaboratorId: string) {
   }
   const row = await boardCollaboratorRepository.findByIdForBoard(
     collaboratorId,
-    board._id
+    board._id,
+    session
   );
   if (!row) {
     throw new ApiError(404, ErrorCodes.COLLABORATOR_NOT_FOUND, 'Collaborator not found');
@@ -102,30 +110,57 @@ export const boardCollaboratorService = {
       );
     }
 
-    let row;
-    if (existing) {
-      await boardCollaboratorRepository.update(existing._id.toString(), {
-        role,
-        status: 'pending',
-        invitedBy: actor.actorId,
-        invitedAt: new Date(),
-        respondedAt: null
-      });
-      row = await boardCollaboratorRepository.find(board._id, invitee._id);
-    } else {
-      row = await boardCollaboratorRepository.create({
+    const result = await withProductTransaction(async session => {
+      let row;
+      if (existing) {
+        await boardCollaboratorRepository.update(
+          existing._id.toString(),
+          {
+            role,
+            status: 'pending',
+            invitedBy: actor.actorId,
+            invitedAt: new Date(),
+            respondedAt: null
+          },
+          session
+        );
+        row = await boardCollaboratorRepository.find(board._id, invitee._id, session);
+      } else {
+        row = await boardCollaboratorRepository.create(
+          {
+            boardId: board._id,
+            userId: invitee._id,
+            role,
+            status: 'pending',
+            invitedBy: actor.actorId
+          },
+          session
+        );
+      }
+
+      const activity = await activityService.log(session, {
         boardId: board._id,
-        userId: invitee._id,
-        role,
-        status: 'pending',
-        invitedBy: actor.actorId
+        actor,
+        actionType: 'collaborator.invited',
+        targetType: 'collaborator',
+        targetId: row!._id.toString(),
+        metadata: {email, role, userId: invitee._id.toString()}
       });
-    }
+
+      return {row: row!, activity};
+    });
 
     logger.info(
       {boardId: board._id.toString(), userId: invitee._id.toString(), role},
       'Board invitation sent'
     );
+
+    await realtimeService.broadcast({
+      boardId: board._id.toString(),
+      type: 'collaborator.invited',
+      payload: {userId: invitee._id.toString(), role, status: 'pending'},
+      activity: result.activity
+    });
 
     await notificationService.notifyInvitationSent({
       inviteeId: invitee._id,
@@ -136,47 +171,109 @@ export const boardCollaboratorService = {
       },
       inviterId: actor.actorId,
       boardId: board._id,
-      collaboratorId: row!._id,
+      collaboratorId: result.row._id,
       boardName: board.name,
       role
     });
 
-    return serializeCollaborator(row!, invitee);
+    return serializeCollaborator(result.row, invitee);
   },
 
   /** Owner-only. */
   async setRole(
+    actor: Actor,
     board: BoardDocument,
     collaboratorId: string,
     role: CollaboratorRole
   ) {
-    const row = await findRowOrThrow(board, collaboratorId);
+    const result = await withProductTransaction(async session => {
+      const row = await findRowOrThrow(board, collaboratorId, session);
 
-    if (row.userId.equals(board.ownerId)) {
-      throw new ApiError(
-        400,
-        ErrorCodes.CANNOT_MODIFY_OWNER,
-        "The owner's role cannot be changed"
-      );
-    }
+      if (row.userId.equals(board.ownerId)) {
+        throw new ApiError(
+          400,
+          ErrorCodes.CANNOT_MODIFY_OWNER,
+          "The owner's role cannot be changed"
+        );
+      }
 
-    await boardCollaboratorRepository.setRole(row._id.toString(), role);
-    return {id: row._id.toString(), userId: row.userId.toString(), role};
+      await boardCollaboratorRepository.setRole(row._id.toString(), role, session);
+
+      const activity = await activityService.log(session, {
+        boardId: board._id,
+        actor,
+        actionType: 'collaborator.role_changed',
+        targetType: 'collaborator',
+        targetId: row._id.toString(),
+        metadata: {
+          userId: row.userId.toString(),
+          from: row.role,
+          to: role
+        }
+      });
+
+      return {row, activity};
+    });
+
+    await realtimeService.broadcast({
+      boardId: board._id.toString(),
+      type: 'collaborator.role_changed',
+      payload: {
+        userId: result.row.userId.toString(),
+        role,
+        collaboratorId: result.row._id.toString()
+      },
+      activity: result.activity
+    });
+
+    return {id: result.row._id.toString(), userId: result.row.userId.toString(), role};
   },
 
   /** Owner-only. */
-  async remove(board: BoardDocument, collaboratorId: string) {
-    const row = await findRowOrThrow(board, collaboratorId);
+  async remove(actor: Actor, board: BoardDocument, collaboratorId: string) {
+    const result = await withProductTransaction(async session => {
+      const row = await findRowOrThrow(board, collaboratorId, session);
 
-    if (row.userId.equals(board.ownerId)) {
-      throw new ApiError(
-        400,
-        ErrorCodes.CANNOT_MODIFY_OWNER,
-        'The owner cannot be removed from their own board'
-      );
-    }
+      if (row.userId.equals(board.ownerId)) {
+        throw new ApiError(
+          400,
+          ErrorCodes.CANNOT_MODIFY_OWNER,
+          'The owner cannot be removed from their own board'
+        );
+      }
 
-    await boardCollaboratorRepository.delete(row._id.toString());
+      await boardCollaboratorRepository.delete(row._id.toString(), session);
+
+      const person = await userRepository.findById(row.userId.toString());
+      const activity = await activityService.log(session, {
+        boardId: board._id,
+        actor,
+        actionType: 'collaborator.removed',
+        targetType: 'collaborator',
+        targetId: row._id.toString(),
+        metadata: {
+          userId: row.userId.toString(),
+          email: person?.email ?? '',
+          role: row.role
+        }
+      });
+
+      return {row, activity};
+    });
+
+    // The removed person is still subscribed to the board's channel; the event
+    // names their own userId so their client can drop the board at once instead
+    // of waiting for the next subscribe to be refused.
+    await realtimeService.broadcast({
+      boardId: board._id.toString(),
+      type: 'collaborator.removed',
+      payload: {
+        userId: result.row.userId.toString(),
+        collaboratorId: result.row._id.toString()
+      },
+      activity: result.activity
+    });
+
     return {message: 'Collaborator removed'};
   },
 
@@ -194,48 +291,88 @@ export const boardCollaboratorService = {
       );
     }
 
-    const row = await boardCollaboratorRepository.findByIdForUser(
-      collaboratorId,
-      actor.actorId
-    );
-    if (!row) {
-      throw new ApiError(404, ErrorCodes.COLLABORATOR_NOT_FOUND, 'Invitation not found');
-    }
-
-    if (row.status !== 'pending') {
-      throw new ApiError(
-        409,
-        ErrorCodes.VALIDATION_ERROR,
-        `This invitation was already ${row.status}`
+    const result = await withProductTransaction(async session => {
+      const row = await boardCollaboratorRepository.findByIdForUser(
+        collaboratorId,
+        actor.actorId,
+        session
       );
-    }
+      if (!row) {
+        throw new ApiError(404, ErrorCodes.COLLABORATOR_NOT_FOUND, 'Invitation not found');
+      }
 
-    await boardCollaboratorRepository.setStatus(row._id.toString(), decision, new Date());
+      if (row.status !== 'pending') {
+        throw new ApiError(
+          409,
+          ErrorCodes.VALIDATION_ERROR,
+          `This invitation was already ${row.status}`
+        );
+      }
 
-    const board = await boardRepository.findById(row.boardId.toString());
+      await boardCollaboratorRepository.setStatus(
+        row._id.toString(),
+        decision,
+        new Date(),
+        session
+      );
+
+      // A decline grants no access and changes no board state worth an audit
+      // line; an acceptance does both.
+      const activity =
+        decision === 'accepted'
+          ? await activityService.log(session, {
+              boardId: row.boardId,
+              actor,
+              actionType: 'collaborator.accepted',
+              targetType: 'collaborator',
+              targetId: row._id.toString(),
+              metadata: {
+                userId: actor.actorId.toString(),
+                role: row.role
+              }
+            })
+          : null;
+
+      return {row, activity};
+    });
+
+    const board = await boardRepository.findById(result.row.boardId.toString());
     logger.info(
-      {boardId: row.boardId.toString(), userId: actor.actorId.toString(), decision},
+      {boardId: result.row.boardId.toString(), userId: actor.actorId.toString(), decision},
       'Board invitation answered'
     );
 
     // The invitee's "you were invited" card has served its purpose — it is
     // deleted so no stale Accept/Decline row can survive the answer — and the
     // inviter now learns what happened. Emails are best-effort inside.
-    await notificationRepository.deleteByCollaboratorId(row._id);
+    await notificationRepository.deleteByCollaboratorId(result.row._id);
     await notificationService.notifyInvitationAnswered({
-      inviterId: row.invitedBy,
+      inviterId: result.row.invitedBy,
       inviteeId: actor.actorId,
-      boardId: row.boardId,
-      collaboratorId: row._id,
+      boardId: result.row.boardId,
+      collaboratorId: result.row._id,
       boardName: board?.name ?? '',
       decision: decision === 'declined' ? 'declined' : 'accepted'
     });
 
+    if (result.activity) {
+      await realtimeService.broadcast({
+        boardId: result.row.boardId.toString(),
+        type: 'collaborator.accepted',
+        payload: {
+          userId: actor.actorId.toString(),
+          role: result.row.role,
+          collaboratorId: result.row._id.toString()
+        },
+        activity: result.activity
+      });
+    }
+
     return {
-      id: row._id.toString(),
-      boardId: row.boardId.toString(),
+      id: result.row._id.toString(),
+      boardId: result.row.boardId.toString(),
       boardName: board?.name ?? '',
-      role: row.role,
+      role: result.row.role,
       status: decision
     };
   },

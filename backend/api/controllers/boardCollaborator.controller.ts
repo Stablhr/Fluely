@@ -41,8 +41,10 @@ export const boardCollaboratorController = {
 
   async setRole(req: Request, res: Response, next: NextFunction) {
     try {
+      const actor = actorFromRequest(req);
       res.status(200).json(
         await boardCollaboratorService.setRole(
+          actor,
           requireBoard(req),
           req.params.collaboratorId,
           req.body.role
@@ -55,8 +57,10 @@ export const boardCollaboratorController = {
 
   async remove(req: Request, res: Response, next: NextFunction) {
     try {
+      const actor = actorFromRequest(req);
       res.status(200).json(
         await boardCollaboratorService.remove(
+          actor,
           requireBoard(req),
           req.params.collaboratorId
         )

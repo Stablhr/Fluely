@@ -1,5 +1,6 @@
 import {NextFunction, Request, Response} from 'express';
 import {cardService} from '../services/card.service';
+import {actorFromRequest} from '../utils/actor';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
 
@@ -21,7 +22,11 @@ export const cardController = {
 
   async create(req: Request, res: Response, next: NextFunction) {
     try {
-      res.status(201).json(await cardService.create(requireBoard(req), req.body));
+      res
+        .status(201)
+        .json(
+          await cardService.create(actorFromRequest(req), requireBoard(req), req.body)
+        );
     } catch (error) {
       next(error);
     }
@@ -30,7 +35,12 @@ export const cardController = {
   async update(req: Request, res: Response, next: NextFunction) {
     try {
       res.status(200).json(
-        await cardService.update(requireBoard(req), req.params.cardId, req.body)
+        await cardService.update(
+          actorFromRequest(req),
+          requireBoard(req),
+          req.params.cardId,
+          req.body
+        )
       );
     } catch (error) {
       next(error);
@@ -39,9 +49,14 @@ export const cardController = {
 
   async move(req: Request, res: Response, next: NextFunction) {
     try {
-      res
-        .status(200)
-        .json(await cardService.move(requireBoard(req), req.params.cardId, req.body));
+      res.status(200).json(
+        await cardService.move(
+          actorFromRequest(req),
+          requireBoard(req),
+          req.params.cardId,
+          req.body
+        )
+      );
     } catch (error) {
       next(error);
     }
@@ -52,6 +67,7 @@ export const cardController = {
       const {cardOrder, expectedRevision} = req.body;
       res.status(200).json(
         await cardService.reorder(
+          actorFromRequest(req),
           requireBoard(req),
           req.params.listId,
           cardOrder,
@@ -66,15 +82,14 @@ export const cardController = {
   async remove(req: Request, res: Response, next: NextFunction) {
     try {
       const {expectedRevision} = req.query as {expectedRevision?: string};
-      res
-        .status(200)
-        .json(
-          await cardService.remove(
-            requireBoard(req),
-            req.params.cardId,
-            expectedRevision ? Number(expectedRevision) : undefined
-          )
-        );
+      res.status(200).json(
+        await cardService.remove(
+          actorFromRequest(req),
+          requireBoard(req),
+          req.params.cardId,
+          expectedRevision ? Number(expectedRevision) : undefined
+        )
+      );
     } catch (error) {
       next(error);
     }

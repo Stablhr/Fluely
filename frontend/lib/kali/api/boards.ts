@@ -315,3 +315,58 @@ export async function respondToInvitation(
 ): Promise<void> {
   await httpClient.post(`/boards/invitations/${invitationId}`, { decision });
 }
+
+/**
+ * Board activity — the server-backed audit feed.
+ *
+ * Mirrors `ActivityActionTypes` / `ActivityTargetTypes` in
+ * `backend/api/constants/product.ts` and `SerializedActivity` in
+ * `activity.service.ts`, restated as unions so a new action on the backend
+ * fails at compile time wherever the wording switch is exhaustive.
+ */
+export type ActivityActionType =
+  | "board.updated"
+  | "board.visibility_changed"
+  | "board.deleted"
+  | "list.created"
+  | "list.updated"
+  | "list.archived"
+  | "list.deleted"
+  | "card.created"
+  | "card.updated"
+  | "card.status_changed"
+  | "card.assigned"
+  | "card.moved"
+  | "card.archived"
+  | "card.deleted"
+  | "collaborator.invited"
+  | "collaborator.role_changed"
+  | "collaborator.removed"
+  | "collaborator.accepted";
+
+export type ActivityTargetType = "board" | "list" | "card" | "collaborator";
+
+export interface BoardActivityDto {
+  id: string;
+  boardId: string;
+  userId: string;
+  actionType: ActivityActionType;
+  targetType: ActivityTargetType;
+  targetId: string | null;
+  metadata: Record<string, unknown>;
+  actor: { id: string; name: string };
+  createdAt: string;
+}
+
+/** First page of a board's audit feed, newest first. */
+export async function fetchBoardActivity(
+  boardId: string,
+  page = 1,
+  limit = 30,
+): Promise<BoardActivityDto[]> {
+  const { data } = await httpClient.get<{ activity: BoardActivityDto[] }>(
+    `/boards/${boardId}/activity`,
+    { params: { page, limit } },
+  );
+  return data.activity;
+}

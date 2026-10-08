@@ -3,6 +3,7 @@ import {boardRepository} from '../repositories/board.repository';
 import {BoardDocument} from '../models/Board.model';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
+import {ProductSession} from '../utils/transaction';
 
 /**
  * The board is the aggregate root: a card or a list is part of the board's
@@ -38,12 +39,13 @@ export function assertBoardRevision(board: BoardDocument, expectedRevision?: num
  */
 export async function bumpBoardRevision(
   boardId: Types.ObjectId | string,
-  expectedRevision?: number
+  expectedRevision?: number,
+  session?: ProductSession
 ): Promise<number> {
   const filter: Record<string, unknown> = {_id: boardId};
   if (expectedRevision !== undefined) filter.revision = expectedRevision;
 
-  const updated = await boardRepository.bumpRevision(filter);
+  const updated = await boardRepository.bumpRevision(filter, session);
   if (!updated) {
     throw new ApiError(
       409,

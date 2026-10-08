@@ -99,6 +99,8 @@ export function getFriendlyErrorMessage(
         return "That file is too large to upload.";
       case "VALIDATION_ERROR":
         return "Please check the details you entered and try again.";
+      case "REALTIME_UNAVAILABLE":
+        return "Live updates are unavailable right now. Changes may take a moment to appear.";
       default:
         break;
     }

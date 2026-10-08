@@ -30,11 +30,42 @@ jest.mock('../api/repositories/board.repository', () => ({
   }
 }));
 
+// The mutation services run their writes inside `withProductTransaction` and
+// tee an activity entry + a realtime broadcast alongside them. The transaction
+// helper is replaced with its documented standalone-Mongo fallback (session
+// undefined), and the collaborators are faked so nothing here needs a database
+// or Pusher credentials.
+jest.mock('../api/utils/transaction', () => ({
+  withProductTransaction: (work: (session: undefined) => Promise<unknown>) =>
+    work(undefined)
+}));
+
+jest.mock('../api/services/activity.service', () => ({
+  activityService: {
+    // The implementation is re-installed in `beforeEach` — `resetAllMocks`
+    // wipes factory-defined implementations, and the services read
+    // `activity.actionType` to name the realtime broadcast.
+    log: jest.fn(),
+    list: jest.fn(async () => [])
+  }
+}));
+
+jest.mock('../api/services/realtime.service', () => ({
+  realtimeService: {
+    enabled: false,
+    authorize: jest.fn(),
+    broadcast: jest.fn(async () => undefined)
+  },
+  parseChannel: jest.fn()
+}));
+
 import {listRepository} from '../api/repositories/list.repository';
 import {cardRepository} from '../api/repositories/card.repository';
 import {boardRepository} from '../api/repositories/board.repository';
 import {listService} from '../api/services/list.service';
 import {cardService} from '../api/services/card.service';
+import {activityService} from '../api/services/activity.service';
+import {realtimeService} from '../api/services/realtime.service';
 
 const BOARD = new Types.ObjectId('ccccccccccccccccccccccc1');
 const OTHER_BOARD = new Types.ObjectId('ccccccccccccccccccccccc2');
@@ -43,13 +74,21 @@ const OTHER_LIST = new Types.ObjectId('ddddddddddddddddddddddd2');
 const CARD = new Types.ObjectId('eeeeeeeeeeeeeeeeeeeeeee1');
 const OTHER_CARD = new Types.ObjectId('eeeeeeeeeeeeeeeeeeeeeee2');
 
+/** The account performing the writes — every mutation now records who did it. */
+const ACTOR = {
+  actorType: 'user' as const,
+  actorId: new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaa01')
+};
+
 const mockedLists = listRepository as jest.Mocked<typeof listRepository>;
 const mockedCards = cardRepository as jest.Mocked<typeof cardRepository>;
 const mockedBoards = boardRepository as jest.Mocked<typeof boardRepository>;
+const mockedActivity = activityService as jest.Mocked<typeof activityService>;
+const mockedRealtime = realtimeService as jest.Mocked<typeof realtimeService>;
 
 // Derived from the real signatures, so a change to a repository's return type
 // breaks these fakes instead of quietly drifting.
-type BoardRow = Parameters<typeof listService.create>[0];
+type BoardRow = Parameters<typeof listService.create>[1];
 type ListRow = Awaited<ReturnType<typeof listRepository.listByBoard>>[number];
 type CardRow = Awaited<ReturnType<typeof cardRepository.listByBoard>>[number];
 
@@ -103,6 +142,21 @@ function allowBump() {
   mockedBoards.bumpRevision.mockResolvedValue({matchedCount: 1} as never);
 }
 
+/** Stands in for the audit write — echoes the entry the service asked to log. */
+function installActivityLog() {
+  mockedActivity.log.mockImplementation(async (_session, params) => ({
+    id: 'activity-1',
+    boardId: params.boardId.toString(),
+    userId: params.actor.actorId.toString(),
+    actionType: params.actionType,
+    targetType: params.targetType,
+    targetId: params.targetId ?? null,
+    metadata: (params.metadata ?? {}) as Record<string, unknown>,
+    actor: {id: params.actor.actorId.toString(), name: 'Test Actor'},
+    createdAt: new Date()
+  }));
+}
+
 beforeEach(() => {
   // `resetAllMocks`, not `clearAllMocks`: only the former drains the
   // `mockResolvedValueOnce` queue, and a leftover value from a previous test
@@ -110,18 +164,20 @@ beforeEach(() => {
   jest.resetAllMocks();
   allowBump();
   mockedBoards.update.mockResolvedValue({matchedCount: 1} as never);
+  installActivityLog();
 });
 
 describe('list writes', () => {
   it('appends a new list to the board order, which is what makes it visible', async () => {
     mockedLists.create.mockResolvedValue(list());
 
-    await listService.create(board(4, [OTHER_LIST]), {name: 'To do'});
+    await listService.create(ACTOR, board(4, [OTHER_LIST]), {name: 'To do'});
 
     expect(mockedBoards.update).toHaveBeenCalledWith(
       BOARD.toString(),
       {listOrder: [OTHER_LIST, LIST]},
-      false
+      false,
+      undefined
     );
   });
 
@@ -129,7 +185,7 @@ describe('list writes', () => {
     mockedLists.findByIdForBoard.mockResolvedValue(null);
 
     await expect(
-      listService.update(board(), LIST.toString(), {name: 'Renamed'})
+      listService.update(ACTOR, board(), LIST.toString(), {name: 'Renamed'})
     ).rejects.toMatchObject({statusCode: 404, code: 'LIST_NOT_FOUND'});
   });
 
@@ -137,14 +193,16 @@ describe('list writes', () => {
     mockedLists.listByBoard.mockResolvedValue([list()]);
 
     await expect(
-      listService.reorder(board(), [LIST.toString(), OTHER_LIST.toString()], 4)
+      listService.reorder(ACTOR, board(), [LIST.toString(), OTHER_LIST.toString()], 4)
     ).rejects.toMatchObject({statusCode: 404, code: 'LIST_NOT_FOUND'});
   });
 
   it('does not write the order when a reorder is refused', async () => {
     mockedLists.listByBoard.mockResolvedValue([list()]);
 
-    await expect(listService.reorder(board(), [OTHER_LIST.toString()], 4)).rejects.toThrow();
+    await expect(
+      listService.reorder(ACTOR, board(), [OTHER_LIST.toString()], 4)
+    ).rejects.toThrow();
 
     expect(mockedBoards.bumpRevision).not.toHaveBeenCalled();
     expect(mockedBoards.update).not.toHaveBeenCalled();
@@ -153,14 +211,15 @@ describe('list writes', () => {
   it('takes the list out of the board order on delete', async () => {
     mockedLists.findByIdForBoard.mockResolvedValue(list());
 
-    await listService.remove(board(4, [OTHER_LIST, LIST]), LIST.toString(), 4);
+    await listService.remove(ACTOR, board(4, [OTHER_LIST, LIST]), LIST.toString(), 4);
 
     expect(mockedBoards.update).toHaveBeenCalledWith(
       BOARD.toString(),
       {listOrder: [OTHER_LIST]},
-      false
+      false,
+      undefined
     );
-    expect(mockedLists.delete).toHaveBeenCalledWith(LIST.toString(), BOARD);
+    expect(mockedLists.delete).toHaveBeenCalledWith(LIST.toString(), BOARD, undefined);
   });
 });
 
@@ -169,7 +228,7 @@ describe('card writes', () => {
     mockedLists.findByIdForBoard.mockResolvedValue(null);
 
     await expect(
-      cardService.create(board(), {listId: OTHER_LIST.toString(), title: 'Sneaky'})
+      cardService.create(ACTOR, board(), {listId: OTHER_LIST.toString(), title: 'Sneaky'})
     ).rejects.toMatchObject({statusCode: 404, code: 'LIST_NOT_FOUND'});
 
     expect(mockedCards.create).not.toHaveBeenCalled();
@@ -179,18 +238,21 @@ describe('card writes', () => {
     mockedLists.findByIdForBoard.mockResolvedValue(list());
     mockedCards.create.mockResolvedValue(card());
 
-    await cardService.create(board(), {listId: LIST.toString(), title: 'Write copy'});
+    await cardService.create(ACTOR, board(), {listId: LIST.toString(), title: 'Write copy'});
 
-    expect(mockedLists.update).toHaveBeenCalledWith(LIST.toString(), BOARD, {
-      cardOrder: [CARD]
-    });
+    expect(mockedLists.update).toHaveBeenCalledWith(
+      LIST.toString(),
+      BOARD,
+      {cardOrder: [CARD]},
+      undefined
+    );
   });
 
   it('rejects a card that belongs to another board', async () => {
     mockedCards.findByIdForBoard.mockResolvedValue(null);
 
     await expect(
-      cardService.update(board(), OTHER_CARD.toString(), {title: 'Renamed'})
+      cardService.update(ACTOR, board(), OTHER_CARD.toString(), {title: 'Renamed'})
     ).rejects.toMatchObject({statusCode: 404, code: 'CARD_NOT_FOUND'});
   });
 
@@ -207,15 +269,26 @@ describe('card writes', () => {
       .mockResolvedValueOnce(list({_id: OTHER_LIST, cardOrder: []}))
       .mockResolvedValueOnce(list({cardOrder: [CARD, OTHER_CARD]}));
 
-    await cardService.move(board(), CARD.toString(), {listId: OTHER_LIST.toString()});
+    await cardService.move(ACTOR, board(), CARD.toString(), {listId: OTHER_LIST.toString()});
 
-    expect(mockedLists.update).toHaveBeenCalledWith(LIST.toString(), BOARD, {
-      cardOrder: [OTHER_CARD]
-    });
-    expect(mockedLists.update).toHaveBeenCalledWith(OTHER_LIST.toString(), BOARD, {
-      cardOrder: [CARD]
-    });
-    expect(mockedCards.move).toHaveBeenCalledWith(CARD.toString(), BOARD, OTHER_LIST);
+    expect(mockedLists.update).toHaveBeenCalledWith(
+      LIST.toString(),
+      BOARD,
+      {cardOrder: [OTHER_CARD]},
+      undefined
+    );
+    expect(mockedLists.update).toHaveBeenCalledWith(
+      OTHER_LIST.toString(),
+      BOARD,
+      {cardOrder: [CARD]},
+      undefined
+    );
+    expect(mockedCards.move).toHaveBeenCalledWith(
+      CARD.toString(),
+      BOARD,
+      OTHER_LIST,
+      undefined
+    );
   });
 
   it('refuses a move whose destination list is on another board', async () => {
@@ -223,7 +296,7 @@ describe('card writes', () => {
     mockedLists.findByIdForBoard.mockResolvedValue(null);
 
     await expect(
-      cardService.move(board(), CARD.toString(), {listId: OTHER_LIST.toString()})
+      cardService.move(ACTOR, board(), CARD.toString(), {listId: OTHER_LIST.toString()})
     ).rejects.toMatchObject({statusCode: 404, code: 'LIST_NOT_FOUND'});
 
     expect(mockedCards.move).not.toHaveBeenCalled();
@@ -235,7 +308,7 @@ describe('card writes', () => {
     mockedCards.listByBoard.mockResolvedValue([card()]);
 
     await expect(
-      cardService.move(board(), CARD.toString(), {
+      cardService.move(ACTOR, board(), CARD.toString(), {
         listId: LIST.toString(),
         cardOrder: [CARD.toString(), OTHER_CARD.toString()]
       })
@@ -248,12 +321,15 @@ describe('card writes', () => {
     mockedCards.findByIdForBoard.mockResolvedValue(card());
     mockedLists.findByIdForBoard.mockResolvedValue(list({cardOrder: [CARD, OTHER_CARD]}));
 
-    await cardService.remove(board(), CARD.toString(), 4);
+    await cardService.remove(ACTOR, board(), CARD.toString(), 4);
 
-    expect(mockedLists.update).toHaveBeenCalledWith(LIST.toString(), BOARD, {
-      cardOrder: [OTHER_CARD]
-    });
-    expect(mockedCards.delete).toHaveBeenCalledWith(CARD.toString(), BOARD);
+    expect(mockedLists.update).toHaveBeenCalledWith(
+      LIST.toString(),
+      BOARD,
+      {cardOrder: [OTHER_CARD]},
+      undefined
+    );
+    expect(mockedCards.delete).toHaveBeenCalledWith(CARD.toString(), BOARD, undefined);
   });
 
   it('refuses a card order naming cards from another board', async () => {
@@ -261,7 +337,7 @@ describe('card writes', () => {
     mockedCards.listByBoard.mockResolvedValue([card()]);
 
     await expect(
-      cardService.reorder(board(), LIST.toString(), [OTHER_CARD.toString()], 4)
+      cardService.reorder(ACTOR, board(), LIST.toString(), [OTHER_CARD.toString()], 4)
     ).rejects.toMatchObject({statusCode: 404, code: 'CARD_NOT_FOUND'});
   });
 });
@@ -274,7 +350,7 @@ describe('child writes share the board revision', () => {
     mockedLists.findByIdForBoard.mockResolvedValue(list());
 
     await expect(
-      listService.create(board(4), {name: 'To do', expectedRevision: 4})
+      listService.create(ACTOR, board(4), {name: 'To do', expectedRevision: 4})
     ).rejects.toMatchObject({statusCode: 409, code: 'REVISION_CONFLICT'});
 
     expect(mockedLists.create).not.toHaveBeenCalled();
@@ -289,7 +365,7 @@ describe('child writes share the board revision', () => {
     mockedLists.create.mockResolvedValue(list() as never);
     mockedBoards.update.mockResolvedValue(undefined as never);
 
-    const result = await listService.create(board(4), {
+    const result = await listService.create(ACTOR, board(4), {
       name: 'To do',
       expectedRevision: 4,
     });
@@ -300,17 +376,20 @@ describe('child writes share the board revision', () => {
   it('folds the expected revision into the bump so the check cannot be skipped', async () => {
     mockedLists.create.mockResolvedValue(list());
 
-    await listService.create(board(4), {name: 'To do', expectedRevision: 4});
+    await listService.create(ACTOR, board(4), {name: 'To do', expectedRevision: 4});
 
-    expect(mockedBoards.bumpRevision).toHaveBeenCalledWith({_id: BOARD, revision: 4});
+    expect(mockedBoards.bumpRevision).toHaveBeenCalledWith(
+      {_id: BOARD, revision: 4},
+      undefined
+    );
   });
 
   it('bumps without a revision filter when the client sends none', async () => {
     mockedLists.create.mockResolvedValue(list());
 
-    await listService.create(board(4), {name: 'To do'});
+    await listService.create(ACTOR, board(4), {name: 'To do'});
 
-    expect(mockedBoards.bumpRevision).toHaveBeenCalledWith({_id: BOARD});
+    expect(mockedBoards.bumpRevision).toHaveBeenCalledWith({_id: BOARD}, undefined);
   });
 });
 
@@ -364,7 +443,7 @@ describe('an order may only name cards that live in the target list', () => {
     ]);
 
     await expect(
-      cardService.reorder(board(), LIST.toString(), [OTHER_CARD.toString()]),
+      cardService.reorder(ACTOR, board(), LIST.toString(), [OTHER_CARD.toString()]),
     ).rejects.toMatchObject({code: 'CARD_NOT_FOUND'});
     expect(mockedLists.update).not.toHaveBeenCalled();
   });
@@ -374,7 +453,7 @@ describe('an order may only name cards that live in the target list', () => {
     mockedCards.listByBoard.mockResolvedValue([card() as CardRow]);
 
     await expect(
-      cardService.reorder(board(), LIST.toString(), [OTHER_CARD.toString()]),
+      cardService.reorder(ACTOR, board(), LIST.toString(), [OTHER_CARD.toString()]),
     ).rejects.toMatchObject({code: 'CARD_NOT_FOUND'});
     expect(mockedLists.update).not.toHaveBeenCalled();
   });
@@ -387,7 +466,7 @@ describe('an order may only name cards that live in the target list', () => {
     mockedCards.listByBoard.mockResolvedValue([card() as CardRow]);
 
     await expect(
-      listService.update(board(), LIST.toString(), {
+      listService.update(ACTOR, board(), LIST.toString(), {
         cardOrder: [OTHER_CARD.toString()],
       }),
     ).rejects.toMatchObject({code: 'CARD_NOT_FOUND'});
@@ -411,6 +490,7 @@ describe('an order may only name cards that live in the target list', () => {
     });
 
     await cardService.reorder(
+      ACTOR,
       board(),
       LIST.toString(),
       [OTHER_CARD.toString(), CARD.toString()],
@@ -430,11 +510,78 @@ describe('an order may only name cards that live in the target list', () => {
       card({_id: OTHER_CARD}) as CardRow,
     ]);
 
-    await cardService.move(board(), CARD.toString(), {
+    await cardService.move(ACTOR, board(), CARD.toString(), {
       listId: LIST.toString(),
       cardOrder: [OTHER_CARD.toString(), CARD.toString()],
     });
 
     expect(mockedCards.move).toHaveBeenCalled();
+  });
+});
+
+describe('every write records who did it and tells everyone else', () => {
+  it('logs the activity entry and broadcasts it with the write', async () => {
+    mockedLists.create.mockResolvedValue(list());
+
+    await listService.create(ACTOR, board(4, [OTHER_LIST]), {name: 'To do'});
+
+    expect(mockedActivity.log).toHaveBeenCalledTimes(1);
+    expect(mockedActivity.log).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({
+        boardId: BOARD,
+        actor: ACTOR,
+        actionType: 'list.created',
+        targetType: 'list',
+        targetId: LIST.toString()
+      })
+    );
+
+    expect(mockedRealtime.broadcast).toHaveBeenCalledTimes(1);
+    expect(mockedRealtime.broadcast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boardId: BOARD.toString(),
+        type: 'list.created',
+        activity: expect.objectContaining({actionType: 'list.created'})
+      })
+    );
+  });
+
+  it('names the broadcast after the facet that changed', async () => {
+    mockedCards.findByIdForBoard.mockResolvedValue(card({done: false}));
+    mockedLists.findByIdForBoard.mockResolvedValue(list());
+
+    await cardService.update(ACTOR, board(), CARD.toString(), {done: true});
+
+    expect(mockedActivity.log).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({actionType: 'card.status_changed', targetType: 'card'})
+    );
+    expect(mockedRealtime.broadcast).toHaveBeenCalledWith(
+      expect.objectContaining({type: 'card.status_changed'})
+    );
+  });
+
+  it('logs nothing and broadcasts nothing when the write is refused', async () => {
+    mockedLists.findByIdForBoard.mockResolvedValue(null);
+
+    await expect(
+      listService.update(ACTOR, board(), LIST.toString(), {name: 'Renamed'})
+    ).rejects.toMatchObject({statusCode: 404, code: 'LIST_NOT_FOUND'});
+
+    expect(mockedActivity.log).not.toHaveBeenCalled();
+    expect(mockedRealtime.broadcast).not.toHaveBeenCalled();
+  });
+
+  it('does not announce a write that lost the revision race', async () => {
+    mockedBoards.bumpRevision.mockResolvedValue(null as never);
+    mockedLists.create.mockResolvedValue(list());
+
+    await expect(
+      listService.create(ACTOR, board(4), {name: 'To do', expectedRevision: 4})
+    ).rejects.toMatchObject({statusCode: 409, code: 'REVISION_CONFLICT'});
+
+    expect(mockedActivity.log).not.toHaveBeenCalled();
+    expect(mockedRealtime.broadcast).not.toHaveBeenCalled();
   });
 });

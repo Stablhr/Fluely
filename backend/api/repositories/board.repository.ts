@@ -1,6 +1,7 @@
 import {FilterQuery, Types} from 'mongoose';
 import {BoardDocument, BoardModel} from '../models/Board.model';
 import {BoardVisibility} from '../constants/product';
+import {ProductSession} from '../utils/transaction';
 
 type CreateBoardInput = Pick<
   BoardDocument,
@@ -14,7 +15,10 @@ type CreateBoardInput = Pick<
 export const boardRepository = {
   create: (data: CreateBoardInput) => BoardModel.create(data),
 
-  findById: (id: string) => BoardModel.findById(id).exec(),
+  findById: (id: string, session?: ProductSession) =>
+    session
+      ? BoardModel.findById(id).session(session).exec()
+      : BoardModel.findById(id).exec(),
 
   findByPublicSlug: (slug: string) => BoardModel.findOne({publicSlug: slug}).exec(),
 
@@ -42,10 +46,15 @@ export const boardRepository = {
   listByOwnerAndVisibility: (ownerId: Types.ObjectId, visibility: BoardVisibility) =>
     BoardModel.find({ownerId, visibility}).sort({updatedAt: -1}).exec(),
 
-  update: (id: string, data: Partial<BoardDocument>, bumpRevision = true) => {
+  update: (
+    id: string,
+    data: Partial<BoardDocument>,
+    bumpRevision = true,
+    session?: ProductSession
+  ) => {
     const update: Record<string, unknown> = {...data};
     if (bumpRevision) update.$inc = {revision: 1};
-    return BoardModel.updateOne({_id: id}, update).exec();
+    return BoardModel.updateOne({_id: id}, update, {session}).exec();
   },
 
   setPublicSlug: (id: string, publicSlug: string | null) =>
@@ -63,8 +72,8 @@ export const boardRepository = {
    * conflict with itself. `new: true` returns the post-increment document; null
    * means the compare-and-set lost, i.e. somebody else wrote first.
    */
-  bumpRevision: (filter: Record<string, unknown>) =>
-    BoardModel.findOneAndUpdate(filter, {$inc: {revision: 1}}, {new: true}).exec(),
+  bumpRevision: (filter: Record<string, unknown>, session?: ProductSession) =>
+    BoardModel.findOneAndUpdate(filter, {$inc: {revision: 1}}, {new: true, session}).exec(),
 
   findWithRevision: (id: string, expectedRevision?: number) => {
     const filter: FilterQuery<BoardDocument> = {_id: id};
@@ -72,5 +81,6 @@ export const boardRepository = {
     return BoardModel.findOne(filter).exec();
   },
 
-  delete: (id: string) => BoardModel.deleteOne({_id: id}).exec()
+  delete: (id: string, session?: ProductSession) =>
+    BoardModel.deleteOne({_id: id}, {session}).exec()
 };

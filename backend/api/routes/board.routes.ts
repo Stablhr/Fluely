@@ -3,11 +3,13 @@ import {boardController} from '../controllers/board.controller';
 import {boardCollaboratorController} from '../controllers/boardCollaborator.controller';
 import {listController} from '../controllers/list.controller';
 import {cardController} from '../controllers/card.controller';
+import {activityController} from '../controllers/activity.controller';
 import {validateRequest} from '../middleware/validation';
 import {requireAuth, requireUser} from '../middleware/auth';
 import {requireBoardAccess} from '../middleware/boardAccess';
 import {authActionLimiter, authReadLimiter} from '../middleware/rateLimit';
 import {
+  activityQuerySchema,
   boardCreateSchema,
   boardIdParamsSchema,
   boardListQuerySchema,
@@ -117,6 +119,15 @@ router.get(
   validateRequest({params: boardIdParamsSchema}),
   requireBoardAccess('read'),
   boardController.structure
+);
+
+// ── Audit trail ───────────────────────────────────────────────────
+router.get(
+  '/:boardId/activity',
+  authReadLimiter,
+  validateRequest({params: boardIdParamsSchema, query: activityQuerySchema}),
+  requireBoardAccess('read'),
+  activityController.list
 );
 
 // ── Lists ─────────────────────────────────────────────────────────

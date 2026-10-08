@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import type { DropResult } from '@hello-pangea/dnd'
 import { useStore } from '@/lib/kali/store/useStore'
+import { useBoardRealtime } from '@/lib/kali/realtime/useBoardRealtime'
 import BoardTopBar from './BoardTopBar'
 import ListColumn from './ListColumn'
 import TableView from './TableView'
@@ -43,6 +44,11 @@ export default function BoardView() {
   // once when the board appears -- right after sign-in, when the boards query
   // resolves -- which is exactly when a pull is needed.
   const hasBoard = Boolean(board)
+
+  // Live sync is only for boards with a server row behind them: a local-only
+  // board has no channel to join, and the public-board page is a different
+  // component entirely — anonymous viewers keep the static snapshot.
+  useBoardRealtime(boardId, Boolean(board?.ownerId && board.revision !== null))
 
   useEffect(() => {
     if (!hasBoard) return

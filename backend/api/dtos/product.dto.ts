@@ -337,6 +337,12 @@ export const activityQuerySchema = paginationQuerySchema.extend({
   type: text(80).optional()
 });
 
+/** Body sent by pusher-js when it asks to join a private/presence channel. */
+export const realtimeAuthSchema = z.object({
+  socket_id: requiredText(120),
+  channel_name: requiredText(200)
+});
+
 export const exportQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(true)
 });
