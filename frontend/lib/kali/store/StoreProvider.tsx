@@ -157,6 +157,93 @@ function toCardPatch(patch: Partial<Card>): Partial<CreateCardInput> {
 }
 
 /**
+ * Member identity across the wire.
+ *
+ * The store can name exactly one member -- the signed-in person, filed under
+ * the local key `YOU_ID` -- because the roster itself lives on the server. The
+ * server knows that same person by their account id. Every member id that
+ * crosses the boundary is translated between the two; without it a card
+ * assignment would send `YOU_ID` as though it were a user id and come back as a
+ * validation error.
+ *
+ * `OBJECT_ID` is the shape the server's `objectId` rule accepts, so an id that
+ * does not match is one the server cannot key: it is dropped on the way out
+ * rather than sent to fail, and left as-is on the way in.
+ */
+const OBJECT_ID = /^[a-f\d]{24}$/i;
+
+/** Store member ids -> server user ids, dropping anything the server cannot key. */
+function memberIdsToServer(
+  ids: string[],
+  youId: string | null | undefined,
+): string[] {
+  return ids
+    .map((id) => (id === YOU_ID && youId ? youId : id))
+    .filter((id) => OBJECT_ID.test(id));
+}
+
+/**
+ * Server user ids -> store member ids.
+ *
+ * Only the signed-in person has a member record to render, so their account id
+ * becomes the local key; every other id is left untouched and simply has no
+ * member to draw -- the same as any other id the roster cannot name.
+ */
+function memberIdsFromServer(
+  ids: string[],
+  youId: string | null | undefined,
+): string[] {
+  if (!youId || !ids.includes(youId)) return ids;
+  return ids.map((id) => (id === youId ? YOU_ID : id));
+}
+
+/** A single store member id -> the server's user id, or null when it cannot key it. */
+function memberIdToServer(
+  id: string | null | undefined,
+  youId: string | null | undefined,
+): string | null {
+  if (!id) return null;
+  const resolved = id === YOU_ID && youId ? youId : id;
+  return OBJECT_ID.test(resolved) ? resolved : null;
+}
+
+/** Applies `memberIdsFromServer` to a card without disturbing the rest of it. */
+function withLocalMemberIds(card: Card, youId: string | null | undefined): Card {
+  const memberIds = memberIdsFromServer(card.memberIds, youId);
+  return memberIds === card.memberIds ? card : { ...card, memberIds };
+}
+
+/**
+ * A list's assignee as the store shows it: a name, not the user id the server
+ * keeps. Only the signed-in person can be named from here -- the roster lives on
+ * the server -- so every other id is left as it came and simply shows as the id
+ * it is.
+ */
+function withLocalAssignee(
+  list: List,
+  youId: string | null | undefined,
+  youName: string | undefined,
+): List {
+  if (!youId || !youName || list.assignee !== youId) return list;
+  return { ...list, assignee: youName };
+}
+
+/**
+ * Whether a rejected write lost the board's optimistic-concurrency check.
+ *
+ * Normalized errors carry the server's `code`, but the value can also arrive
+ * still wrapped in an Axios response, so both shapes are checked.
+ */
+function isRevisionConflict(error: unknown): boolean {
+  const err = error as
+    | { code?: unknown; response?: { data?: { code?: unknown } } }
+    | null
+    | undefined;
+  const code = err?.code ?? err?.response?.data?.code;
+  return code === "REVISION_CONFLICT";
+}
+
+/**
  * Stamp the signed-in person's name onto the local "you" member.
  *
  * The store is persisted under a single key that is not namespaced per account,
@@ -457,7 +544,10 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
             startDate: localCards[j].startDate,
             location: localCards[j].location || null,
             labelIds: localCards[j].labelIds,
-            memberIds: localCards[j].memberIds,
+            memberIds: memberIdsToServer(
+              localCards[j].memberIds,
+              currentUser?.id,
+            ),
             expectedRevision: revision,
           });
           revision = card.revision;
@@ -466,7 +556,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
       markChildrenSynced(boardId);
     },
-    [markChildrenSynced],
+    [currentUser?.id, markChildrenSynced],
   );
 
   /**
@@ -662,10 +752,17 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         const cards: Record<string, Card> = {...prev.cards};
 
         structure.lists.forEach((dto, index) => {
-          lists[dto.id] = toList(dto, index, lists[dto.id]);
+          lists[dto.id] = withLocalAssignee(
+            toList(dto, index, lists[dto.id]),
+            currentUser?.id,
+            currentUser?.name,
+          );
         });
         structure.cards.forEach((dto) => {
-          cards[dto.id] = toCard(dto, cards[dto.id]);
+          cards[dto.id] = withLocalMemberIds(
+            toCard(dto, cards[dto.id]),
+            currentUser?.id,
+          );
         });
 
         // The board's own list order comes from the server, since that array is
@@ -730,16 +827,23 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         getFriendlyErrorMessage(err, "Could not load this board’s contents."),
       );
     }
-  }, [importLocalChildren, mutate, repairBoardChildren, setError]);
+  }, [currentUser?.id, currentUser?.name, importLocalChildren, mutate, repairBoardChildren, setError]);
 
   /**
    * Sends a child write to the server and adopts the new board revision.
    *
-   * On rejection the board is re-read rather than rewound to a captured
-   * snapshot. The server is the source of truth for a synced board, so pulling
-   * it again is both simpler than a per-mutation rollback and more honest: it
-   * also picks up anything a collaborator changed in the meantime, which a
-   * rollback to a stale local copy would have silently discarded.
+   * A write that loses the revision race is retried once against a fresh read
+   * of the board before it is treated as a failure: the change is still the
+   * user's intent, and the only thing wrong with it was its stale revision.
+   * This keeps per-keystroke-free edits (title, description, a run of label or
+   * member toggles) from being discarded just because a collaborator -- or the
+   * previous edit in the same burst -- wrote first.
+   *
+   * On any other rejection the board is re-read rather than rewound to a
+   * captured snapshot. The server is the source of truth for a synced board, so
+   * pulling it again is both simpler than a per-mutation rollback and more
+   * honest: it also picks up anything a collaborator changed in the meantime,
+   * which a rollback to a stale local copy would have silently discarded.
    */
   const writeThrough = useCallback(
     async (
@@ -750,10 +854,23 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       inflightChildWritesRef.current += 1;
       let failed = false;
       try {
-        const revision = await send(
-          dataRef.current.boards[boardId]?.revision ?? undefined,
-        );
-        applyRevision(boardId, revision);
+        try {
+          const revision = await send(
+            dataRef.current.boards[boardId]?.revision ?? undefined,
+          );
+          applyRevision(boardId, revision);
+        } catch (err) {
+          if (!isRevisionConflict(err)) throw err;
+          // Re-read for the revision only -- the structure itself is left for
+          // the poll or a later sync, so a write still in flight is not merged
+          // over here. The retry then carries the revision the server holds.
+          const structure = await fetchStructure(boardId);
+          applyRevision(boardId, structure.revision);
+          const revision = await send(
+            dataRef.current.boards[boardId]?.revision ?? undefined,
+          );
+          applyRevision(boardId, revision);
+        }
       } catch (err) {
         failed = true;
         setError(getFriendlyErrorMessage(err, failureMessage));
@@ -1069,20 +1186,21 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
    * reconciliation.
    */
   /**
-   * Finds the member id behind a display name.
+   * Finds the server user id behind a display name.
    *
    * The store's list and card `assignee` is a name, while the server's is a
-   * reference to a user. Null means the name belongs to nobody in the member
-   * list -- a leftover from a board this person cannot see the roster of -- and
-   * the caller keeps that value local instead of sending an id that is not
-   * there.
+   * reference to a user, so the name is resolved against the board's members
+   * and translated to the id the server can key. Null means the name belongs to
+   * nobody the server could reference -- a leftover from a board this person
+   * cannot see the roster of -- and the caller keeps that value local instead
+   * of sending an id that is not there.
    */
   const resolveMemberId = (name: string): string | null => {
     if (!name) return null;
     const match = Object.values(dataRef.current.members).find(
       member => member.name === name,
     );
-    return match?.id ?? null;
+    return memberIdToServer(match?.id, currentUser?.id);
   };
 
   const patchListOnServer = (
@@ -1398,6 +1516,12 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     const card = dataRef.current.cards[id];
     if (card && isServerBoard(dataRef.current.boards[card.boardId])) {
       const serverPatch = toCardPatch(patch);
+      if (serverPatch.memberIds !== undefined) {
+        serverPatch.memberIds = memberIdsToServer(
+          serverPatch.memberIds,
+          currentUser?.id,
+        );
+      }
       // Cover, files, comments, activity, and watching have no server column, so
       // a patch made only of those would go out as an empty body and come back
       // as a validation error. Nothing would be stored either way, so let the
@@ -1406,23 +1530,30 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       if (Object.keys(serverPatch).length > 0) {
         void writeThrough(
           card.boardId,
-          () =>
-            updateCardOnServer(card.boardId, id, serverPatch).then(
-              (updated) => {
-                mutate((prev) => {
-                  const current = prev.cards[id];
-                  if (!current) return prev;
-                  return {
-                    ...prev,
-                    cards: {
-                      ...prev.cards,
-                      [id]: {...toCard(updated, current), ...patch},
+          revision =>
+            updateCardOnServer(card.boardId, id, {
+              ...serverPatch,
+              expectedRevision: revision,
+            }).then((updated) => {
+              mutate((prev) => {
+                const current = prev.cards[id];
+                if (!current) return prev;
+                return {
+                  ...prev,
+                  cards: {
+                    ...prev.cards,
+                    [id]: {
+                      ...withLocalMemberIds(
+                        toCard(updated, current),
+                        currentUser?.id,
+                      ),
+                      ...patch,
                     },
-                  };
-                });
-                return updated.revision;
-              },
-            ),
+                  },
+                };
+              });
+              return updated.revision;
+            }),
           "Could not save that card.",
         );
       }
