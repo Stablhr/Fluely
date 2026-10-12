@@ -92,6 +92,38 @@ function toCoverSize(size: CardCoverSize | undefined): Card["coverSize"] {
 }
 
 /**
+ * Calendar dates vs. instants.
+ *
+ * The store keeps `dueDate`/`startDate` as calendar dates ("2026-10-12") because
+ * that is what the planner, the calendar, and the date pickers compare against.
+ * The server stores a `Date` and its DTOs require a full ISO 8601 instant, so
+ * the wire format has to be reconciled here in both directions. Sending a
+ * calendar date as-is is rejected as a validation error, and adopting a server
+ * instant unmodified leaves the store holding "2026-10-12T00:00:00.000Z" -- a
+ * value no calendar-day comparison on the client will ever match again.
+ */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Server instant -> store calendar date. */
+function toDateOnly(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value.slice(0, 10);
+}
+
+/**
+ * Store calendar date -> server instant. UTC midnight, so slicing the first ten
+ * characters off the server's echo lands back on the very same day regardless of
+ * the browser's timezone.
+ */
+function toServerInstant(
+  value: string | null | undefined,
+): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return DATE_ONLY.test(value) ? `${value}T00:00:00.000Z` : value;
+}
+
+/**
  * Turns a server list into a store list, keeping the local-only fields.
  *
  * `order` is not the server's `position` in any meaningful sense -- the
@@ -137,8 +169,8 @@ export function toCard(dto: CardDto, existing?: Card): Card {
     coverSize: toCoverSize(dto.coverSize),
     labelIds: dto.labelIds ?? [],
     memberIds: dto.memberIds ?? [],
-    dueDate: dto.dueDate ?? null,
-    startDate: dto.startDate ?? null,
+    dueDate: toDateOnly(dto.dueDate),
+    startDate: toDateOnly(dto.startDate),
     location: dto.location ?? "",
     watching: dto.watching ?? false,
     archived: dto.archived ?? false,
@@ -257,7 +289,11 @@ export async function createCardOnServer(
   const { data } = await httpClient.post<{
     card: CardDto;
     revision: number;
-  }>(`/boards/${boardId}/cards`, input);
+  }>(`/boards/${boardId}/cards`, {
+    ...input,
+    dueDate: toServerInstant(input.dueDate),
+    startDate: toServerInstant(input.startDate),
+  });
   return { ...data.card, revision: data.revision };
 }
 
@@ -269,7 +305,11 @@ export async function updateCardOnServer(
   const { data } = await httpClient.patch<{
     card: CardDto;
     revision: number;
-  }>(`/boards/${boardId}/cards/${cardId}`, patch);
+  }>(`/boards/${boardId}/cards/${cardId}`, {
+    ...patch,
+    dueDate: toServerInstant(patch.dueDate),
+    startDate: toServerInstant(patch.startDate),
+  });
   return { ...data.card, revision: data.revision };
 }
 

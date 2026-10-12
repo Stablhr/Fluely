@@ -1397,27 +1397,35 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const updateCard = (id: string, patch: Partial<Card>) => {
     const card = dataRef.current.cards[id];
     if (card && isServerBoard(dataRef.current.boards[card.boardId])) {
-      void writeThrough(
-        card.boardId,
-            () =>
-          updateCardOnServer(card.boardId, id, toCardPatch(patch)).then(
-            (updated) => {
-              mutate((prev) => {
-                const current = prev.cards[id];
-                if (!current) return prev;
-                return {
-                  ...prev,
-                  cards: {
-                    ...prev.cards,
-                    [id]: {...toCard(updated, current), ...patch},
-                  },
-                };
-              });
-              return updated.revision;
-            },
-          ),
-        "Could not save that card.",
-      );
+      const serverPatch = toCardPatch(patch);
+      // Cover, files, comments, activity, and watching have no server column, so
+      // a patch made only of those would go out as an empty body and come back
+      // as a validation error. Nothing would be stored either way, so let the
+      // local update below stand and skip the request rather than surface a
+      // failure for a change the server was never asked to keep.
+      if (Object.keys(serverPatch).length > 0) {
+        void writeThrough(
+          card.boardId,
+          () =>
+            updateCardOnServer(card.boardId, id, serverPatch).then(
+              (updated) => {
+                mutate((prev) => {
+                  const current = prev.cards[id];
+                  if (!current) return prev;
+                  return {
+                    ...prev,
+                    cards: {
+                      ...prev.cards,
+                      [id]: {...toCard(updated, current), ...patch},
+                    },
+                  };
+                });
+                return updated.revision;
+              },
+            ),
+          "Could not save that card.",
+        );
+      }
     }
     mutate((prev) => ({
       ...prev,
