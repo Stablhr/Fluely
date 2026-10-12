@@ -195,16 +195,34 @@
   }
 }
 
+/* The OS hand cursor is white, so it disappears against the ivory and white
+   cards. Every draggable swaps in a bordered hand instead (white fill, ink
+   outline) that stays visible however light the surface behind it is: `grab`
+   at rest, `grabbing` while the item is held. Keying off the drag-handle
+   attribute the DnD library puts on every handle keeps the change on the drag
+   surfaces rather than the whole app. */
+.kali-app {
+  --cursor-grab-hand: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg fill='%23111827' stroke='%23111827' stroke-width='3.5' stroke-linejoin='round'%3E%3Crect x='7' y='13' width='19' height='15' rx='6'/%3E%3Crect x='8' y='6' width='5' height='14' rx='2.5'/%3E%3Crect x='12.5' y='4.5' width='5' height='15' rx='2.5'/%3E%3Crect x='17' y='6' width='5' height='14' rx='2.5'/%3E%3Crect x='21.5' y='8.5' width='5' height='11.5' rx='2.5'/%3E%3Crect x='3.5' y='14' width='4.5' height='9' rx='2.25'/%3E%3C/g%3E%3Cg fill='%23ffffff'%3E%3Crect x='7' y='13' width='19' height='15' rx='6'/%3E%3Crect x='8' y='6' width='5' height='14' rx='2.5'/%3E%3Crect x='12.5' y='4.5' width='5' height='15' rx='2.5'/%3E%3Crect x='17' y='6' width='5' height='14' rx='2.5'/%3E%3Crect x='21.5' y='8.5' width='5' height='11.5' rx='2.5'/%3E%3Crect x='3.5' y='14' width='4.5' height='9' rx='2.25'/%3E%3C/g%3E%3Cg fill='none' stroke='%23111827' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M12.75 6.5V15'/%3E%3Cpath d='M17.25 6.5V15'/%3E%3Cpath d='M21.75 9V15'/%3E%3C/g%3E%3C/svg%3E");
+  --cursor-grabbing-hand: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg fill='%23111827' stroke='%23111827' stroke-width='3.5' stroke-linejoin='round'%3E%3Crect x='7' y='13' width='19' height='14' rx='6'/%3E%3Crect x='8' y='8' width='5' height='8' rx='2.5'/%3E%3Crect x='12.5' y='7' width='5' height='9' rx='2.5'/%3E%3Crect x='17' y='8' width='5' height='8' rx='2.5'/%3E%3Crect x='21.5' y='9.5' width='5' height='6.5' rx='2.5'/%3E%3Crect x='3.5' y='14' width='4.5' height='8' rx='2.25'/%3E%3C/g%3E%3Cg fill='%23ffffff'%3E%3Crect x='7' y='13' width='19' height='14' rx='6'/%3E%3Crect x='8' y='8' width='5' height='8' rx='2.5'/%3E%3Crect x='12.5' y='7' width='5' height='9' rx='2.5'/%3E%3Crect x='17' y='8' width='5' height='8' rx='2.5'/%3E%3Crect x='21.5' y='9.5' width='5' height='6.5' rx='2.5'/%3E%3Crect x='3.5' y='14' width='4.5' height='8' rx='2.25'/%3E%3C/g%3E%3Cg fill='none' stroke='%23111827' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M12.75 8.5V15'/%3E%3Cpath d='M17.25 8.5V15'/%3E%3Cpath d='M21.75 10V15'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.kali-app [data-rfd-drag-handle-context-id] {
+  cursor: var(--cursor-grab-hand) 10 4, grab;
+}
+
+.kali-app [data-rfd-drag-handle-context-id]:active {
+  cursor: var(--cursor-grabbing-hand) 10 4, grabbing;
+}
+
 /* A drag in progress should look draggable everywhere, not just over the gap.
    The library sets `cursor: grabbing` on <body>, but that single-element rule
-   loses to any utility under the pointer -- cards use `cursor-pointer` and
-   buttons `cursor: pointer` -- so dragging a card over another showed a pointer
-   instead of the black grab hand. `beginDragCursor`/`endDragCursor` add this
-   class for the duration of the drag; living outside `@layer` and carrying
-   `!important` lets it outrank every layered utility. */
-body.kali-dragging,
-body.kali-dragging * {
-  cursor: grabbing !important;
+   loses to any utility under the pointer, so dragging a card over another
+   showed a pointer instead of the grab hand. `beginDragCursor`/`endDragCursor`
+   add this class for the duration of the drag; carrying `!important` lets it
+   outrank every layered utility inside the app. */
+body.kali-dragging .kali-app,
+body.kali-dragging .kali-app * {
+  cursor: var(--cursor-grabbing-hand) 10 4, grabbing !important;
 }
 
 @utility scroll-slim {
