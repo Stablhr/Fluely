@@ -338,7 +338,10 @@ export const activityQuerySchema = paginationQuerySchema.extend({
 });
 
 export const pollQuerySchema = z.object({
-  since: z.coerce.number().int().positive().optional()
+  // Zero is a valid cursor: a board's first revision is 1, and the client seeds
+  // its cursor with `board.revision ?? 0`, so rejecting 0 would 400 the very
+  // first poll of a board it has not synced yet.
+  since: z.coerce.number().int().nonnegative().optional()
 });
 
 export const exportQuerySchema = z.object({

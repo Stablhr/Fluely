@@ -402,6 +402,8 @@ describe('board structure', () => {
       LIST.toString()
     ]);
     expect(result.cards).toHaveLength(1);
+    // The poller adopts this so it can stop treating the same change as new.
+    expect(result.revision).toBe(4);
   });
 
   it('keeps a list the order array forgot about', async () => {

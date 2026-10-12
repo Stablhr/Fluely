@@ -82,15 +82,35 @@ function normalizeAxiosError(error: unknown): NormalizedApiError {
   };
 }
 
+function isCsrfError(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const axiosError = error as AxiosError<ApiErrorPayload>;
+  return (
+    axiosError.response?.status === 403 &&
+    axiosError.response.data?.code === 'CSRF_TOKEN_INVALID'
+  );
+}
+
 async function refreshAccessToken() {
   if (refreshPromise) return refreshPromise;
 
-  refreshPromise = refreshClient
-    .post('/auth/refresh', {})
-    .then(() => undefined)
-    .finally(() => {
-      refreshPromise = null;
-    });
+  refreshPromise = (async () => {
+    try {
+      await refreshClient.post('/auth/refresh', {});
+    } catch (error) {
+      // A cached CSRF token can outlive the cookie it was issued for (the
+      // cookie is cleared when a refresh fails, and a server restart drops it).
+      // That surfaces as a 403 on the token-guarded refresh call and is the one
+      // refresh failure worth retrying: drop the cached value so the request
+      // interceptor fetches a fresh one, and try once more. Anything else means
+      // the refresh token itself is gone, so let it reject.
+      if (!isCsrfError(error)) throw error;
+      csrfToken = null;
+      await refreshClient.post('/auth/refresh', {});
+    }
+  })().finally(() => {
+    refreshPromise = null;
+  });
 
   return refreshPromise;
 }

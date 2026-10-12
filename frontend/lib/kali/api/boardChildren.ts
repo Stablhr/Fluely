@@ -74,10 +74,17 @@ export interface CardDto {
   updatedAt: string;
 }
 
-/** The whole board in one call, ordered the way the board should render. */
+/**
+ * The whole board in one call, ordered the way the board should render.
+ *
+ * `revision` is the board's counter as of this read. A polling client adopts it
+ * so its own cursor and its next write's `expectedRevision` both stop lagging
+ * the server.
+ */
 export interface StructureDto {
   lists: ListDto[];
   cards: CardDto[];
+  revision: number;
 }
 
 function toCoverSize(size: CardCoverSize | undefined): Card["coverSize"] {

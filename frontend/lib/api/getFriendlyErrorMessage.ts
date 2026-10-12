@@ -86,7 +86,7 @@ export function getFriendlyErrorMessage(
       case "CANNOT_MODIFY_OWNER":
         return "The board owner's access cannot be changed.";
       case "REVISION_CONFLICT":
-        return "Someone else changed this board while you were editing. Reload to see their changes.";
+        return "Someone else changed this board while you were editing. Your view has been updated with their changes.";
       case "WORKSPACE_NOT_FOUND":
         return "That workspace no longer exists.";
       case "WORKSPACE_MEMBER_EXISTS":

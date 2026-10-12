@@ -2,13 +2,11 @@
 
 import {useEffect, useRef, useCallback} from "react";
 import {useRouter} from "next/navigation";
-import {fetchBoardPoll, type BoardPollResponse} from "@/lib/kali/api/boards";
+import {fetchBoardPoll} from "@/lib/kali/api/boards";
 import {useStore} from "@/lib/kali/store/useStore";
 
 const POLL_INTERVAL_MS = 3500;
 const DRAIN_MAX_ROUNDS = 3;
-
-type KickSignal = "ok" | "removed" | "deleted";
 
 export function useBoardPoll(
   boardId: string,
@@ -18,14 +16,33 @@ export function useBoardPoll(
   const router = useRouter();
   const {
     applyBoardPoll,
-    replacePresence,
-    currentUserId
+    replacePresence
   } = useStore();
 
   const sinceRef = useRef(initialRevision);
   const cancelledRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const drainingRef = useRef(false);
+  /** The board whose cursor is seeded, so a revision bump does not re-seed it. */
+  const cursorBoardRef = useRef<string | null>(null);
+  const initialRevisionRef = useRef(initialRevision);
+
+  // Kept in a ref rather than in the polling effect's dependency list. The
+  // revision changes on every local write and every adopted remote change, and
+  // re-running the effect for each would clear and rebuild the interval, drop
+  // its cursor back to the current revision, and blink the presence roster off
+  // and on. The cursor is seeded once per board instead.
+  useEffect(() => {
+    initialRevisionRef.current = initialRevision;
+  }, [initialRevision]);
+
+  const stopPolling = useCallback(() => {
+    cancelledRef.current = true;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
   const pollOnce = useCallback(async () => {
     if (cancelledRef.current || !boardId) return;
@@ -61,17 +78,42 @@ export function useBoardPoll(
       if (cancelledRef.current) return;
       const err = error as {status?: number; response?: {status?: number}};
       const status = err?.status ?? err?.response?.status;
-      if (status === 403 || status === 404) {
-        router.push("/boards");
+
+      // The shared client refreshes an expired access token and replays the
+      // request before an error reaches here, reusing the original query string
+      // -- so a recovered expiry resumes on the same `since` cursor. A 401 that
+      // survives that attempt means the refresh token is gone too: the session
+      // is over, not merely stale. Stop, and send the user back to sign-in
+      // rather than hammering a dead session every tick.
+      if (status === 401) {
+        stopPolling();
+        router.replace("/sign-in");
+        return;
       }
+
+      // The board is gone or our access to it was revoked -- neither is
+      // recoverable by retrying, so stop and leave the board.
+      if (status === 403 || status === 404) {
+        stopPolling();
+        router.replace("/boards");
+        return;
+      }
+
       // 429 / network / 5xx: swallow, next tick retries
     }
-  }, [boardId, applyBoardPoll, router]);
+  }, [boardId, applyBoardPoll, router, stopPolling]);
 
   useEffect(() => {
     if (!enabled || !boardId) return;
     cancelledRef.current = false;
-    sinceRef.current = initialRevision;
+
+    // Seed the cursor only when this board starts polling. Re-seeding on every
+    // revision change would skip activity that landed between the last poll and
+    // a local write's own revision bump.
+    if (cursorBoardRef.current !== boardId) {
+      cursorBoardRef.current = boardId;
+      sinceRef.current = initialRevisionRef.current;
+    }
 
     void pollOnce();
 
@@ -88,5 +130,5 @@ export function useBoardPoll(
       document.removeEventListener("visibilitychange", onVisibilityChange);
       replacePresence(boardId, []);
     };
-  }, [enabled, boardId, initialRevision, pollOnce, replacePresence]);
+  }, [enabled, boardId, pollOnce, replacePresence]);
 }

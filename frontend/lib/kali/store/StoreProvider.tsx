@@ -271,6 +271,26 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   >({});
   const dataRef = useRef(data);
 
+  /**
+   * Child writes (list/card create, patch, move) that are still outstanding.
+   *
+   * `syncBoardStructure` must not land while one of these is in flight: the
+   * store then holds an optimistic change the server has not confirmed, and a
+   * structure read would replace it with the server's pre-write view -- a
+   * just-created list or card dropped from the order, or a dragged card
+   * snapped back. Worse, the merge's prune deletes the optimistic record, so
+   * the write's own response can no longer re-key it. Syncs that arrive
+   * mid-write are re-scheduled instead, and run once nothing is outstanding.
+   */
+  const inflightChildWritesRef = useRef(0);
+
+  /**
+   * Held in a ref so `syncBoardStructure` can re-schedule itself without a
+   * circular `useCallback` dependency on `scheduleStructureSync` (which
+   * depends on it in turn). Assigned next to its definition below.
+   */
+  const scheduleStructureSyncRef = useRef<(boardId: string) => void>(() => {});
+
   useEffect(() => {
     dataRef.current = data;
   }, [data]);
@@ -600,7 +620,17 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     const board = dataRef.current.boards[boardId];
     if (!isServerBoard(board)) return;
 
+    // A write of our own that is still in flight means the store holds an
+    // optimistic change the server has not confirmed. Re-schedule and sync once
+    // it settles rather than merge the server's pre-write view over it.
+    const deferForInflightWrite = () => {
+      if (inflightChildWritesRef.current === 0) return false;
+      scheduleStructureSyncRef.current(boardId);
+      return true;
+    };
+
     try {
+      if (deferForInflightWrite()) return;
       let structure = await fetchStructure(boardId);
 
       // Undo create-response damage before anything else reads the ordering
@@ -619,6 +649,10 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         await importLocalChildren(boardId, structure);
         structure = await fetchStructure(boardId);
       }
+
+      // A write may have started while those reads were in flight; the read is
+      // then already behind it, so re-read rather than merge over the write.
+      if (deferForInflightWrite()) return;
 
       mutate((prev) => {
         const current = prev.boards[boardId];
@@ -665,6 +699,17 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           }
         }
 
+        // Adopt the revision this read was taken at, never walking it back. A
+        // local write may have landed while the read was in flight, so the
+        // current value can legitimately be ahead of the server's response;
+        // regressing it would make the very next write conflict. Once adopted,
+        // the poll stops considering the same change new, and a later write
+        // sends a revision the server still holds.
+        const nextRevision =
+          typeof structure.revision === "number"
+            ? Math.max(current.revision ?? 0, structure.revision)
+            : current.revision;
+
         return {
           ...prev,
           lists,
@@ -673,6 +718,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
             ...prev.boards,
             [boardId]: {
               ...current,
+              revision: nextRevision,
               listOrder: serverListOrder,
               updatedAt: current.updatedAt,
             },
@@ -701,14 +747,25 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       send: (revision: number | undefined) => Promise<number | undefined>,
       failureMessage: string,
     ) => {
+      inflightChildWritesRef.current += 1;
+      let failed = false;
       try {
         const revision = await send(
           dataRef.current.boards[boardId]?.revision ?? undefined,
         );
         applyRevision(boardId, revision);
       } catch (err) {
+        failed = true;
         setError(getFriendlyErrorMessage(err, failureMessage));
-        void syncBoardStructure(boardId);
+      } finally {
+        // Count the write out before reacting to its failure, so the re-read
+        // that recovers from a conflict is not itself deferred by the write it
+        // is recovering from.
+        inflightChildWritesRef.current = Math.max(
+          0,
+          inflightChildWritesRef.current - 1,
+        );
+        if (failed) void syncBoardStructure(boardId);
       }
     },
     [applyRevision, syncBoardStructure, setError],
@@ -2167,6 +2224,12 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     },
     [syncBoardStructure],
   );
+
+  // Kept current for `syncBoardStructure`, which reschedules itself through
+  // this ref when it defers over an in-flight write.
+  useEffect(() => {
+    scheduleStructureSyncRef.current = scheduleStructureSync;
+  }, [scheduleStructureSync]);
 
   /** Drops a board's live roster and feed once the board itself is gone. */
   const forgetBoard = useCallback((boardId: string) => {

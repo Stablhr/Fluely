@@ -254,6 +254,11 @@ export const boardService = {
    * and the client can refresh the shell and the children independently. The
    * board's `listOrder` is authoritative for lists, so the lists come back in
    * that order rather than by their own `position`.
+   *
+   * `revision` rides along so a polling client can adopt the server's counter
+   * after every read. Without it a client that pulls a remote change would keep
+   * its stale revision, treat the next poll as new again, and keep sending a
+   * revision the server has moved past — which is a conflict on every write.
    */
   async structure(board: BoardDocument) {
     const [lists, cards] = await Promise.all([
@@ -272,7 +277,8 @@ export const boardService = {
 
     return {
       lists: [...ordered, ...orphans].map(listService.serialize),
-      cards: cards.map(cardService.serialize)
+      cards: cards.map(cardService.serialize),
+      revision: board.revision
     };
   },
 
