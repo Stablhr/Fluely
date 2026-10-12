@@ -17,6 +17,7 @@ import AddListForm from './AddListForm'
 import CardModal from '../card-modal/CardModal'
 import BoardMenuDrawer from './BoardMenuDrawer'
 import type { BoardFilter } from './FilterPanel'
+import { beginDragCursor, endDragCursor } from '@/lib/kali/utils/dragCursor'
 
 export type BoardViewType = 'board' | 'table' | 'calendar' | 'timeline' | 'map'
 
@@ -69,6 +70,7 @@ export default function BoardView() {
   const lists = store.getLists(boardId)
 
   const onDragEnd = (result: DropResult) => {
+    endDragCursor()
     const { source, destination, type } = result
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
@@ -97,7 +99,7 @@ export default function BoardView() {
       />
 
       {activeView === 'board' && (
-        <DragDropContext onDragEnd={onDragEnd}>
+        <DragDropContext onDragStart={beginDragCursor} onDragEnd={onDragEnd}>
           <Droppable droppableId="board-lists" type="LIST" direction="horizontal">
             {(provided) => (
               <div

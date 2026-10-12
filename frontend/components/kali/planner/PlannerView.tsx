@@ -19,6 +19,7 @@ import {
 import type { PlannerRange } from '@/lib/kali/utils/dates'
 import UnscheduledPool from './UnscheduledPool'
 import DayColumn from './DayColumn'
+import { beginDragCursor, endDragCursor } from '@/lib/kali/utils/dragCursor'
 
 export default function PlannerView() {
   const store = useStore()
@@ -40,6 +41,7 @@ export default function PlannerView() {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 
   const onDragEnd = (result: DropResult) => {
+    endDragCursor()
     const { draggableId, source, destination } = result
     if (!destination) return
     const card = store.data.cards[draggableId]
@@ -129,7 +131,7 @@ export default function PlannerView() {
         </p>
       </div>
 
-      <DragDropContext onDragEnd={onDragEnd}>
+      <DragDropContext onDragStart={beginDragCursor} onDragEnd={onDragEnd}>
         <div className="scroll-slim flex h-full min-h-0 gap-4 overflow-x-auto p-4">
           <UnscheduledPool cards={poolCards} />
           <div className="flex min-w-0 flex-1 gap-2">

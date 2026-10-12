@@ -195,6 +195,18 @@
   }
 }
 
+/* A drag in progress should look draggable everywhere, not just over the gap.
+   The library sets `cursor: grabbing` on <body>, but that single-element rule
+   loses to any utility under the pointer -- cards use `cursor-pointer` and
+   buttons `cursor: pointer` -- so dragging a card over another showed a pointer
+   instead of the black grab hand. `beginDragCursor`/`endDragCursor` add this
+   class for the duration of the drag; living outside `@layer` and carrying
+   `!important` lets it outrank every layered utility. */
+body.kali-dragging,
+body.kali-dragging * {
+  cursor: grabbing !important;
+}
+
 @utility scroll-slim {
   scrollbar-width: thin;
   scrollbar-color: rgba(57, 113, 184, 0.35) transparent;

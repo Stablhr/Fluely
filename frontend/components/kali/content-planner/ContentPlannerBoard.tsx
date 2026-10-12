@@ -8,6 +8,7 @@ import { useStore } from '@/lib/kali/store/useStore'
 import type { SocialPost } from '@/lib/kali/store/schema'
 import { formatDate } from '@/lib/kali/utils/dates'
 import PlatformIcon from '../social/PlatformIcon'
+import { beginDragCursor, endDragCursor } from '@/lib/kali/utils/dragCursor'
 import {
   POST_COLUMNS,
   columnForStatus,
@@ -50,6 +51,7 @@ export default function ContentPlannerBoard({ posts, onOpenPost, onCreateIn }: C
   }, [posts])
 
   const onDragEnd = (result: DropResult) => {
+    endDragCursor()
     const { draggableId, destination, source } = result
     // Dropped outside a column, or back where it started.
     if (!destination || destination.droppableId === source.droppableId) return
@@ -59,7 +61,7 @@ export default function ContentPlannerBoard({ posts, onOpenPost, onCreateIn }: C
   }
 
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
+    <DragDropContext onDragStart={beginDragCursor} onDragEnd={onDragEnd}>
       <div className="scroll-slim flex min-h-0 flex-1 gap-3 overflow-x-auto p-3">
         {POST_COLUMNS.map((column) => {
           const columnPosts = grouped.get(column.id) ?? []
