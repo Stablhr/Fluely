@@ -22,7 +22,6 @@ import {
 import { useSignOut } from "@/lib/hooks/auth/useSignOut";
 import CaptureBox from "../shared/CaptureBox";
 import Avatar from "../shared/Avatar";
-import StorageMeter from "../shared/StorageMeter";
 
 interface NavLinkProps {
   to: string;
@@ -311,14 +310,13 @@ export default function Sidebar({
             ))}
         </nav>
 
-        {/* Footer: CaptureBox → User → Sign out → Storage */}
+        {/* Footer: CaptureBox → User → Sign out */}
         {collapsed ? (
           <div
             className="flex flex-col items-center gap-2 border-t px-2 py-3"
             style={{ borderColor: theme.border }}
           >
             <LogoutButton collapsed={collapsed} />
-            <StorageMeter collapsed />
           </div>
         ) : (
           <div
@@ -342,7 +340,6 @@ export default function Sidebar({
               </div>
             )}
             <LogoutButton collapsed={collapsed} />
-            <StorageMeter />
           </div>
         )}
       </aside>
