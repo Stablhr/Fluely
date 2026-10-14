@@ -80,6 +80,12 @@ shared helpers in `api/services/cloudinary.service.ts`, which read the client co
 A record stores the Cloudinary `url` (`secure_url`), `publicId`, and `resourceType`; deletion calls
 `deleteFromCloudinary(publicId, resourceType)` with the exact resource type it was uploaded as.
 
+Profile pictures are the exception to the `MediaAttachment` model: they are a pair of fields on the
+account (`avatarUrl`, `avatarPublicId`) served by `api/services/account.service.ts` via
+`POST /account/me/avatar` and `DELETE /account/me/avatar`. Each person's assets live under
+`fluely/avatars/<userId>`, uploading destroys the picture it replaces, and `avatarPublicId` never
+leaves the server (`PublicAccount` carries `avatarUrl` only).
+
 > **Serverless body limit.** On Vercel, a Serverless Function request body is capped (~4.5 MB), so
 > large video uploads cannot pass through `POST /api/media`. Those need a direct (signed) upload to
 > Cloudinary from the browser instead of the proxy-through-the-API path.

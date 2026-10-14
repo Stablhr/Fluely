@@ -18,3 +18,9 @@ export function kindForMimeType(mimeType: string): 'image' | 'video' | 'audio' |
   if (type.startsWith('audio/')) return 'audio';
   return 'document';
 }
+
+/**
+ * A tighter cap for profile pictures, which render at ~64px and never need to be
+ * anything close to the general attachment limit.
+ */
+export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;

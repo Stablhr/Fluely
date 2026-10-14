@@ -6,6 +6,16 @@ export interface BaseUserDocument extends mongoose.Document {
   email: string;
   passwordHash: string;
   username?: string;
+  /** Cloudinary URL of the profile picture. `null` until one is uploaded. */
+  avatarUrl?: string | null;
+  /**
+   * Cloudinary `public_id` for the profile picture.
+   *
+   * Kept beside the URL so a replaced or removed avatar can be destroyed
+   * instead of being orphaned in the media library. Server-side only -- it is
+   * never included in `PublicAccount`.
+   */
+  avatarPublicId?: string | null;
   workspaceId?: Types.ObjectId | null;
   isVerified: boolean;
   verificationCode?: string | null;
@@ -30,6 +40,9 @@ export function createBaseUserSchema<T extends BaseUserDocument>() {
       },
       passwordHash: {type: String, required: true},
       username: {type: String, unique: true, sparse: true},
+      // Profile picture. Stored on Cloudinary; see `services/account.service.ts`.
+      avatarUrl: {type: String, default: null},
+      avatarPublicId: {type: String, default: null},
       // Primary workspace. Membership itself lives in the WorkspaceMember
       // collection, which is the source of truth; this field is denormalised
       // for convenience so the UI can resolve a default without a join.

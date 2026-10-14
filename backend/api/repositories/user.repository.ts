@@ -27,6 +27,15 @@ export const userRepository = {
   setPrimaryWorkspace: (userId: string, workspaceId: Types.ObjectId | null) =>
     UserModel.updateOne({_id: userId}, {workspaceId}).exec(),
 
+  setAvatar: (userId: string, avatarUrl: string, avatarPublicId: string) =>
+    UserModel.updateOne({_id: userId}, {avatarUrl, avatarPublicId}).exec(),
+
+  clearAvatar: (userId: string) =>
+    UserModel.updateOne(
+      {_id: userId},
+      {avatarUrl: null, avatarPublicId: null}
+    ).exec(),
+
   findByUsername: (username: string) =>
     UserModel.findOne({username}).exec(),
 

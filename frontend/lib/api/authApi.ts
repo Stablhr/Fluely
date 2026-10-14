@@ -29,6 +29,14 @@ export type AuthUser = {
   lastName: string;
   username?: string;
   /**
+   * Cloudinary URL of the profile picture, or `null` when none is set.
+   *
+   * Optional because an admin account never gets one, and because a response
+   * predating the field simply omits it — callers must treat `null` and
+   * `undefined` the same way rather than assuming a picture exists.
+   */
+  avatarUrl?: string | null;
+  /**
    * The person's primary workspace, as the backend reports it.
    *
    * Optional because an admin account never gets a workspace, and because a

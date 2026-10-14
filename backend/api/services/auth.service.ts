@@ -38,6 +38,12 @@ export type PublicAccount = {
   firstName: string;
   lastName: string;
   username?: string;
+  /**
+   * Cloudinary URL of the profile picture, or `null` when none is set.
+   * `avatarPublicId` is deliberately absent -- the client has no use for it and
+   * it should not leave the server.
+   */
+  avatarUrl: string | null;
   workspaceId: string | null;
 };
 
@@ -56,6 +62,7 @@ export function toPublicAccount(
     firstName: string;
     lastName: string;
     username?: string;
+    avatarUrl?: string | null;
     workspaceId?: unknown;
   },
   type: 'user' | 'admin'
@@ -67,6 +74,7 @@ export function toPublicAccount(
     firstName: account.firstName,
     lastName: account.lastName,
     username: account.username,
+    avatarUrl: account.avatarUrl ?? null,
     workspaceId: account.workspaceId ? String(account.workspaceId) : null
   };
 }
