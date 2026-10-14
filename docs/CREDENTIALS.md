@@ -127,7 +127,14 @@ You need an email service to send verification and password reset emails.
 2. Import the same repository
 3. Set the **root directory** to `frontend`
 4. In **Environment Variables**, add:
-   - `NEXT_PUBLIC_API_URL` = `https://your-backend.vercel.app/api`
+   - `NEXT_PUBLIC_API_URL` = `/api`
+   - `API_PROXY_ORIGIN` = `https://your-backend.vercel.app`
+
+   `NEXT_PUBLIC_API_URL=/api` makes the browser call the frontend origin, and the
+   rewrite in `frontend/next.config.ts` proxies `/api/*` to `API_PROXY_ORIGIN`.
+   That keeps the session cookies first-party so they survive third-party-cookie
+   blocking. (For local development, `.env` points `NEXT_PUBLIC_API_URL` straight
+   at the backend instead.)
 5. Deploy
 
 ---

@@ -91,7 +91,9 @@ SEED_ADMIN_LAST_NAME (optional): Test
 
 NEXT_PUBLIC_API_URL: http://localhost:5000/api
   → local default: http://localhost:5000/api
-  → change to production URL when deploying
+  → production: /api, with API_PROXY_ORIGIN set to the backend URL. The app then
+    proxies /api through its own origin (frontend/next.config.ts) so the session
+    cookies stay first-party.
 
 ---
 
@@ -128,7 +130,7 @@ Production frontend URL: ___________
   → updates: backend/index.ts line 16 (origin array)
 
 Backend deploy URL: ___________
-  → updates: frontend/.env NEXT_PUBLIC_API_URL
+  → updates: frontend API_PROXY_ORIGIN (NEXT_PUBLIC_API_URL stays `/api`)
 
 ---
 
