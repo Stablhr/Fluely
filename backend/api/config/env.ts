@@ -9,6 +9,8 @@ const envSchema = z.object({
   MONGO_URI: z.string().min(1),
   JWT_SECRET: z.string().min(1),
   JWT_REFRESH_SECRET: z.string().min(1),
+  /** Rolling session length in days; see `config/session.ts`. Defaults to 30. */
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().max(3650).optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().optional(),
   SMTP_USER: z.string().optional(),

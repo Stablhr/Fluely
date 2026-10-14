@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import {env} from '../config/env';
+import {ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_SECONDS} from '../config/session';
 import {userRepository} from '../repositories/user.repository';
 import {adminRepository} from '../repositories/admin.repository';
 import {ApiError} from '../utils/error';
@@ -343,13 +344,13 @@ export const authService = {
     const accessToken: string = jwt.sign(
       {userId: account.id, type: userType},
       env.JWT_SECRET,
-      {expiresIn: '15m'}
+      {expiresIn: ACCESS_TOKEN_TTL_SECONDS}
     );
 
     const refreshToken = jwt.sign(
       {userId: account.id, type: userType},
       env.JWT_REFRESH_SECRET,
-      {expiresIn: '7d'}
+      {expiresIn: REFRESH_TOKEN_TTL_SECONDS}
     );
 
     return {accessToken, refreshToken, user: account, userType};
@@ -395,13 +396,13 @@ export const authService = {
       const accessToken = jwt.sign(
         {userId: account.id, type: payload.type},
         env.JWT_SECRET,
-        {expiresIn: '15m'}
+        {expiresIn: ACCESS_TOKEN_TTL_SECONDS}
       );
 
       const newRefreshToken = jwt.sign(
         {userId: account.id, type: payload.type},
         env.JWT_REFRESH_SECRET,
-        {expiresIn: '7d'}
+        {expiresIn: REFRESH_TOKEN_TTL_SECONDS}
       );
 
       return {accessToken, refreshToken: newRefreshToken};

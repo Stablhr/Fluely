@@ -4,6 +4,7 @@ import {authService, toPublicAccount} from '../services/auth.service';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
 import {env} from '../config/env';
+import {ACCESS_TOKEN_MAX_AGE_MS, REFRESH_TOKEN_MAX_AGE_MS} from '../config/session';
 import {ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE} from '../constants/cookies';
 
 const COOKIE_OPTIONS: CookieOptions = {
@@ -68,11 +69,11 @@ export const authController = {
 
       res.cookie(ACCESS_TOKEN_COOKIE, accessToken, {
         ...opts,
-        maxAge: 15 * 60 * 1000
+        maxAge: ACCESS_TOKEN_MAX_AGE_MS
       });
       res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
         ...opts,
-        maxAge: 7 * 24 * 60 * 60 * 1000
+        maxAge: REFRESH_TOKEN_MAX_AGE_MS
       });
 
       res.status(200).json({
@@ -98,11 +99,11 @@ export const authController = {
       const opts = COOKIE_OPTIONS;
       res.cookie(ACCESS_TOKEN_COOKIE, result.accessToken, {
         ...opts,
-        maxAge: 15 * 60 * 1000
+        maxAge: ACCESS_TOKEN_MAX_AGE_MS
       });
       res.cookie(REFRESH_TOKEN_COOKIE, result.refreshToken, {
         ...opts,
-        maxAge: 7 * 24 * 60 * 60 * 1000
+        maxAge: REFRESH_TOKEN_MAX_AGE_MS
       });
 
       res.status(200).json({message: 'Refreshed'});
