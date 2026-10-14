@@ -68,7 +68,17 @@ export interface FileAttachment {
   id: string;
   name: string;
   type: "file" | "image";
+  /**
+   * A Cloudinary HTTPS URL as of the media migration. It kept the `dataUrl`
+   * name so every existing renderer (`<img src={...}>`) works unchanged; new
+   * uploads no longer store base64 bytes here.
+   */
   dataUrl: string;
+  /** `MediaAttachment` id on the server; used to delete the asset. */
+  mediaId?: string;
+  /** Cloudinary `public_id`, kept for reference/cleanup. */
+  publicId?: string;
+  mimeType?: string;
   size: number;
   addedAt: string;
 }
@@ -89,7 +99,7 @@ export interface ActivityItem {
 
 export type Reactions = Record<string, number>;
 
-export type Cover = string | { type: "image"; dataUrl: string } | null;
+export type Cover = string | { type: "image"; dataUrl: string; mediaId?: string } | null;
 
 export interface BoardSettings {
   commentPermission: "members" | "anyone";
@@ -241,6 +251,10 @@ export interface SocialMediaAttachment {
   name: string;
   dataUrl: string;
   storageUrl?: string;
+  /** `MediaAttachment` id on the server; used to delete the asset. */
+  mediaId?: string;
+  /** Cloudinary `public_id`, kept for reference/cleanup. */
+  publicId?: string;
   size: number;
   thumbnail?: string;
   thumbnailUrl?: string;

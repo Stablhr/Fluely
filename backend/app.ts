@@ -10,7 +10,6 @@ import {requestLogger} from './api/middleware/requestLogger';
 import {csrfProtection} from './api/middleware/csrf';
 import {httpsRedirect} from './api/middleware/httpsRedirect';
 import {notFoundHandler} from './api/middleware/notFound';
-import {mediaConfig} from './api/config/media';
 
 const app = express();
 
@@ -41,8 +40,6 @@ app.use('/api', routes);
 app.get('/', async (_req, res) => {
   res.send('test production!');
 });
-
-app.use('/uploads', express.static(mediaConfig.uploadDirAbs));
 
 app.use(notFoundHandler);
 app.use(errorHandler);

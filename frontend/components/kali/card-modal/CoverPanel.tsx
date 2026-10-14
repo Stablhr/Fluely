@@ -6,6 +6,8 @@ import type { Card, FileAttachment } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import { uid } from '@/lib/kali/utils/id'
 import { formatSize } from '@/lib/kali/utils/format'
+import { getFriendlyErrorMessage } from '@/lib/api/getFriendlyErrorMessage'
+import { uploadMediaFile } from '@/lib/api/mediaApi'
 import { MAX_FILE_SIZE } from './CardAttachments'
 
 interface CoverPanelProps {
@@ -47,40 +49,44 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
 
   const setImageCover = (attachment: FileAttachment) => {
     store.updateCard(card.id, {
-      cover: { type: 'image', dataUrl: attachment.dataUrl },
+      cover: { type: 'image', dataUrl: attachment.dataUrl, mediaId: attachment.mediaId },
     })
     store.addActivity(card.id, 'changed the cover image')
   }
 
-  const uploadCover = (file: File | undefined) => {
+  const uploadCover = async (file: File | undefined) => {
     if (!file) return
     if (file.size > MAX_FILE_SIZE) {
-      setError(`"${file.name}" is ${formatSize(file.size)} — keep cover images under 2 MB.`)
+      setError(
+        `"${file.name}" is ${formatSize(file.size)} — keep cover images under ${formatSize(MAX_FILE_SIZE)}.`,
+      )
       return
     }
     setUploading(true)
     setError(null)
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = reader.result as string
+    try {
+      const media = await uploadMediaFile(file, { boardId: card.boardId, cardId: card.id })
       const attachment: FileAttachment = {
         id: uid(),
         name: file.name,
         type: 'image',
-        dataUrl,
-        size: file.size,
+        dataUrl: media.url,
+        mediaId: media.id,
+        mimeType: media.mimeType,
+        size: media.sizeBytes,
         addedAt: new Date().toISOString(),
       }
       store.updateCard(card.id, {
         files: [...card.files, attachment],
-        cover: { type: 'image', dataUrl },
+        cover: { type: 'image', dataUrl: media.url, mediaId: media.id },
         coverSize: card.coverSize || 'small',
       })
       store.addActivity(card.id, `attached ${file.name} as cover`)
+    } catch (err) {
+      setError(getFriendlyErrorMessage(err, 'Could not upload that cover image.'))
+    } finally {
       setUploading(false)
     }
-    reader.onerror = () => setUploading(false)
-    reader.readAsDataURL(file)
   }
 
   const sectionTitle =
@@ -227,7 +233,7 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
               accept="image/*"
               hidden
               onChange={(e) => {
-                uploadCover(e.target.files?.[0])
+                void uploadCover(e.target.files?.[0])
                 e.target.value = ''
               }}
             />

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { socialPostsApi, publishingJobsApi } from '@/lib/kali/api/social-posts'
-import { uploadFile } from '@/lib/kali/api/client'
 import { loadSocialPosts, saveSocialPosts } from '@/lib/kali/store/storage'
 import { localToUTC } from '@/lib/kali/utils/timezones'
 import type { SocialPost, SocialPostPlatform, SocialMediaAttachment, SocialAnalytics, PublishingJob, Platform } from '@/lib/kali/store/schema'
@@ -379,6 +378,5 @@ export function useSocialPosts() {
     schedulePost,
     cancelPost,
     retryPost,
-    uploadFile,
   }
 }

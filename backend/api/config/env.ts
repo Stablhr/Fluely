@@ -23,7 +23,16 @@ const envSchema = z.object({
   MEDIA_MAX_FILE_SIZE_MB: z.coerce.number().positive().max(500).optional(),
   MEDIA_QUOTA_MB: z.coerce.number().positive().max(100000).optional(),
   MEDIA_ALLOWED_MIME_TYPES: z.string().optional(),
-  MEDIA_UPLOAD_DIR: z.string().optional(),
+  /**
+   * Cloudinary credentials. Optional here so the app boots (and the test suite
+   * runs) without them, but every upload path requires all three; see
+   * `config/cloudinary.ts`.
+   */
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  /** Root folder every asset is stored under. Defaults to `fluely`. */
+  CLOUDINARY_FOLDER: z.string().optional(),
   SOCIAL_SIMULATION_FAILURE_RATE: z.coerce.number().min(0).max(1).optional()
 });
 
@@ -54,6 +63,5 @@ export const env = {
     .map(value => value.trim().toLowerCase())
     .filter(Boolean),
   SOCIAL_SIMULATION_FAILURE_RATE:
-    parsed.data.SOCIAL_SIMULATION_FAILURE_RATE ?? 0,
-  MEDIA_UPLOAD_DIR: parsed.data.MEDIA_UPLOAD_DIR ?? 'uploads'
+    parsed.data.SOCIAL_SIMULATION_FAILURE_RATE ?? 0
 };

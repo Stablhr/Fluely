@@ -4,10 +4,18 @@ import {
   MediaAttachmentModel
 } from '../models/MediaAttachment.model';
 import {MediaKind} from '../constants/product';
+import {CloudinaryResourceType} from '../services/cloudinary.service';
 
 export type CreateMediaInput = Pick<
   MediaAttachmentDocument,
-  'ownerId' | 'kind' | 'originalName' | 'storedName' | 'mimeType' | 'sizeBytes'
+  | 'ownerId'
+  | 'kind'
+  | 'resourceType'
+  | 'originalName'
+  | 'url'
+  | 'publicId'
+  | 'mimeType'
+  | 'sizeBytes'
 > & {boardId?: Types.ObjectId | null; cardId?: Types.ObjectId | null};
 
 export const mediaRepository = {

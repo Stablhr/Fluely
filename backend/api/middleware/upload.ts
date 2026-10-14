@@ -2,25 +2,14 @@ import multer from 'multer';
 import {NextFunction, Request, Response} from 'express';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
-import {createSecureToken} from '../utils/crypto';
-import {
-  ensureUploadDir,
-  extensionForMimeType,
-  mediaConfig
-} from '../config/media';
+import {mediaConfig} from '../config/media';
 
-ensureUploadDir();
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    ensureUploadDir();
-    cb(null, mediaConfig.uploadDirAbs);
-  },
-  filename: (_req, file, cb) => {
-    const ext = extensionForMimeType(file.mimetype);
-    cb(null, `${createSecureToken(16)}${ext}`);
-  }
-});
+/**
+ * Files are held in memory and handed to Cloudinary as a stream by
+ * `mediaService.create`. Nothing is written to the server's filesystem, which
+ * is also what makes this work on serverless hosts where the disk is read-only.
+ */
+const storage = multer.memoryStorage();
 
 function fileFilter(
   _req: Request,
@@ -62,7 +51,7 @@ export function handleUploadErrors(
         new ApiError(
           413,
           ErrorCodes.FILE_TOO_LARGE,
-          `File exceeds the ${Math.round(mediaConfig.maxFileSizeBytes / 1024 / 1024)}MB limit`
+          `File is larger than the ${Math.round(mediaConfig.maxFileSizeBytes / 1024 / 1024)}MB limit`
         )
       );
       return;
@@ -72,7 +61,7 @@ export function handleUploadErrors(
         new ApiError(
           400,
           ErrorCodes.VALIDATION_ERROR,
-          'Too many files, or an unexpected file field was sent'
+          'Too many files, or an unexpected field name'
         )
       );
       return;

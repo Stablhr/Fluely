@@ -1,71 +1,15 @@
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
 import {env} from './env';
 
-const isServerless =
-  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
-  Boolean(process.env.LAMBDA_TASK_ROOT) ||
-  Boolean(process.env.AWS_EXECUTION_ENV) ||
-  Boolean(process.env.VERCEL) ||
-  Boolean(process.env.VERCEL_ENV) ||
-  Boolean(process.env.SERVERLESS) ||
-  process.env.NODE_ENV === 'production' && process.platform !== 'win32';
-
-const explicitAbsoluteDir =
-  env.MEDIA_UPLOAD_DIR && path.isAbsolute(env.MEDIA_UPLOAD_DIR)
-    ? env.MEDIA_UPLOAD_DIR
-    : null;
-
-const dirRelativeToCwd = env.MEDIA_UPLOAD_DIR
-  ? path.resolve(process.cwd(), env.MEDIA_UPLOAD_DIR)
-  : null;
-
-// Serverless bundles ship a read-only filesystem apart from the temp dir, so a
-// relative MEDIA_UPLOAD_DIR (including the `'uploads'` default) cannot be
-// created there. Only an explicit absolute path overrides the temp dir.
-const uploadDirAbs =
-  explicitAbsoluteDir ??
-  (isServerless ? null : dirRelativeToCwd) ??
-  path.join(os.tmpdir(), 'uploads');
-
+/**
+ * Upload policy only. Files are streamed to Cloudinary (see
+ * `config/cloudinary.ts`), so this module no longer owns a local directory --
+ * nothing is ever written to the server's disk.
+ */
 export const mediaConfig = {
-  uploadDirAbs,
-  publicPath: '/uploads',
   allowedMimeTypes: env.MEDIA_ALLOWED_MIME_TYPES,
   maxFileSizeBytes: env.MEDIA_MAX_FILE_SIZE_BYTES,
   quotaBytes: env.MEDIA_QUOTA_BYTES
 };
-
-/**
- * Idempotent. Called on boot so the upload target always exists before multer
- * writes to it, and again from tests that build a fresh temp directory.
- */
-export function ensureUploadDir(dir: string = uploadDirAbs): void {
-  fs.mkdirSync(dir, {recursive: true});
-}
-
-/**
- * Extensions are derived from the allow-list rather than the client-supplied
- * filename, so a hostile `originalname` cannot introduce an executable
- * extension on disk.
- */
-export function extensionForMimeType(mimeType: string): string {
-  const map: Record<string, string> = {
-    'image/jpeg': '.jpg',
-    'image/png': '.png',
-    'image/gif': '.gif',
-    'image/webp': '.webp',
-    'video/mp4': '.mp4',
-    'video/webm': '.webm',
-    'audio/mpeg': '.mp3',
-    'audio/ogg': '.ogg',
-    'audio/wav': '.wav',
-    'application/pdf': '.pdf',
-    'text/plain': '.txt'
-  };
-  return map[mimeType.toLowerCase()] ?? '.bin';
-}
 
 export function kindForMimeType(mimeType: string): 'image' | 'video' | 'audio' | 'document' {
   const type = mimeType.toLowerCase();

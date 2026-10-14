@@ -50,7 +50,7 @@ local store in the browser; the remote API client in `frontend/lib/kali/api/` st
 | Auth | jsonwebtoken, HTTP-only cookie rotation, bcrypt |
 | Validation | Zod (DTO pattern) |
 | Email | Nodemailer |
-| Uploads | multer |
+| Uploads | multer (in-memory) → Cloudinary |
 | Logging | Pino |
 | Security | Helmet, CORS, express-rate-limit |
 
@@ -95,7 +95,7 @@ fluely/
 │   └── .env.example
 └── backend/
     ├── api/
-    │   ├── config/               # DB connection, env schema
+    │   ├── config/               # DB connection, env schema, Cloudinary client
     │   ├── constants/            # Shared constants
     │   ├── controllers/          # Route handlers
     │   ├── dtos/                 # Zod validation schemas
@@ -108,7 +108,8 @@ fluely/
     │   ├── templates/            # HTML email templates
     │   └── utils/                # Error, crypto, pagination, serialization
     ├── scripts/
-    │   └── seed-admin.ts         # Admin seed script
+    │   ├── seed-admin.ts         # Admin seed script
+    │   └── migrate-media-to-cloudinary.ts  # Upload legacy local files to Cloudinary
     ├── .env.example
     └── package.json
 ```
@@ -120,6 +121,7 @@ fluely/
 - Git
 - MongoDB instance (local or Atlas)
 - SMTP credentials (e.g. Gmail, Resend, Mailtrap)
+- A Cloudinary account (uploaded files are stored there, never on local disk)
 
 ## 🚀 Getting Started
 
@@ -138,8 +140,9 @@ npm install
 cp .env.example .env
 ```
 
-Fill in `MONGO_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, and the SMTP values — see
-`backend/.env.example` for the full list. Generate secrets with:
+Fill in `MONGO_URI`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, the SMTP values, and the
+three `CLOUDINARY_*` credentials — see `backend/.env.example` for the full list.
+Generate secrets with:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"

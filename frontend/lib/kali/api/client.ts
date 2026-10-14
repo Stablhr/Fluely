@@ -27,19 +27,3 @@ export const api = {
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 }
-
-export async function uploadFile(file: File): Promise<{
-  storageUrl: string
-  name: string
-  size: number
-  mimeType: string
-}> {
-  if (!API_BASE) throw new Error('Remote API is not configured')
-  const formData = new FormData()
-  formData.append('file', file)
-  const res = await fetch(`${API_BASE}/media/upload`, { method: 'POST', body: formData })
-  const json: ApiResponse<{ storageUrl: string; name: string; size: number; mimeType: string }> =
-    await res.json()
-  if (!json.ok) throw new Error(json.error ?? 'Upload failed')
-  return json.data!
-}

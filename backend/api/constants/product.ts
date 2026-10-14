@@ -57,6 +57,15 @@ export const MediaKinds = ['image', 'video', 'audio', 'document'] as const;
 export type MediaKind = (typeof MediaKinds)[number];
 
 /**
+ * The Cloudinary `resource_type` an asset was stored as. Kept alongside the
+ * app-level `MediaKind` because deleting a Cloudinary asset requires the exact
+ * resource type it was uploaded with (audio is a `video` resource, and non-media
+ * files are `raw`).
+ */
+export const CloudinaryResourceTypes = ['image', 'video', 'raw'] as const;
+export type CloudinaryResourceType = (typeof CloudinaryResourceTypes)[number];
+
+/**
  * The audit trail's vocabulary. Names the event, not the wording — the sentence
  * shown in the activity feed is assembled by the client from the type plus the
  * metadata recorded with it, so copy can change without a data migration.

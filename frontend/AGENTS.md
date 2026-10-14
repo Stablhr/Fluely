@@ -52,6 +52,11 @@ App data lives in `lib/kali/store/`, a `useSyncExternalStore` store backed by `l
 namespaced per user id. The remote API in `lib/kali/api/` is inert until `NEXT_PUBLIC_KALI_API_URL`
 is set, so treat those modules as a contract for backend work rather than live endpoints.
 
+Uploaded files are the exception to "data lives in the store": they go to the backend's Cloudinary
+pipeline via `lib/api/mediaApi.ts` (`POST /api/media`, multipart field `files`), and only the
+returned HTTPS URL plus the media `id` are kept in the store. Never persist base64 file bytes in
+`localStorage`.
+
 ## Code Style
 
 - TypeScript strict mode — no `any` types in new code

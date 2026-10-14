@@ -12,6 +12,7 @@ npm run dev          # Start dev server (port 5000)
 npm run build        # Compile TypeScript
 npm run start        # Start production server
 npm run seed:admin   # Seed admin account
+npm run migrate:media-to-cloudinary  # One-off: upload legacy local files to Cloudinary
 npm run lint         # ESLint
 npm test             # Jest (no test suite included)
 ```
@@ -19,7 +20,7 @@ npm test             # Jest (no test suite included)
 ## Architecture
 
 ```
-api/config/          # DB connection (db.ts) and env validation (env.ts)
+api/config/          # DB connection (db.ts), env validation (env.ts), Cloudinary client (cloudinary.ts)
 api/constants/       # Error codes, cookies, product enums (board roles, platforms, statuses)
 api/controllers/     # Route handlers (thin — delegate to services)
 api/services/        # Business logic (auth, email, blocklist)
@@ -31,7 +32,7 @@ api/templates/       # HTML email templates
 api/dtos/            # Zod validation schemas
 api/utils/           # ApiError, actor resolution, crypto, pagination, serialization, transactions
 api/logging/         # Pino logger configuration
-scripts/             # Seed scripts (seed-admin.ts)
+scripts/             # Seed and one-off migration scripts (seed-admin.ts, migrate-media-to-cloudinary.ts)
 ```
 
 ## Code Style
@@ -68,6 +69,20 @@ All API errors must follow this shape (enforced in `api/middleware/errorHandler.
 - All input passes through Zod validation before reaching services
 - Sanitize middleware strips `$`-prefixed keys to prevent NoSQL injection
 - Body size limited to 10kb (`express.json({ limit: '10kb' })`)
+
+## Media Uploads
+
+Uploaded files go to Cloudinary; nothing is written to local disk. `multer` uses in-memory storage
+(`api/middleware/upload.ts`) and `mediaService.create` streams each buffer to Cloudinary through the
+shared helpers in `api/services/cloudinary.service.ts`, which read the client configured once in
+`api/config/cloudinary.ts`. Assets live under `fluely/{avatars,boards,tasks,content-planner}`.
+
+A record stores the Cloudinary `url` (`secure_url`), `publicId`, and `resourceType`; deletion calls
+`deleteFromCloudinary(publicId, resourceType)` with the exact resource type it was uploaded as.
+
+> **Serverless body limit.** On Vercel, a Serverless Function request body is capped (~4.5 MB), so
+> large video uploads cannot pass through `POST /api/media`. Those need a direct (signed) upload to
+> Cloudinary from the browser instead of the proxy-through-the-API path.
 
 ## Testing
 

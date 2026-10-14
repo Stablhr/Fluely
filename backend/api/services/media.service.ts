@@ -1,4 +1,3 @@
-import fs from 'fs/promises';
 import path from 'path';
 import {Types} from 'mongoose';
 import {mediaRepository} from '../repositories/media.repository';
@@ -8,8 +7,18 @@ import {ErrorCodes} from '../constants/errorCodes';
 import {MediaKind} from '../constants/product';
 import {paginationFrom, paginationMeta} from '../utils/pagination';
 import {parseObjectId} from '../utils/actor';
+import {
+  CloudinaryResourceType,
+  deleteFromCloudinary,
+  folderForMedia,
+  uploadToCloudinary
+} from './cloudinary.service';
 
 type UploadedFile = Express.Multer.File;
+
+function toResourceType(value: string): CloudinaryResourceType {
+  return value === 'video' || value === 'raw' ? value : 'image';
+}
 
 function serialize(doc: {
   _id: Types.ObjectId;
@@ -17,7 +26,7 @@ function serialize(doc: {
   cardId: Types.ObjectId | null;
   kind: string;
   originalName: string;
-  storedName: string;
+  url?: string | null;
   mimeType: string;
   sizeBytes: number;
   createdAt: Date;
@@ -28,7 +37,7 @@ function serialize(doc: {
     cardId: doc.cardId ? doc.cardId.toString() : null,
     kind: doc.kind,
     name: doc.originalName,
-    url: `${mediaConfig.publicPath}/${doc.storedName}`,
+    url: doc.url ?? '',
     mimeType: doc.mimeType,
     sizeBytes: doc.sizeBytes,
     createdAt: doc.createdAt
@@ -36,6 +45,13 @@ function serialize(doc: {
 }
 
 export const mediaService = {
+  /**
+   * Streams every uploaded buffer to Cloudinary, then records one row per file.
+   *
+   * Uploads happen before any row is written, so a failed upload leaves no
+   * half-created batch; anything already pushed to Cloudinary is destroyed
+   * again rather than being orphaned.
+   */
   async create(
     ownerId: Types.ObjectId,
     files: UploadedFile[],
@@ -59,17 +75,44 @@ export const mediaService = {
 
     const boardId = scope.boardId ? parseObjectId(scope.boardId, 'boardId') : null;
     const cardId = scope.cardId ? parseObjectId(scope.cardId, 'cardId') : null;
+    const folder = folderForMedia({boardId: scope.boardId, cardId: scope.cardId});
+
+    const uploaded: {file: UploadedFile; result: Awaited<ReturnType<typeof uploadToCloudinary>>}[] =
+      [];
+
+    try {
+      for (const file of files) {
+        const result = await uploadToCloudinary(file.buffer, {
+          folder,
+          resource_type: 'auto',
+          use_filename: true,
+          unique_filename: true
+        });
+        uploaded.push({file, result});
+      }
+    } catch (error) {
+      await Promise.all(
+        uploaded.map(({result}) =>
+          deleteFromCloudinary(result.public_id, toResourceType(result.resource_type)).catch(
+            () => undefined
+          )
+        )
+      );
+      throw error;
+    }
 
     const created = await Promise.all(
-      files.map((file) =>
+      uploaded.map(({file, result}) =>
         mediaRepository
           .create({
             ownerId,
             boardId,
             cardId,
             kind: kindForMimeType(file.mimetype) as MediaKind,
+            resourceType: toResourceType(result.resource_type),
             originalName: path.basename(file.originalname),
-            storedName: path.basename(file.filename),
+            url: result.secure_url,
+            publicId: result.public_id,
             mimeType: file.mimetype,
             sizeBytes: file.size
           })
@@ -100,7 +143,15 @@ export const mediaService = {
       throw new ApiError(404, ErrorCodes.MEDIA_NOT_FOUND, 'Attachment not found');
     }
 
+    // Destroy first: if Cloudinary is unreachable the row survives and the
+    // request can be retried, rather than leaving an orphaned asset behind.
+    if (existing.publicId) {
+      await deleteFromCloudinary(
+        existing.publicId,
+        (existing.resourceType as CloudinaryResourceType) ?? 'image'
+      );
+    }
+
     await mediaRepository.deleteByIdForOwner(id.toString(), ownerId);
-    await fs.unlink(path.join(mediaConfig.uploadDirAbs, existing.storedName)).catch(() => undefined);
   }
 };

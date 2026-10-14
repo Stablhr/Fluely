@@ -6,48 +6,77 @@ import type { Card, FileAttachment } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import { uid } from '@/lib/kali/utils/id'
 import { formatSize } from '@/lib/kali/utils/format'
+import { getFriendlyErrorMessage } from '@/lib/api/getFriendlyErrorMessage'
+import { deleteMedia, uploadMediaFile } from '@/lib/api/mediaApi'
 import SectionLabel from '../shared/SectionLabel'
 
-export const MAX_FILE_SIZE = 2 * 1024 * 1024
+/**
+ * Mirrors the backend's `MEDIA_MAX_FILE_SIZE_MB` default. The server rejects
+ * anything larger regardless, so this is only early feedback.
+ */
+export const MAX_FILE_SIZE = 50 * 1024 * 1024
 
 export default function CardAttachments({ card }: { card: Card }) {
   const store = useStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const addFile = (file: File | undefined, type: 'file' | 'image') => {
+  const addFile = async (file: File | undefined, type: 'file' | 'image') => {
     if (!file) return
     if (file.size > MAX_FILE_SIZE) {
       setError(
-        `"${file.name}" is ${formatSize(file.size)} — keep attachments under 2 MB.`,
+        `"${file.name}" is ${formatSize(file.size)} — keep attachments under ${formatSize(MAX_FILE_SIZE)}.`,
       )
       return
     }
-    const reader = new FileReader()
-    reader.onload = () => {
+    setUploading(true)
+    setError(null)
+    try {
+      const media = await uploadMediaFile(file, { boardId: card.boardId, cardId: card.id })
       const attachment: FileAttachment = {
         id: uid(),
         name: file.name,
         type,
-        dataUrl: reader.result as string,
-        size: file.size,
+        dataUrl: media.url,
+        mediaId: media.id,
+        mimeType: media.mimeType,
+        size: media.sizeBytes,
         addedAt: new Date().toISOString(),
       }
       store.updateCard(card.id, { files: [...card.files, attachment] })
       store.addActivity(card.id, `attached ${file.name}`)
-      setError(null)
+    } catch (error) {
+      setError(getFriendlyErrorMessage(error, 'Could not upload that file. Please try again.'))
+    } finally {
+      setUploading(false)
     }
-    reader.onerror = () => setError('Could not read that file.')
-    reader.readAsDataURL(file)
   }
 
   const remove = (id: string) => {
-    store.updateCard(card.id, { files: card.files.filter((a) => a.id !== id) })
+    const attachment = card.files.find((a) => a.id === id)
+    const isActiveCover =
+      !!attachment &&
+      card.cover !== null &&
+      typeof card.cover !== 'string' &&
+      card.cover.type === 'image' &&
+      card.cover.dataUrl === attachment.dataUrl
+
+    store.updateCard(card.id, {
+      files: card.files.filter((a) => a.id !== id),
+      ...(isActiveCover ? { cover: null } : {}),
+    })
+
+    // Best-effort: drop the asset from Cloudinary too, so replacing attachments
+    // does not leave orphans accumulating in the account.
+    if (attachment?.mediaId) {
+      void deleteMedia(attachment.mediaId).catch(() => undefined)
+    }
   }
 
   const ghostClass =
-    'inline-flex items-center gap-1.5 rounded-md bg-surface-alt px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition-colors duration-150 hover:bg-primary-subtle hover:text-primary-hover active:scale-[0.98]'
+    'inline-flex items-center gap-1.5 rounded-md bg-surface-alt px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition-colors duration-150 hover:bg-primary-subtle hover:text-primary-hover active:scale-[0.98] disabled:opacity-40'
 
   return (
     <section>
@@ -70,21 +99,19 @@ export default function CardAttachments({ card }: { card: Card }) {
               />
             ) : (
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-surface-elevated text-text-secondary">
-                <FileText size={18} />
+                <FileText size={16} />
               </span>
             )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <p className="truncate text-sm font-medium text-text-primary" title={attachment.name}>
-                  {attachment.name}
-                </p>
+                <span className="min-w-0 truncate text-sm font-medium text-text-primary">{attachment.name}</span>
                 {isCover && (
-                  <span className="shrink-0 rounded-full bg-primary-subtle px-1.5 py-0.5 text-[10px] font-bold text-primary-hover">
+                  <span className="shrink-0 rounded-full bg-primary-subtle px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-hover">
                     Cover
                   </span>
                 )}
               </div>
-              <p className="font-mono text-[11px] text-text-muted">
+              <p className="mt-0.5 font-mono text-[11px] text-text-muted">
                 {formatSize(attachment.size)}
               </p>
             </div>
@@ -93,7 +120,7 @@ export default function CardAttachments({ card }: { card: Card }) {
               onClick={() => remove(attachment.id)}
               title="Remove attachment"
               aria-label={`Remove ${attachment.name}`}
-              className="rounded-md p-1.5 text-text-muted transition-colors duration-150 hover:bg-danger-subtle hover:text-danger-text"
+              className="shrink-0 rounded-md p-1.5 text-text-muted transition-colors duration-150 hover:bg-danger-subtle hover:text-danger-text"
             >
               <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                 <path d="M6 6l12 12M18 6L6 18" />
@@ -118,20 +145,20 @@ export default function CardAttachments({ card }: { card: Card }) {
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className={ghostClass} onClick={() => fileRef.current?.click()}>
+          <button type="button" className={ghostClass} disabled={uploading} onClick={() => fileRef.current?.click()}>
             <Paperclip size={13} />
-            Attach file
+            {uploading ? 'Uploading…' : 'Attach file'}
           </button>
-          <button type="button" className={ghostClass} onClick={() => imageRef.current?.click()}>
+          <button type="button" className={ghostClass} disabled={uploading} onClick={() => imageRef.current?.click()}>
             <ImageIcon size={13} />
-            Attach image
+            {uploading ? 'Uploading…' : 'Attach image'}
           </button>
           <input
             ref={fileRef}
             type="file"
             hidden
             onChange={(e) => {
-              addFile(e.target.files?.[0], 'file')
+              void addFile(e.target.files?.[0], 'file')
               e.target.value = ''
             }}
           />
@@ -141,15 +168,14 @@ export default function CardAttachments({ card }: { card: Card }) {
             accept="image/*"
             hidden
             onChange={(e) => {
-              addFile(e.target.files?.[0], 'image')
+              void addFile(e.target.files?.[0], 'image')
               e.target.value = ''
             }}
           />
         </div>
 
         <p className="text-[11px] leading-snug text-text-muted">
-          Files are stored in your browser&apos;s local storage — keep uploads under ~2 MB. They
-          won&apos;t sync across devices yet.
+          Uploads are stored on Cloudinary and shared with everyone on the board.
         </p>
       </div>
     </section>

@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "seed:admin": "tsx scripts/seed-admin.ts",
     "fix:slug-index": "tsx scripts/fix-public-slug-index.ts",
+    "migrate:media-to-cloudinary": "tsx scripts/migrate-media-to-cloudinary.ts",
     "lint": "eslint .",
     "test": "jest"
   },
@@ -18,6 +19,7 @@
   "dependencies": {
     "@types/express": "^4.17.17",
     "bcrypt": "^5.1.1",
+    "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",

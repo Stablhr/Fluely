@@ -11,7 +11,8 @@ import type {
   SocialPostPlatform,
   SocialPostStatus,
 } from '@/lib/kali/store/schema'
-import { uploadFile } from '@/lib/kali/api/client'
+import { deleteMedia, uploadMediaFile } from '@/lib/api/mediaApi'
+import { getFriendlyErrorMessage } from '@/lib/api/getFriendlyErrorMessage'
 import Button from '../shared/Button'
 import { Input, Textarea } from '../shared/Input'
 import SectionLabel from '../shared/SectionLabel'
@@ -120,6 +121,7 @@ export default function PostDetailPanel({
   )
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -150,35 +152,33 @@ export default function PostDetailPanel({
   const handleUpload = async (files: FileList | null) => {
     if (!files?.length) return
     setUploading(true)
+    setUploadError(null)
     try {
-      const added = await Promise.all(
-        Array.from(files).map(
-          (file) =>
-            new Promise<SocialMediaAttachment>((resolve) => {
-              const base = {
-                id: `media-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                type: mediaTypeFor(file),
-                name: file.name,
-                size: file.size,
-                mimeType: file.type,
-                platformCompat: ALL_PLATFORMS,
-              }
-              // Prefer the remote upload; fall back to an inline data URL so the
-              // planner still works while the media API is inert.
-              uploadFile(file)
-                .then((res) =>
-                  resolve({ ...base, dataUrl: res.storageUrl, storageUrl: res.storageUrl } as SocialMediaAttachment),
-                )
-                .catch(() => {
-                  const reader = new FileReader()
-                  reader.onload = () => resolve({ ...base, dataUrl: String(reader.result) } as SocialMediaAttachment)
-                  reader.onerror = () => resolve({ ...base, dataUrl: '' } as SocialMediaAttachment)
-                  reader.readAsDataURL(file)
-                })
-            }),
-        ),
+      const results = await Promise.all(
+        Array.from(files).map(async (file): Promise<SocialMediaAttachment | null> => {
+          try {
+            const uploaded = await uploadMediaFile(file)
+            return {
+              id: uploaded.id,
+              type: mediaTypeFor(file),
+              name: file.name,
+              dataUrl: uploaded.url,
+              storageUrl: uploaded.url,
+              mediaId: uploaded.id,
+              mimeType: uploaded.mimeType,
+              size: uploaded.sizeBytes,
+              platformCompat: ALL_PLATFORMS,
+            }
+          } catch (error) {
+            setUploadError(getFriendlyErrorMessage(error, `Could not upload "${file.name}".`))
+            return null
+          }
+        }),
       )
-      setDraft((d) => ({ ...d, media: [...d.media, ...added] }))
+      setDraft((d) => ({
+        ...d,
+        media: [...d.media, ...results.filter((m): m is SocialMediaAttachment => m !== null)],
+      }))
     } finally {
       setUploading(false)
     }
@@ -357,7 +357,10 @@ export default function PostDetailPanel({
                     )}
                     <button
                       type="button"
-                      onClick={() => set('media', draft.media.filter((m) => m.id !== item.id))}
+                      onClick={() => {
+                        set('media', draft.media.filter((m) => m.id !== item.id))
+                        if (item.mediaId) void deleteMedia(item.mediaId).catch(() => undefined)
+                      }}
                       aria-label={`Remove ${item.name}`}
                       className="absolute right-1 top-1 rounded bg-brand-ink/70 p-0.5 text-brand-ivory opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100"
                     >
@@ -382,6 +385,11 @@ export default function PostDetailPanel({
                 }}
               />
             </label>
+            {uploadError && (
+              <p className="mt-2 rounded-md bg-danger-subtle px-2.5 py-1.5 text-[12px] font-medium text-danger-text">
+                {uploadError}
+              </p>
+            )}
           </div>
 
           <div>

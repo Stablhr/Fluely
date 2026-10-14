@@ -9,7 +9,8 @@ import Button from '../shared/Button'
 import { Input, Textarea } from '../shared/Input'
 import SectionLabel from '../shared/SectionLabel'
 import AIGenerateModal from './AIGenerateModal'
-import { uploadFile } from '@/lib/kali/api/client'
+import { deleteMedia, uploadMediaFile } from '@/lib/api/mediaApi'
+import { getFriendlyErrorMessage } from '@/lib/api/getFriendlyErrorMessage'
 import { COMMON_TIMEZONES, getBrowserTimezone } from '@/lib/kali/utils/timezones'
 import { useMediaLibrary } from '@/lib/kali/feature-hooks/useMediaLibrary'
 import MediaLibraryPanel from './MediaLibraryPanel'
@@ -132,6 +133,7 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
   const [scheduleResult, setScheduleResult] = useState<{ ok: boolean; errors?: string[] } | null>(null)
   const [showPreview, setShowPreview] = useState(false)
   const [libOpen, setLibOpen] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const { addToLibrary } = useMediaLibrary()
 
   const isEditing = !!post
@@ -195,45 +197,38 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
 
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (!files) return
-    const uploadPromises = Array.from(files).map(async (file) => {
-      const mediaType: SocialMediaAttachment['type'] = file.type.startsWith('video/')
-        ? 'video'
-        : file.type.startsWith('audio/')
-          ? 'audio'
-          : 'image'
-      try {
-        const result = await uploadFile(file)
-        return {
-          id: `media-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          type: mediaType,
-          name: file.name,
-          dataUrl: result.storageUrl,
-          storageUrl: result.storageUrl,
-          size: file.size,
-          mimeType: result.mimeType,
-          platformCompat: ALL_PLATFORMS,
-        } as SocialMediaAttachment
-      } catch {
-        // Fallback to base64 if API is unavailable
-        return new Promise<SocialMediaAttachment>((resolve) => {
-          const reader = new FileReader()
-          reader.onload = () => {
-            resolve({
-              id: `media-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              type: mediaType,
-              name: file.name,
-              dataUrl: reader.result as string,
-              size: file.size,
-              platformCompat: ALL_PLATFORMS,
-            })
-          }
-          reader.readAsDataURL(file)
-        })
-      }
-    })
-    const results = await Promise.all(uploadPromises)
-    setMedia((prev) => [...prev, ...results])
+    if (!files?.length) return
+    setUploadError(null)
+    const results = await Promise.all(
+      Array.from(files).map(async (file) => {
+        const mediaType: SocialMediaAttachment['type'] = file.type.startsWith('video/')
+          ? 'video'
+          : file.type.startsWith('audio/')
+            ? 'audio'
+            : 'image'
+        try {
+          const uploaded = await uploadMediaFile(file)
+          return {
+            id: uploaded.id,
+            type: mediaType,
+            name: file.name,
+            dataUrl: uploaded.url,
+            storageUrl: uploaded.url,
+            mediaId: uploaded.id,
+            mimeType: uploaded.mimeType,
+            size: uploaded.sizeBytes,
+            platformCompat: ALL_PLATFORMS,
+          } as SocialMediaAttachment
+        } catch (error) {
+          setUploadError(getFriendlyErrorMessage(error, `Could not upload "${file.name}".`))
+          return null
+        }
+      })
+    )
+    setMedia((prev) => [
+      ...prev,
+      ...results.filter((item): item is SocialMediaAttachment => item !== null),
+    ])
     e.target.value = ''
   }
 
@@ -413,7 +408,11 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
                   )}
                   <button
                     type="button"
-                    onClick={() => removeMediaFromPost(post?.id ?? '', m.id)}
+                    onClick={() => {
+                      setMedia((prev) => prev.filter((item) => item.id !== m.id))
+                      if (post?.id) removeMediaFromPost(post.id, m.id)
+                      if (m.mediaId) void deleteMedia(m.mediaId).catch(() => undefined)
+                    }}
                     aria-label={`Remove ${m.name}`}
                     className="absolute right-0.5 top-0.5 rounded-full bg-danger p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
                   >
@@ -434,6 +433,12 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
                 <Plus size={20} className="text-text-muted" />
               </label>
             </div>
+            {uploadError && (
+              <p className="animate-in mt-2 flex items-center gap-1.5 rounded-md bg-danger-subtle px-2.5 py-1.5 text-xs font-medium text-danger-text">
+                <AlertTriangle size={13} className="shrink-0" />
+                {uploadError}
+              </p>
+            )}
           </div>
 
           {/* Per-Platform Overrides */}
