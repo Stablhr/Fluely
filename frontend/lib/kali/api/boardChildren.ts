@@ -218,7 +218,12 @@ export async function createListOnServer(
   const { data } = await httpClient.post<{
     list: ListDto;
     revision: number;
-  }>(`/boards/${boardId}/lists`, input);
+  }>(`/boards/${boardId}/lists`, {
+    ...input,
+    // `listCreateSchema.backgroundColor` is optional but not nullable, unlike the
+    // patch schema. A colorless list must omit the field rather than send null.
+    backgroundColor: input.backgroundColor || undefined,
+  });
   return { ...data.list, revision: data.revision };
 }
 
@@ -291,8 +296,11 @@ export async function createCardOnServer(
     revision: number;
   }>(`/boards/${boardId}/cards`, {
     ...input,
-    dueDate: toServerInstant(input.dueDate),
-    startDate: toServerInstant(input.startDate),
+    // `cardCreateSchema` dates are `optionalDate` (optional, not nullable),
+    // unlike the patch schema. A card with no date must omit the field, not
+    // send null -- `null` fails validation and aborts the whole import.
+    dueDate: toServerInstant(input.dueDate) ?? undefined,
+    startDate: toServerInstant(input.startDate) ?? undefined,
   });
   return { ...data.card, revision: data.revision };
 }
