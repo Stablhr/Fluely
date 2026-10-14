@@ -6,8 +6,15 @@ import axios, {
 } from 'axios';
 import type {ApiErrorPayload, NormalizedApiError} from './types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
-const resolvedBaseUrl = API_BASE_URL.length > 0 ? API_BASE_URL : undefined;
+/**
+ * The API base URL.
+ *
+ * Defaults to the same-origin `/api` proxy (see next.config.ts) so the session
+ * cookies stay first-party. Local development sets NEXT_PUBLIC_API_URL to the
+ * absolute backend URL and calls it directly instead.
+ */
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const resolvedBaseUrl = API_BASE_URL;
 
 let refreshPromise: Promise<void> | null = null;
 
