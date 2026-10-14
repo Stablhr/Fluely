@@ -7,10 +7,12 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
 import {useRouter} from 'next/navigation';
+import {useQueryClient} from '@tanstack/react-query';
 import {login} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
 import {getDashboardPath} from '@/lib/auth/redirects';
 import {holdForMinimum} from '@/lib/auth/loadingCurtain';
+import {meQueryKey} from '@/lib/hooks/auth/useMeQuery';
 import {useLoadingScreen} from '@/lib/provider/LoadingScreenProvider';
 import {
   authErrorClass,
@@ -32,6 +34,7 @@ export default function SignInPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const {show, hide} = useLoadingScreen();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,13 +50,17 @@ export default function SignInPage() {
     const startedAt = Date.now();
     show('login');
     try {
-      const users = await login({email, password});
+      const {user} = await login({email, password});
+      // Seed the session cache with the account we just signed in as, so the
+      // app's auth gate renders the dashboard straight from cache rather than
+      // firing another /auth/me round trip and flashing a loading screen.
+      queryClient.setQueryData(meQueryKey, {user});
       // Hold the curtain until MIN_CURTAIN_MS so the mascot gets a readable
       // pass, then hand off to the dashboard. Deliberately no hide() on
       // success: the curtain stays up across the navigation so the dashboard
       // never flashes in behind it.
       await holdForMinimum(startedAt);
-      router.push(getDashboardPath(users.user.type));
+      router.replace(getDashboardPath(user.type));
     } catch (error) {
       hide();
       setErrorMessage(getFriendlyErrorMessage(error, 'Failed to sign in'));
