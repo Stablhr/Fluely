@@ -23,7 +23,7 @@ interface CardModalProps {
 }
 
 export default function CardModal({ cardId, onClose }: CardModalProps) {
-  const { data, updateCard, addActivity, deleteCard, archiveCard, toggleDone } = useStore()
+  const { data, updateCard, addActivity, deleteCard, archiveCard, toggleDone, canWrite } = useStore()
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState('')
   const [overflowOpen, setOverflowOpen] = useState(false)
@@ -47,6 +47,10 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
   const board = data.boards[card.boardId]
   const list = data.lists[card.listId]
   if (!board || !list) return null
+
+  // A viewer gets a read-only card: the editors below would otherwise accept
+  // input that the store guard silently drops.
+  const mayWrite = canWrite(card.boardId)
 
   const commitTitle = () => {
     setEditingTitle(false)
@@ -107,7 +111,7 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
           <div className="p-4 sm:p-6">
             <div className="flex flex-wrap items-start gap-2 sm:gap-3">
               <div className="min-w-0 flex-1">
-                {editingTitle ? (
+                {editingTitle && mayWrite ? (
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
@@ -125,11 +129,14 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
                 ) : (
                   <h2
                     onClick={() => {
+                      if (!mayWrite) return
                       setTitle(card.title)
                       setEditingTitle(true)
                     }}
-                    title="Click to rename"
-                    className="cursor-text break-words rounded-md px-2 py-1 text-[20px] font-semibold leading-snug text-text-primary transition-colors duration-150 hover:bg-surface-alt"
+                    title={mayWrite ? 'Click to rename' : card.title}
+                    className={`break-words rounded-md px-2 py-1 text-[20px] font-semibold leading-snug text-text-primary transition-colors duration-150 ${
+                      mayWrite ? 'cursor-text hover:bg-surface-alt' : ''
+                    }`}
                   >
                     {card.title}
                   </h2>
@@ -140,6 +147,7 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
                 </p>
               </div>
 
+              {mayWrite && (
               <button
                 type="button"
                 onClick={() => toggleDone(card.id)}
@@ -153,7 +161,9 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
                 {card.done ? <RotateCcw size={14} /> : <Check size={14} />}
                 <span className="hidden sm:inline">{card.done ? 'Reopen' : 'Mark as done'}</span>
               </button>
+              )}
 
+              {mayWrite && (
               <button
                 type="button"
                 onClick={toggleWatch}
@@ -166,8 +176,10 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
                 {card.watching ? <Eye size={14} /> : <EyeOff size={14} />}
                 <span className="hidden sm:inline">{card.watching ? 'Watching' : 'Watch'}</span>
               </button>
+              )}
 
               {/* Overflow menu */}
+              {mayWrite && (
               <div className="relative shrink-0" ref={overflowRef}>
                 <button
                   type="button"
@@ -204,21 +216,22 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
                   </div>
                 )}
               </div>
+              )}
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-5 sm:mt-5 sm:gap-7 md:grid-cols-[1fr_220px]">
               <div className="min-w-0 space-y-6">
-                <CardDescription card={card} />
-                <CardAttachments card={card} />
-                <CardComments card={card} />
+                <CardDescription card={card} readOnly={!mayWrite} />
+                <CardAttachments card={card} readOnly={!mayWrite} />
+                <CardComments card={card} readOnly={!mayWrite} />
               </div>
 
               <aside className="min-w-0 space-y-5">
-                <CardLabels card={card} />
-                <CardMembers card={card} />
-                <CardDueDate card={card} />
-                <CardLocation card={card} />
-                <CardCover card={card} onOpenPanel={() => setCoverPanelOpen(true)} />
+                <CardLabels card={card} readOnly={!mayWrite} />
+                <CardMembers card={card} readOnly={!mayWrite} />
+                <CardDueDate card={card} readOnly={!mayWrite} />
+                <CardLocation card={card} readOnly={!mayWrite} />
+                <CardCover card={card} readOnly={!mayWrite} onOpenPanel={() => setCoverPanelOpen(true)} />
                 <CardSocialPosts cardId={card.id} />
               </aside>
             </div>
@@ -227,6 +240,7 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
               <CardActivity card={card} />
             </div>
 
+            {mayWrite && (
             <div className="mt-5 flex justify-end">
               <button
                 type="button"
@@ -237,12 +251,15 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
                 Delete card
               </button>
             </div>
+            )}
           </div>
         </div>
       </div>
 
-      <CoverPanel card={card} open={coverPanelOpen} onClose={() => setCoverPanelOpen(false)} />
-      {moveDialogOpen && <MoveCardDialog card={card} onClose={() => setMoveDialogOpen(false)} />}
+      {mayWrite && (
+        <CoverPanel card={card} open={coverPanelOpen} onClose={() => setCoverPanelOpen(false)} />
+      )}
+      {moveDialogOpen && mayWrite && <MoveCardDialog card={card} onClose={() => setMoveDialogOpen(false)} />}
     </Modal>
   )
 }

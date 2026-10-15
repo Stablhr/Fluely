@@ -443,6 +443,32 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     setData(next);
   }, []);
 
+  /* ── Who may change a board ────────────────────────────────────────
+     The access level is the server's, mirrored onto the board row when boards
+     are pulled. Gating on it here -- before any optimistic local write -- is
+     what keeps a viewer from watching an edit land and then vanish when the
+     server refuses it: the mutation is dropped, no request goes out, and no
+     error toast is raised for an action they were never allowed to take. The
+     UI hides the same affordances, so this is the backstop rather than the only
+     guard.
+     A board that only ever lived in this browser carries `access: "owner"` (the
+     storage migration writes it), so local-only boards are unaffected. */
+
+  const boardAccess = useCallback(
+    (id: string) => dataRef.current.boards[id]?.access ?? "none",
+    [],
+  );
+
+  const canWrite = useCallback(
+    (id: string) => canWriteBoard(boardAccess(id)),
+    [boardAccess],
+  );
+
+  const canManage = useCallback(
+    (id: string) => canManageBoard(boardAccess(id)),
+    [boardAccess],
+  );
+
   /* ── Board children (lists and cards) ──────────────────────────────
      A board with a server row is the source of truth for its lists and cards;
      everything below writes through and reconciles what comes back. A board that
@@ -1021,11 +1047,13 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     });
   }, [mutate]);
 
-  const renameBoard = (id: string, name: string) =>
+  const renameBoard = (id: string, name: string) => {
+    if (!canWrite(id)) return;
     mutate((prev) => ({
       ...prev,
       boards: patchRecord(prev.boards, id, { name, updatedAt: now() }),
     }));
+  };
 
   const toggleStar = (id: string) =>
     mutate((prev) => {
@@ -1041,6 +1069,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     });
 
   const addList = (boardId: string, name: string) => {
+    if (!canWrite(boardId)) return;
     const id = uid();
     if (isServerBoard(dataRef.current.boards[boardId])) {
       void writeThrough(
@@ -1120,7 +1149,9 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
   const renameList = (id: string, name: string) => {
     const list = dataRef.current.lists[id];
-    if (list && isServerBoard(dataRef.current.boards[list.boardId])) {
+    if (!list) return;
+    if (!canWrite(list.boardId)) return;
+    if (isServerBoard(dataRef.current.boards[list.boardId])) {
       void writeThrough(
         list.boardId,
         revision =>
@@ -1215,6 +1246,11 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   ) => {
     const list = dataRef.current.lists[id];
     if (!list || !isServerBoard(dataRef.current.boards[list.boardId])) return;
+    // A viewer may collapse or expand a list locally -- reading a collapsed
+    // list's cards should keep working -- but the change is not sent: the
+    // server would refuse it, and the next structure pull would put the stored
+    // value back regardless. The caller still applies it locally.
+    if (!canWrite(list.boardId)) return;
 
     void writeThrough(
       list.boardId,
@@ -1248,6 +1284,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const setListAssignee = (id: string, name: string) => {
+    const boardId = dataRef.current.lists[id]?.boardId;
+    if (!boardId || !canWrite(boardId)) return;
     patchListOnServer(
       id,
       {assignee: name},
@@ -1265,6 +1303,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const setListBackgroundColor = (id: string, color: string) => {
+    const boardId = dataRef.current.lists[id]?.boardId;
+    if (!boardId || !canWrite(boardId)) return;
     patchListOnServer(
       id,
       { backgroundColor: color },
@@ -1278,7 +1318,9 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const toggleListCollapsed = (id: string) => {
-    const collapsed = !(dataRef.current.lists[id]?.collapsed ?? false);
+    const list = dataRef.current.lists[id];
+    if (!list) return;
+    const collapsed = !list.collapsed;
     patchListOnServer(id, { collapsed }, { collapsed }, "Could not collapse that list.");
     mutate((prev) => {
       const list = prev.lists[id];
@@ -1291,6 +1333,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const archiveList = (id: string) => {
+    const boardId = dataRef.current.lists[id]?.boardId;
+    if (!boardId || !canWrite(boardId)) return;
     mutate((prev) => {
       const list = prev.lists[id];
       if (!list) return prev;
@@ -1330,6 +1374,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const restoreList = (boardId: string, archivedIndex: number) => {
+    if (!canWrite(boardId)) return;
     mutate((prev) => {
       const board = prev.boards[boardId];
       if (!board) return prev;
@@ -1366,6 +1411,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const moveList = (boardId: string, startIndex: number, endIndex: number) => {
+    if (!canWrite(boardId)) return;
     // Computed up front from the committed order rather than from inside the
     // reducer: this is the array that has to be sent, and the reducer's draft is
     // not available outside it.
@@ -1403,9 +1449,10 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const addCard = (listId: string, title: string): string => {
-    const id = uid();
     const list = dataRef.current.lists[listId];
-    if (list && isServerBoard(dataRef.current.boards[list.boardId])) {
+    if (!list || !canWrite(list.boardId)) return "";
+    const id = uid();
+    if (isServerBoard(dataRef.current.boards[list.boardId])) {
       void writeThrough(
         list.boardId,
         revision =>
@@ -1481,7 +1528,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
   const deleteCard = (id: string) => {
     const card = dataRef.current.cards[id];
-    if (card && isServerBoard(dataRef.current.boards[card.boardId])) {
+    if (!card || !canWrite(card.boardId)) return;
+    if (isServerBoard(dataRef.current.boards[card.boardId])) {
       void writeThrough(
         card.boardId,
         revision =>
@@ -1514,7 +1562,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
   const updateCard = (id: string, patch: Partial<Card>) => {
     const card = dataRef.current.cards[id];
-    if (card && isServerBoard(dataRef.current.boards[card.boardId])) {
+    if (!card || !canWrite(card.boardId)) return;
+    if (isServerBoard(dataRef.current.boards[card.boardId])) {
       const serverPatch = toCardPatch(patch);
       if (serverPatch.memberIds !== undefined) {
         serverPatch.memberIds = memberIdsToServer(
@@ -1567,7 +1616,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const moveCard = (cardId: string, destListId: string, destIndex: number) => {
     const card = dataRef.current.cards[cardId];
     const dest = dataRef.current.lists[destListId];
-    if (card && dest && isServerBoard(dataRef.current.boards[card.boardId])) {
+    if (!card || !dest || !canWrite(card.boardId)) return;
+    if (isServerBoard(dataRef.current.boards[card.boardId])) {
       // The destination's whole new order is computed here rather than sent as
       // an index: the source list has to be rewritten too, and the two are only
       // consistent if the client states both sides at once.
@@ -1653,6 +1703,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const addActivity = (cardId: string, text: string) => {
+    const boardId = dataRef.current.cards[cardId]?.boardId;
+    if (!boardId || !canWrite(boardId)) return;
     mutate((prev) => {
       const card = prev.cards[cardId];
       if (!card) return prev;
@@ -1686,6 +1738,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     mutate((prev) => {
       const card = prev.cards[id];
       if (!card || card.archived) return prev;
+      if (!canWrite(card.boardId)) return prev;
       const board = prev.boards[card.boardId];
       return {
         ...prev,
@@ -1725,6 +1778,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     mutate((prev) => {
       const card = prev.cards[id];
       if (!card || !card.archived) return prev;
+      if (!canWrite(card.boardId)) return prev;
       let listId = card.listId;
       let listName = prev.lists[listId]?.name;
       if (!prev.lists[listId]) {
@@ -1775,6 +1829,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     mutate((prev) => {
       const card = prev.cards[id];
       if (!card) return prev;
+      if (!canWrite(card.boardId)) return prev;
       const done = !card.done;
       return {
         ...prev,
@@ -1812,6 +1867,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const setBoardVisibility = async (id: string, visibility: Visibility) => {
     const board = dataRef.current.boards[id];
     if (!board) return;
+    if (!canManage(id)) return;
     if (board.visibility === visibility) return;
 
     const previous = {
@@ -1887,7 +1943,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const setBoardBackground = (id: string, background: string) =>
     mutate((prev) => {
       const board = prev.boards[id];
-      if (!board) return prev;
+      if (!board || !canWrite(id)) return prev;
       return {
         ...prev,
         boards: {
@@ -1906,10 +1962,13 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     });
 
   const setBoardDescription = (id: string, description: string) =>
-    mutate((prev) => ({
-      ...prev,
-      boards: patchRecord(prev.boards, id, { description, updatedAt: now() }),
-    }));
+    mutate((prev) => {
+      if (!canWrite(id)) return prev;
+      return {
+        ...prev,
+        boards: patchRecord(prev.boards, id, { description, updatedAt: now() }),
+      };
+    });
 
   const addBoardActivity = (boardId: string, text: string) =>
     mutate((prev) => {
@@ -1937,7 +1996,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   ) =>
     mutate((prev) => {
       const board = prev.boards[boardId];
-      if (!board) return prev;
+      if (!board || !canManage(boardId)) return prev;
       const currentSettings = board.settings ?? {
         commentPermission: "members" as const,
         selfJoin: false,
@@ -2039,6 +2098,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const addLabel = (boardId: string, name: string, color: string): string => {
+    if (!canWrite(boardId)) return "";
     const id = uid();
     mutate((prev) => {
       const board = prev.boards[boardId];
@@ -2072,6 +2132,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       const board = prev.boards[boardId];
       const label = board?.labels[labelId];
       if (!board || !label) return prev;
+      if (!canWrite(boardId)) return prev;
       return {
         ...prev,
         boards: {
@@ -2089,6 +2150,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     mutate((prev) => {
       const board = prev.boards[boardId];
       if (!board || !board.labels[labelId]) return prev;
+      if (!canWrite(boardId)) return prev;
       const labelName = board.labels[labelId].name;
       const labels = { ...board.labels };
       delete labels[labelId];
@@ -2125,21 +2187,6 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
      The four share actions below used to append a name to a local array. They
      now go to the server, because a name the server has never heard of cannot
      grant anyone access to anything. */
-
-  const boardAccess = useCallback(
-    (id: string) => dataRef.current.boards[id]?.access ?? "none",
-    [],
-  );
-
-  const canWrite = useCallback(
-    (id: string) => canWriteBoard(boardAccess(id)),
-    [boardAccess],
-  );
-
-  const canManage = useCallback(
-    (id: string) => canManageBoard(boardAccess(id)),
-    [boardAccess],
-  );
 
   const getCollaborators = useCallback(
     (boardId: string): Collaborator[] =>
@@ -2726,6 +2773,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       const item = prev.inbox.find((i) => i.id === itemId);
       const list = prev.lists[listId];
       if (!item || !list || list.boardId !== boardId) return prev;
+      if (!canWrite(boardId)) return prev;
       const card = makeCard(list, item.text, {
         activity: [{ id: uid(), text: "created from inbox", createdAt: now() }],
       });
@@ -2740,6 +2788,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       const item = prev.inbox.find((i) => i.id === itemId);
       const board = prev.boards[boardId];
       if (!item || !board || board.listOrder.length === 0) return prev;
+      if (!canWrite(boardId)) return prev;
       const listId = board.listOrder[0];
       const list = prev.lists[listId];
       if (!list) return prev;

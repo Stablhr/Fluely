@@ -7,7 +7,7 @@ import { useStore } from '@/lib/kali/store/useStore'
 import SectionLabel from '../shared/SectionLabel'
 import Avatar from '../shared/Avatar'
 
-export default function CardMembers({ card }: { card: Card }) {
+export default function CardMembers({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
   const store = useStore()
   const [open, setOpen] = useState(false)
 
@@ -37,15 +37,17 @@ export default function CardMembers({ card }: { card: Card }) {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="mt-2 text-xs font-semibold text-primary-hover hover:underline"
-      >
-        {open ? 'Done' : 'Assign members'}
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="mt-2 text-xs font-semibold text-primary-hover hover:underline"
+        >
+          {open ? 'Done' : 'Assign members'}
+        </button>
+      )}
 
-      {open && (
+      {!readOnly && open && (
         <div className="animate-in mt-2 space-y-0.5 rounded-lg border border-border-strong bg-surface-elevated p-1.5 shadow-subtle">
           {store.members.map((member) => {
             const active = card.memberIds.includes(member.id)

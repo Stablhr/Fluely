@@ -68,9 +68,11 @@ export default function BoardView() {
   }
 
   const lists = store.getLists(boardId)
+  const mayWrite = store.canWrite(boardId)
 
   const onDragEnd = (result: DropResult) => {
     endDragCursor()
+    if (!mayWrite) return
     const { source, destination, type } = result
     if (!destination) return
     if (source.droppableId === destination.droppableId && source.index === destination.index) return
@@ -108,12 +110,12 @@ export default function BoardView() {
                 className="scroll-slim flex h-full items-start gap-3 overflow-x-auto bg-board-canvas p-4"
               >
                 {lists.map((list, index) => (
-                  <Draggable key={list.id} draggableId={list.id} index={index}>
+                  <Draggable key={list.id} draggableId={list.id} index={index} isDragDisabled={!mayWrite}>
                     {(listProvided) => (
                       <div ref={listProvided.innerRef} {...listProvided.draggableProps}>
                         <ListColumn
                           list={list}
-                          dragHandleProps={listProvided.dragHandleProps}
+                          dragHandleProps={mayWrite ? listProvided.dragHandleProps : null}
                           search={search}
                           filter={filter}
                           onOpenCard={setOpenCardId}
@@ -123,7 +125,7 @@ export default function BoardView() {
                   </Draggable>
                 ))}
                 {provided.placeholder}
-                <AddListForm boardId={boardId} />
+                {mayWrite && <AddListForm boardId={boardId} />}
               </div>
             )}
           </Droppable>

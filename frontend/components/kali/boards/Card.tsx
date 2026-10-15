@@ -85,7 +85,8 @@ function DoneToggle({ card }: { card: Card }) {
 }
 
 function CardFace({ card, index, onOpenCard }: CardFaceProps) {
-  const { data } = useStore()
+  const { data, canWrite } = useStore()
+  const mayWrite = canWrite(card.boardId)
   const board = data.boards[card.boardId]
   const labels = (card.labelIds
     .map((id) => board?.labels[id])
@@ -96,21 +97,23 @@ function CardFace({ card, index, onOpenCard }: CardFaceProps) {
   const extraLabels = labels.length > 4 ? labels.length - 4 : 0
 
   return (
-    <Draggable draggableId={card.id} index={index}>
+    <Draggable draggableId={card.id} index={index} isDragDisabled={!mayWrite}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={() => !snapshot.isDragging && onOpenCard(card.id)}
-          className={`relative cursor-pointer rounded-xl p-2.5 ring-1 transition-shadow duration-150 ${
+          className={`relative rounded-xl p-2.5 ring-1 transition-shadow duration-150 ${
+            mayWrite ? 'cursor-pointer' : 'cursor-default'
+          } ${
             snapshot.isDragging
               ? 'z-50 opacity-95 ring-primary shadow-medium'
               : 'ring-[var(--color-card-border)] hover:shadow-subtle hover:ring-[var(--color-card-border-strong)]'
           }`}
           style={{ ...provided.draggableProps.style, background: 'var(--color-card-surface)', color: 'var(--color-card-text)', borderColor: snapshot.isDragging ? undefined : 'var(--color-card-border)' }}
         >
-          <DoneToggle card={card} />
+          {mayWrite && <DoneToggle card={card} />}
           <CardCoverBand card={card} />
 
           {labels.length > 0 && (

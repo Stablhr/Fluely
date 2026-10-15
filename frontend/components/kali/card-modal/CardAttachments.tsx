@@ -16,7 +16,7 @@ import SectionLabel from '../shared/SectionLabel'
  */
 export const MAX_FILE_SIZE = 50 * 1024 * 1024
 
-export default function CardAttachments({ card }: { card: Card }) {
+export default function CardAttachments({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
   const store = useStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
@@ -115,6 +115,7 @@ export default function CardAttachments({ card }: { card: Card }) {
                 {formatSize(attachment.size)}
               </p>
             </div>
+            {!readOnly && (
             <button
               type="button"
               onClick={() => remove(attachment.id)}
@@ -126,6 +127,7 @@ export default function CardAttachments({ card }: { card: Card }) {
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </button>
+            )}
           </div>
           )
         })}
@@ -144,6 +146,8 @@ export default function CardAttachments({ card }: { card: Card }) {
           </p>
         )}
 
+        {!readOnly && (
+        <>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" className={ghostClass} disabled={uploading} onClick={() => fileRef.current?.click()}>
             <Paperclip size={13} />
@@ -177,6 +181,8 @@ export default function CardAttachments({ card }: { card: Card }) {
         <p className="text-[11px] leading-snug text-text-muted">
           Uploads are stored on Cloudinary and shared with everyone on the board.
         </p>
+        </>
+        )}
       </div>
     </section>
   )

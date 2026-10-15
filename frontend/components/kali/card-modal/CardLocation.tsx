@@ -6,7 +6,7 @@ import type { Card } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import SectionLabel from '../shared/SectionLabel'
 
-export default function CardLocation({ card }: { card: Card }) {
+export default function CardLocation({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
   const { updateCard, addActivity } = useStore()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(card.location)
@@ -24,7 +24,15 @@ export default function CardLocation({ card }: { card: Card }) {
     <section>
       <SectionLabel icon={<MapPin size={14} />}>Location</SectionLabel>
 
-      {card.location && !editing ? (
+      {readOnly ? (
+        card.location ? (
+          <span className="mt-2 inline-block min-w-0 break-all rounded-md bg-surface-alt px-2.5 py-1 text-xs font-medium text-text-secondary">
+            {card.location}
+          </span>
+        ) : (
+          <p className="mt-2 text-xs text-text-muted">No location.</p>
+        )
+      ) : card.location && !editing ? (
         <div className="mt-2 flex items-center gap-1.5">
           <span className="min-w-0 break-all rounded-md bg-surface-alt px-2.5 py-1 text-xs font-medium text-text-secondary">
             {card.location}

@@ -5,7 +5,7 @@ import { Plus, X } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 
 export default function AddListForm({ boardId }: { boardId: string }) {
-  const addList = useStore().addList
+  const { addList, canWrite } = useStore()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
 
@@ -16,6 +16,10 @@ export default function AddListForm({ boardId }: { boardId: string }) {
     setName('')
     setOpen(false)
   }
+
+  // Hidden entirely for a viewer: the store guard would drop the add anyway, and
+  // offering it just to refuse it is the behaviour this replaces.
+  if (!canWrite(boardId)) return null
 
   if (!open) {
     return (

@@ -21,7 +21,8 @@ interface ListColumnProps {
 }
 
 export default function ListColumn({ list, dragHandleProps, search, filter, onOpenCard }: ListColumnProps) {
-  const { data, renameList, toggleListCollapsed } = useStore()
+  const { data, renameList, toggleListCollapsed, canWrite } = useStore()
+  const mayWrite = canWrite(list.boardId)
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(list.name)
 
@@ -124,18 +125,19 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
           ) : (
             <h3
               onClick={() => {
+                if (!mayWrite) return
                 setName(list.name)
                 setEditing(true)
               }}
-              title="Click to rename"
-              className="flex-1 cursor-text truncate text-sm font-semibold"
+              title={mayWrite ? "Click to rename" : list.name}
+              className={`flex-1 truncate text-sm font-semibold ${mayWrite ? 'cursor-text' : ''}`}
               style={{ color: 'var(--surface-text)' }}
             >
               {list.name}
             </h3>
           )}
           <span className="font-mono text-[10.5px]" style={{ color: 'var(--surface-text-faint)' }}>{allCards.length}</span>
-          <ListMenu list={list} />
+          {mayWrite && <ListMenu list={list} />}
         </div>
 
         {list.assignee && (
