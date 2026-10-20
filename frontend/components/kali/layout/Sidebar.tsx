@@ -168,14 +168,11 @@ export default function Sidebar({
     .filter((b) => b.access === "editor" || b.access === "viewer")
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
-  const workspaceBoards = allBoards
-    .filter((b) => b.access === "workspace-view" || b.access === "public-view")
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-
+  // Only boards the signed-in person owns or was explicitly invited to are
+  // shown. Workspace/public discovery is intentionally not surfaced here.
   const sections: { title: string; boards: typeof owned }[] = [
     { title: "Your Boards", boards: owned },
     { title: "Shared with you", boards: shared },
-    { title: "Workspace", boards: workspaceBoards },
   ].filter((s) => s.boards.length > 0);
 
   const themeBg = "var(--surface-bg-subtle)";

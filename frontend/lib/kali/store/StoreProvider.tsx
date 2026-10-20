@@ -1075,10 +1075,17 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           try {
             await deleteBoardOnServer(id);
           } catch (err) {
-            setError(
-              getFriendlyErrorMessage(err, "Could not delete that board."),
-            );
-            return;
+            const status =
+              (err as {status?: number; response?: {status?: number}})?.status ??
+              (err as {response?: {status?: number}})?.response?.status;
+            // Collaborators cannot delete server-side, but they still need the
+            // board gone from their own device once the owner deletes it.
+            if (status !== 403 && status !== 404) {
+              setError(
+                getFriendlyErrorMessage(err, "Could not delete that board."),
+              );
+              return;
+            }
           }
           removeBoardLocally(id);
         })();
@@ -2258,6 +2265,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
       mutate((prev) => {
         const boards: Record<string, Board> = { ...prev.boards };
+        const lists: Record<string, List> = { ...prev.lists };
+        const cards: Record<string, Card> = { ...prev.cards };
         for (const dto of dtos) {
           const existing = boards[dto.id];
           // A board the server knows about but this browser has never seen still
@@ -2285,7 +2294,25 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           };
           boards[dto.id] = { ...local, ...mergeServerBoard(existing, dto) };
         }
-        return { ...prev, boards };
+
+        // Drop boards the server no longer returns (e.g. deleted by their
+        // owner) so every device's list reconciles without a manual refresh.
+        const serverIds = new Set(dtos.map((dto) => dto.id));
+        for (const id of Object.keys(boards)) {
+          const board = boards[id];
+          if (board && board.ownerId && board.revision !== null && !serverIds.has(id)) {
+            const listIds = new Set(board.listOrder);
+            for (const [listId, list] of Object.entries(lists)) {
+              if (listIds.has(listId) || list.boardId === id) delete lists[listId];
+            }
+            for (const [cardId, card] of Object.entries(cards)) {
+              if (card.boardId === id) delete cards[cardId];
+            }
+            delete boards[id];
+          }
+        }
+
+        return { ...prev, boards, lists, cards };
       });
     } catch (err) {
       setError(getFriendlyErrorMessage(err, "Could not load your boards."));
