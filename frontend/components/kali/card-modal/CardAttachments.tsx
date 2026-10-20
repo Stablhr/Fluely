@@ -20,10 +20,11 @@ export default function CardAttachments({ card, readOnly = false }: { card: Card
   const store = useStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const addFile = async (file: File | undefined, type: 'file' | 'image') => {
+  const addFile = async (file: File | undefined, type: 'file' | 'image' | 'video') => {
     if (!file) return
     if (file.size > MAX_FILE_SIZE) {
       setError(
@@ -45,7 +46,15 @@ export default function CardAttachments({ card, readOnly = false }: { card: Card
         size: media.sizeBytes,
         addedAt: new Date().toISOString(),
       }
-      store.updateCard(card.id, { files: [...card.files, attachment] })
+      if (type === 'image') {
+        store.updateCard(card.id, {
+          files: [...card.files, attachment],
+          cover: { type: 'image', dataUrl: media.url, mediaId: media.id },
+          coverSize: card.coverSize || 'small',
+        })
+      } else {
+        store.updateCard(card.id, { files: [...card.files, attachment] })
+      }
       store.addActivity(card.id, `attached ${file.name}`)
     } catch (error) {
       setError(getFriendlyErrorMessage(error, 'Could not upload that file. Please try again.'))
@@ -157,6 +166,10 @@ export default function CardAttachments({ card, readOnly = false }: { card: Card
             <ImageIcon size={13} />
             {uploading ? 'Uploading…' : 'Attach image'}
           </button>
+          <button type="button" className={ghostClass} disabled={uploading} onClick={() => videoRef.current?.click()}>
+            <Paperclip size={13} />
+            {uploading ? 'Uploading...' : 'Attach video'}
+          </button>
           <input
             ref={fileRef}
             type="file"
@@ -173,6 +186,16 @@ export default function CardAttachments({ card, readOnly = false }: { card: Card
             hidden
             onChange={(e) => {
               void addFile(e.target.files?.[0], 'image')
+              e.target.value = ''
+            }}
+          />
+          <input
+            ref={videoRef}
+            type="file"
+            accept="video/*"
+            hidden
+            onChange={(e) => {
+              void addFile(e.target.files?.[0], 'video')
               e.target.value = ''
             }}
           />

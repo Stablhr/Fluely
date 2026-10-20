@@ -9,11 +9,10 @@ import CardLabels from './CardLabels'
 import CardMembers from './CardMembers'
 import CardDueDate from './CardDueDate'
 import CardLocation from './CardLocation'
-import CardCover from './CardCover'
 import CardAttachments from './CardAttachments'
 import CardComments from './CardComments'
 import CardActivity from './CardActivity'
-import CoverPanel from './CoverPanel'
+
 import MoveCardDialog from './MoveCardDialog'
 import CardSocialPosts from '../social/CardSocialPosts'
 
@@ -28,7 +27,7 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
   const [title, setTitle] = useState('')
   const [overflowOpen, setOverflowOpen] = useState(false)
   const [moveDialogOpen, setMoveDialogOpen] = useState(false)
-  const [coverPanelOpen, setCoverPanelOpen] = useState(false)
+
   const overflowRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -231,7 +230,7 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
                 <CardMembers card={card} readOnly={!mayWrite} />
                 <CardDueDate card={card} readOnly={!mayWrite} />
                 <CardLocation card={card} readOnly={!mayWrite} />
-                <CardCover card={card} readOnly={!mayWrite} onOpenPanel={() => setCoverPanelOpen(true)} />
+                {/* Cover is set automatically when an image is attached. */}
                 <CardSocialPosts cardId={card.id} />
               </aside>
             </div>
@@ -256,9 +255,6 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
         </div>
       </div>
 
-      {mayWrite && (
-        <CoverPanel card={card} open={coverPanelOpen} onClose={() => setCoverPanelOpen(false)} />
-      )}
       {moveDialogOpen && mayWrite && <MoveCardDialog card={card} onClose={() => setMoveDialogOpen(false)} />}
     </Modal>
   )

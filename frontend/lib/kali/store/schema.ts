@@ -67,7 +67,7 @@ export interface Collaborator {
 export interface FileAttachment {
   id: string;
   name: string;
-  type: "file" | "image";
+  type: "file" | "image" | "video";
   /**
    * A Cloudinary HTTPS URL as of the media migration. It kept the `dataUrl`
    * name so every existing renderer (`<img src={...}>`) works unchanged; new
