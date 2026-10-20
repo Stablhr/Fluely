@@ -358,7 +358,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
      name first. Every account change unmounts this — sign-out and sign-in both
      swap the whole route tree — so a remount always re-reads the name. */
   const [data, setData] = useState<AppData>(() =>
-    withUserName(loadData(), currentUser?.name),
+    withUserName(loadData(currentUser?.id), currentUser?.name),
   );
   const [error, setError] = useState<string | null>(null);
   const [pendingBoardId, setPendingBoardId] = useState<string | null>(null);
@@ -407,7 +407,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     const write = () => {
       idleHandle = null;
       try {
-        saveData(dataRef.current);
+        saveData(dataRef.current, currentUser?.id);
       } catch (err) {
         setError(
           err instanceof Error ? err.message : "Could not save your changes.",
@@ -438,7 +438,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   useEffect(() => {
     const flush = () => {
       try {
-        saveData(dataRef.current);
+        saveData(dataRef.current, currentUser?.id);
       } catch {
         // best effort on unload
       }
@@ -2879,7 +2879,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     });
 
   const resetAll = () => {
-    clearData();
+    clearData(currentUser?.id);
     // Through `mutate`, not `setData`, so `dataRef` swaps with it -- a later
     // mutation against the stale ref would resurrect the cleared store.
     mutate(() => withUserName(emptyData(), currentUser?.name));

@@ -1,7 +1,9 @@
 import type { AppData, Board, SocialPost, SocialPostPlatform } from "./schema";
 import { emptyData } from "./schema";
 
-const STORAGE_KEY = "kali_data";
+function storageKey(userId?: string | null): string {
+  return userId ? `kali_data:${userId}` : "kali_data";
+}
 const SCHEMA_VERSION = 1;
 
 /**
@@ -44,9 +46,36 @@ function migrateBoard(board: Board): void {
   if (board.childrenSyncedAt === undefined) board.childrenSyncedAt = null;
 }
 
-export function loadData(): AppData {
+export function loadData(userId?: string | null): AppData {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const key = storageKey(userId);
+    let raw = localStorage.getItem(key);
+
+    // Migrate a legacy single-key store only when it clearly belongs to this
+    // account, so a brand-new user never inherits someone else's boards.
+    if (!raw && userId) {
+      const legacy = localStorage.getItem("kali_data");
+      if (legacy) {
+        try {
+          const parsed = JSON.parse(legacy) as AppData;
+          const boards = Object.values(parsed?.boards ?? {});
+          const ownsAll = boards.every(
+            (board) =>
+              !board ||
+              typeof board !== "object" ||
+              !(board as { ownerId?: string | null }).ownerId ||
+              (board as { ownerId?: string | null }).ownerId === userId,
+          );
+          if (ownsAll) {
+            localStorage.setItem(key, legacy);
+            raw = legacy;
+          }
+        } catch {
+          // ignore malformed legacy data
+        }
+      }
+    }
+
     if (!raw) return emptyData();
     const parsed = JSON.parse(raw) as AppData;
     if (
@@ -66,9 +95,9 @@ export function loadData(): AppData {
   }
 }
 
-export function saveData(data: AppData): void {
+export function saveData(data: AppData, userId?: string | null): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(storageKey(userId), JSON.stringify(data));
   } catch {
     throw new Error(
       "Could not save — browser storage is full. Remove large attachments or reset data to continue.",
@@ -76,9 +105,9 @@ export function saveData(data: AppData): void {
   }
 }
 
-export function clearData(): void {
+export function clearData(userId?: string | null): void {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey(userId));
   } catch {
     // ignore
   }
