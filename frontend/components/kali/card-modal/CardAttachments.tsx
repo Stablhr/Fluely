@@ -50,7 +50,7 @@ export default function CardAttachments({ card, readOnly = false }: { card: Card
         store.updateCard(card.id, {
           files: [...card.files, attachment],
           cover: { type: 'image', dataUrl: media.url, mediaId: media.id },
-          coverSize: card.coverSize || 'small',
+          coverSize: 'large',
         })
       } else {
         store.updateCard(card.id, { files: [...card.files, attachment] })
