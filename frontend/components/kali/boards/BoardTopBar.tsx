@@ -104,7 +104,8 @@ export default function BoardTopBar({
   onFilterChange,
   onOpenMenu,
 }: BoardTopBarProps) {
-  const { renameBoard, toggleStar, data, presenceByBoard } = useStore()
+  const { renameBoard, toggleStar, data, presenceByBoard, canWrite } = useStore()
+  const mayWrite = canWrite(board.id)
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(board.name)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -188,14 +189,26 @@ export default function BoardTopBar({
         ) : (
           <h2
             onClick={() => {
+              if (!mayWrite) return
               setName(board.name)
               setEditing(true)
             }}
-            title="Click to rename"
-            className="ml-0.5 min-w-0 cursor-text truncate rounded-md px-1.5 py-1 text-sm font-semibold text-text-primary transition-colors duration-150 hover:bg-surface-alt sm:ml-1 sm:text-base"
+            title={mayWrite ? "Click to rename" : board.name}
+            className={`ml-0.5 min-w-0 truncate rounded-md px-1.5 py-1 text-sm font-semibold text-text-primary transition-colors duration-150 sm:ml-1 sm:text-base ${
+              mayWrite ? 'cursor-text hover:bg-surface-alt' : ''
+            }`}
           >
             {board.name}
           </h2>
+        )}
+
+        {!mayWrite && (
+          <span
+            title="You can view this board, but not change it"
+            className="ml-1 shrink-0 rounded-full bg-surface-alt px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.05em] text-text-muted"
+          >
+            View only
+          </span>
         )}
 
         {/* ── Spacer ── */}

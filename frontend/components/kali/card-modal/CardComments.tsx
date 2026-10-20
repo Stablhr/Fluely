@@ -12,7 +12,7 @@ import { hasUserCommentReaction, toggleUserCommentReaction } from '@/lib/kali/ut
 import SectionLabel from '../shared/SectionLabel'
 import Avatar from '../shared/Avatar'
 
-export default function CardComments({ card }: { card: Card }) {
+export default function CardComments({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
   const store = useStore()
   const [text, setText] = useState('')
   const [activePicker, setActivePicker] = useState<string | null>(null)
@@ -60,6 +60,7 @@ export default function CardComments({ card }: { card: Card }) {
     <section>
       <SectionLabel icon={<MessageSquare size={14} />}>Comments</SectionLabel>
 
+      {!readOnly && (
       <div className="mt-2 flex items-start gap-2">
         {you && <Avatar member={you} size={24} />}
         <input
@@ -72,6 +73,7 @@ export default function CardComments({ card }: { card: Card }) {
           className="flex-1 rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
       </div>
+      )}
 
       <div className="mt-3 space-y-3">
         {card.comments.map((comment) => {
@@ -104,6 +106,7 @@ export default function CardComments({ card }: { card: Card }) {
                         <button
                           key={emoji}
                           type="button"
+                          disabled={readOnly}
                           onClick={() => toggleCommentReaction(comment.id, emoji)}
                           className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs transition-colors duration-150 active:scale-[0.98] ${
                             active
@@ -119,6 +122,7 @@ export default function CardComments({ card }: { card: Card }) {
                   </div>
                 )}
 
+                {!readOnly && (
                 <div className="relative mt-1" ref={pickerRef}>
                   <button
                     type="button"
@@ -148,6 +152,7 @@ export default function CardComments({ card }: { card: Card }) {
                     </div>
                   )}
                 </div>
+                )}
               </div>
             </div>
           )

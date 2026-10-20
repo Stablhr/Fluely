@@ -7,7 +7,7 @@ import { useStore } from '@/lib/kali/store/useStore'
 import SectionLabel from '../shared/SectionLabel'
 import LabelChip from '../shared/Chip'
 
-export default function CardLabels({ card }: { card: Card }) {
+export default function CardLabels({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
   const store = useStore()
   const [open, setOpen] = useState(false)
   const board = store.data.boards[card.boardId]
@@ -38,15 +38,17 @@ export default function CardLabels({ card }: { card: Card }) {
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="mt-2 text-xs font-semibold text-primary-hover hover:underline"
-      >
-        {open ? 'Done' : 'Add labels'}
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="mt-2 text-xs font-semibold text-primary-hover hover:underline"
+        >
+          {open ? 'Done' : 'Add labels'}
+        </button>
+      )}
 
-      {open && (
+      {!readOnly && open && (
         <div className="animate-in mt-2 space-y-0.5 rounded-lg border border-border-strong bg-surface-elevated p-1.5 shadow-subtle">
           {labels.length === 0 && (
             <p className="px-2 py-1 text-xs text-text-muted">No labels on this board yet.</p>

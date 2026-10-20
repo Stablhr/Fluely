@@ -9,8 +9,9 @@ import Modal from '../shared/Modal'
 type Tab = 'cards' | 'lists'
 
 export default function ArchivedPanel({ board, onClose }: { board: Board; onClose: () => void }) {
-  const { data, restoreCard, deleteCard, restoreList } = useStore()
+  const { data, restoreCard, deleteCard, restoreList, canWrite } = useStore()
   const [tab, setTab] = useState<Tab>('cards')
+  const mayWrite = canWrite(board.id)
 
   const archivedCards = Object.values(data.cards).filter(
     (c) => c.boardId === board.id && c.archived,
@@ -73,6 +74,8 @@ export default function ArchivedPanel({ board, onClose }: { board: Board; onClos
                     {data.lists[card.listId]?.name ?? 'Unknown list'}
                   </p>
                 </div>
+                {mayWrite && (
+                <>
                 <button
                   type="button"
                   onClick={() => restoreCard(card.id)}
@@ -91,6 +94,8 @@ export default function ArchivedPanel({ board, onClose }: { board: Board; onClos
                 >
                   <Trash2 size={15} />
                 </button>
+                </>
+                )}
               </div>
             ))}
           </div>
@@ -112,6 +117,7 @@ export default function ArchivedPanel({ board, onClose }: { board: Board; onClos
                     {entry.cards.length} card{entry.cards.length !== 1 ? 's' : ''}
                   </p>
                 </div>
+                {mayWrite && (
                 <button
                   type="button"
                   onClick={() => restoreList(board.id, index)}
@@ -120,6 +126,7 @@ export default function ArchivedPanel({ board, onClose }: { board: Board; onClos
                 >
                   <RotateCcw size={15} />
                 </button>
+                )}
               </div>
             ))}
           </div>

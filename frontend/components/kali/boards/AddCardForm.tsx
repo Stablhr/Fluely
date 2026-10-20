@@ -5,7 +5,7 @@ import { Plus, X } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 
 export default function AddCardForm({ listId }: { listId: string }) {
-  const addCard = useStore().addCard
+  const { addCard, canWrite, data } = useStore()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
 
@@ -16,6 +16,11 @@ export default function AddCardForm({ listId }: { listId: string }) {
     setTitle('')
     setOpen(false)
   }
+
+  // A viewer gets no way in to begin with, rather than an entry that the store
+  // will quietly refuse. `canWrite` is the same gate the mutation itself uses.
+  const boardId = data.lists[listId]?.boardId
+  if (!boardId || !canWrite(boardId)) return null
 
   if (!open) {
     return (

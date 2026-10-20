@@ -6,7 +6,7 @@ import type { Card } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import SectionLabel from '../shared/SectionLabel'
 
-export default function CardDescription({ card }: { card: Card }) {
+export default function CardDescription({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
   const { updateCard, addActivity } = useStore()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(card.desc)
@@ -24,7 +24,13 @@ export default function CardDescription({ card }: { card: Card }) {
     <section>
       <SectionLabel icon={<AlignLeft size={14} />}>Description</SectionLabel>
 
-      {card.desc && !editing ? (
+      {readOnly ? (
+        card.desc ? (
+          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary">{card.desc}</p>
+        ) : (
+          <p className="mt-2 text-xs text-text-muted">No description.</p>
+        )
+      ) : card.desc && !editing ? (
         <div>
           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary">{card.desc}</p>
           <button

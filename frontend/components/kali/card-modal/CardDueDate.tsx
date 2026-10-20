@@ -7,7 +7,7 @@ import { useStore } from '@/lib/kali/store/useStore'
 import { formatDate } from '@/lib/kali/utils/dates'
 import SectionLabel from '../shared/SectionLabel'
 
-export default function CardDueDate({ card }: { card: Card }) {
+export default function CardDueDate({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
   const { updateCard, addActivity } = useStore()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(card.dueDate ?? '')
@@ -24,7 +24,15 @@ export default function CardDueDate({ card }: { card: Card }) {
     <section>
       <SectionLabel icon={<CalendarDays size={14} />}>Due date</SectionLabel>
 
-      {card.dueDate && !editing ? (
+      {readOnly ? (
+        card.dueDate ? (
+          <span className="mt-2 inline-block rounded-md bg-surface-alt px-2.5 py-1 font-mono text-[11px] font-medium text-text-secondary">
+            {formatDate(card.dueDate)}
+          </span>
+        ) : (
+          <p className="mt-2 text-xs text-text-muted">No due date.</p>
+        )
+      ) : card.dueDate && !editing ? (
         <div className="mt-2 flex items-center gap-1.5">
           <span className="rounded-md bg-surface-alt px-2.5 py-1 font-mono text-[11px] font-medium text-text-secondary">
             {formatDate(card.dueDate)}

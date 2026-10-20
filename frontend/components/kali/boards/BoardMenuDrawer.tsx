@@ -54,6 +54,8 @@ export default function BoardMenuDrawer({
     resetAll,
     deleteBoard,
     makeTemplate,
+    canWrite,
+    canManage,
   } = useStore();
   const router = useRouter();
   const [modal, setModal] = useState<DrawerModal>(null);
@@ -84,6 +86,13 @@ export default function BoardMenuDrawer({
   }, [open, onClose]);
 
   if (!open) return null;
+
+  // The drawer holds both read-only items (activity, print/export, share view)
+  // and write items. The write ones are gated on the same access level the store
+  // mutation checks, so a viewer sees a shorter menu rather than controls that
+  // quietly do nothing.
+  const mayWrite = canWrite(board.id);
+  const mayManage = canManage(board.id);
 
   const archivedCardCount = Object.values(data.cards).filter(
     (c) => c.boardId === board.id && c.archived,
@@ -188,25 +197,27 @@ export default function BoardMenuDrawer({
             </button>
             {aboutOpen && (
               <div className="ml-7 mr-2.5 mb-1">
-                <textarea
-                  value={desc}
-                  onChange={(e) => {
-                    setDesc(e.target.value);
-                    setBoardDescription(board.id, e.target.value);
-                  }}
-                  rows={3}
-                  placeholder="Add a description to your board"
-                  className="w-full resize-none rounded-md border border-border-strong bg-surface px-2.5 py-2 text-sm leading-relaxed text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-                {board.description && (
-                  <p className="mt-1 truncate text-xs text-text-muted">
-                    {board.description}
+                {mayWrite ? (
+                  <textarea
+                    value={desc}
+                    onChange={(e) => {
+                      setDesc(e.target.value);
+                      setBoardDescription(board.id, e.target.value);
+                    }}
+                    rows={3}
+                    placeholder="Add a description to your board"
+                    className="w-full resize-none rounded-md border border-border-strong bg-surface px-2.5 py-2 text-sm leading-relaxed text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  />
+                ) : (
+                  <p className="text-sm leading-relaxed text-text-secondary">
+                    {board.description || "No description."}
                   </p>
                 )}
               </div>
             )}
 
             {/* Visibility */}
+            {mayManage && (
             <button
               type="button"
               className={menuItem}
@@ -215,6 +226,7 @@ export default function BoardMenuDrawer({
               <Eye size={15} className="text-text-secondary" />
               <span className="flex-1">Visibility: {visibilityLabel}</span>
             </button>
+            )}
 
             {/* Print, export, and share */}
             <button
@@ -251,6 +263,7 @@ export default function BoardMenuDrawer({
           {/* ── Group 2 ── */}
           <section className="space-y-0.5">
             {/* Settings */}
+            {mayManage && (
             <button
               type="button"
               className={menuItem}
@@ -259,8 +272,10 @@ export default function BoardMenuDrawer({
               <Settings size={15} className="text-text-secondary" />
               <span className="flex-1">Settings</span>
             </button>
+            )}
 
             {/* Change background */}
+            {mayWrite && (
             <div className="relative">
               <button
                 type="button"
@@ -277,6 +292,7 @@ export default function BoardMenuDrawer({
                 />
               )}
             </div>
+            )}
           </section>
 
           <div className="my-3 h-px bg-border" />
@@ -284,6 +300,7 @@ export default function BoardMenuDrawer({
           {/* ── Group 3 ── */}
           <section className="space-y-0.5">
             {/* Labels */}
+            {mayWrite && (
             <button
               type="button"
               className={menuItem}
@@ -292,6 +309,7 @@ export default function BoardMenuDrawer({
               <Tag size={15} className="text-text-secondary" />
               <span className="flex-1">Labels</span>
             </button>
+            )}
 
             {/* Make template */}
             <div>
@@ -350,6 +368,7 @@ export default function BoardMenuDrawer({
 
           {/* ── Danger zone ── */}
           <section className="space-y-0.5">
+            {mayManage && (
             <button
               type="button"
               onClick={handleDeleteBoard}
@@ -358,6 +377,7 @@ export default function BoardMenuDrawer({
               <Trash2 size={15} />
               Delete board
             </button>
+            )}
 
             <button
               type="button"

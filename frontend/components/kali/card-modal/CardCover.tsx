@@ -7,11 +7,16 @@ import SectionLabel from '../shared/SectionLabel'
 
 interface CardCoverProps {
   card: Card
+  readOnly?: boolean
   onOpenPanel: () => void
 }
 
-export default function CardCover({ card, onOpenPanel }: CardCoverProps) {
+export default function CardCover({ card, readOnly = false, onOpenPanel }: CardCoverProps) {
   const { updateCard, addActivity } = useStore()
+
+  // Nothing to offer a viewer: the cover itself already renders at the top of
+  // the card, so the whole section drops out rather than sitting there inert.
+  if (readOnly) return null
 
   return (
     <section>

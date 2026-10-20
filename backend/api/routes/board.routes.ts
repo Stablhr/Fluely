@@ -8,7 +8,7 @@ import {pollController} from '../controllers/poll.controller';
 import {validateRequest} from '../middleware/validation';
 import {requireAuth, requireUser} from '../middleware/auth';
 import {requireBoardAccess} from '../middleware/boardAccess';
-import {authActionLimiter, authReadLimiter, pollLimiter} from '../middleware/rateLimit';
+import {authActionLimiter, authReadLimiter, backgroundReadLimiter, pollLimiter} from '../middleware/rateLimit';
 import {
   activityQuerySchema,
   boardCreateSchema,
@@ -64,9 +64,11 @@ router.post(
 );
 
 // ── Invitations for the signed-in person ──────────────────────────
+// Refreshed alongside the notification bell, so it shares the background
+// polling budget instead of the interactive read one.
 router.get(
   '/invitations',
-  authReadLimiter,
+  backgroundReadLimiter,
   boardCollaboratorController.listPending
 );
 
