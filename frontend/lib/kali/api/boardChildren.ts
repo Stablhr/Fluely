@@ -72,6 +72,18 @@ export interface CardDto {
   done: boolean;
   createdAt: string;
   updatedAt: string;
+  imageUrl?: string | null;
+  image?: { url: string } | null;
+  coverImageUrl?: string | null;
+  media?: {
+    id: string;
+    url: string;
+    name: string;
+    mimeType: string;
+    sizeBytes: number;
+    kind: string;
+    createdAt: string;
+  }[];
 }
 
 /**
@@ -159,13 +171,51 @@ export function toList(
  * copy always wins for those four and the server owns the rest.
  */
 export function toCard(dto: CardDto, existing?: Card): Card {
+  const imageUrl =
+    dto.imageUrl ?? dto.coverImageUrl ?? dto.image?.url ?? null;
+
+  // Server-owned cover: when the server knows about a cover image, adopt it;
+  // when it does not, keep a locally-set color cover but drop a stale image
+  // cover so a removed cover does not linger.
+  const cover =
+    dto.coverMediaId
+      ? {
+          type: "image" as const,
+          dataUrl:
+            imageUrl ??
+            (existing?.cover && typeof existing.cover !== "string" && existing.cover.type === "image"
+              ? existing.cover.dataUrl
+              : ""),
+          mediaId: dto.coverMediaId,
+        }
+      : existing?.cover && typeof existing.cover === "object" && existing.cover.type === "image"
+        ? null
+        : existing?.cover ?? null;
+
+  // Server-owned attachments: replace the local list with what the server
+  // reports, so collaborators see uploads made on another client. Fall back to
+  // the local copy when the payload omits the field (older server).
+  const files =
+    dto.media !== undefined
+      ? dto.media.map((m) => ({
+          id: m.id,
+          name: m.name,
+          type: m.kind === "image" ? ("image" as const) : ("file" as const),
+          dataUrl: m.url,
+          mediaId: m.id,
+          mimeType: m.mimeType,
+          size: m.sizeBytes,
+          addedAt: m.createdAt ?? new Date().toISOString(),
+        }))
+      : existing?.files ?? [];
+
   return {
     id: dto.id,
     boardId: dto.boardId,
     listId: dto.listId,
     title: dto.title,
     desc: dto.desc ?? "",
-    cover: existing?.cover ?? null,
+    cover,
     coverSize: toCoverSize(dto.coverSize),
     labelIds: dto.labelIds ?? [],
     memberIds: dto.memberIds ?? [],
@@ -175,7 +225,7 @@ export function toCard(dto: CardDto, existing?: Card): Card {
     watching: dto.watching ?? false,
     archived: dto.archived ?? false,
     done: dto.done ?? false,
-    files: existing?.files ?? [],
+    files,
     comments: existing?.comments ?? [],
     activity: existing?.activity ?? [],
     createdAt: existing?.createdAt ?? dto.createdAt,
@@ -283,6 +333,9 @@ export interface CreateCardInput {
   location?: string | null;
   labelIds?: string[];
   memberIds?: string[];
+  coverSize?: "small" | "medium" | "large" | "full";
+  coverMediaId?: string | null;
+  mediaIds?: string[];
   position?: number;
   expectedRevision?: number | null;
 }

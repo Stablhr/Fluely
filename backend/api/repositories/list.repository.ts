@@ -43,5 +43,8 @@ export const listRepository = {
   ) => ListModel.updateOne({_id: id, boardId}, data, {session}).exec(),
 
   delete: (id: string, boardId: Types.ObjectId, session?: ProductSession) =>
-    ListModel.deleteOne({_id: id, boardId}, {session}).exec()
+    ListModel.deleteOne({_id: id, boardId}, {session}).exec(),
+
+  deleteForBoard: (boardId: Types.ObjectId, session?: ProductSession) =>
+    ListModel.deleteMany({boardId}, {session}).exec()
 };

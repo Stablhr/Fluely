@@ -246,6 +246,10 @@ export async function fetchPublicBoard(slug: string): Promise<BoardDto> {
   return data.board;
 }
 
+export async function deleteBoardOnServer(boardId: string): Promise<void> {
+  await httpClient.delete(`/boards/${boardId}`);
+}
+
 export async function setBoardVisibilityOnServer(
   boardId: string,
   visibility: Visibility,

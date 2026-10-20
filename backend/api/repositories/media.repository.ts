@@ -1,4 +1,5 @@
 import {Types} from 'mongoose';
+import {ProductSession} from '../utils/transaction';
 import {
   MediaAttachmentDocument,
   MediaAttachmentModel
@@ -22,6 +23,11 @@ export const mediaRepository = {
   create: (data: CreateMediaInput) => MediaAttachmentModel.create(data),
 
   findById: (id: string) => MediaAttachmentModel.findById(id).exec(),
+
+  findByIds: (ids: string[]) =>
+    ids.length === 0
+      ? Promise.resolve([])
+      : MediaAttachmentModel.find({_id: {$in: ids}}).exec(),
 
   findByIdForOwner: (id: string, ownerId: Types.ObjectId) =>
     MediaAttachmentModel.findOne({_id: id, ownerId}).exec(),
@@ -65,6 +71,6 @@ export const mediaRepository = {
   deleteByIdForOwner: (id: string, ownerId: Types.ObjectId) =>
     MediaAttachmentModel.deleteOne({_id: id, ownerId}).exec(),
 
-  deleteForBoard: (boardId: Types.ObjectId) =>
-    MediaAttachmentModel.deleteMany({boardId}).exec()
+  deleteForBoard: (boardId: Types.ObjectId, session?: ProductSession) =>
+    MediaAttachmentModel.deleteMany({boardId}, {session}).exec()
 };

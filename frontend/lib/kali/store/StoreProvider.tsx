@@ -39,6 +39,7 @@ import { useSocialPosts } from "@/lib/kali/feature-hooks/useSocialPosts";
 import type { BoardActivityDto, BoardDto, BoardPollResponse } from "@/lib/kali/api/boards";
 import {
   createBoardOnServer,
+  deleteBoardOnServer,
   fetchBoardActivity,
   fetchBoards,
   fetchCollaborators,
@@ -153,6 +154,22 @@ function toCardPatch(patch: Partial<Card>): Partial<CreateCardInput> {
   if (patch.location !== undefined) out.location = patch.location;
   if (patch.labelIds !== undefined) out.labelIds = patch.labelIds;
   if (patch.memberIds !== undefined) out.memberIds = patch.memberIds;
+  if (patch.coverSize !== undefined) out.coverSize = patch.coverSize;
+  // Persist uploaded card photos (and cover changes) to the server so other
+  // collaborators see them. `cover` is translated to the media id the server
+  // stores; `files` are translated to their media ids.
+  if (patch.cover !== undefined) {
+    if (patch.cover === null) {
+      out.coverMediaId = null;
+    } else if (typeof patch.cover === "object" && patch.cover?.type === "image") {
+      out.coverMediaId = patch.cover.mediaId ?? null;
+    }
+  }
+  if (patch.files !== undefined) {
+    out.mediaIds = patch.files
+      .map((file) => file.mediaId)
+      .filter((id): id is string => Boolean(id));
+  }
   return out;
 }
 
@@ -990,36 +1007,61 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   // A useCallback rather than a plain function: the realtime handler below
   // depends on it, and re-creating it every render would churn that callback's
   // identity — and with it the Pusher subscription bound to it.
-  const deleteBoard = useCallback((id: string) => {
-    mutate((prev) => {
-      const board = prev.boards[id];
-      if (!board) return prev;
-      const listIds = new Set(board.listOrder);
-      const lists: Record<string, List> = {};
-      for (const [k, v] of Object.entries(prev.lists)) {
-        if (!listIds.has(k)) lists[k] = v;
+  const removeBoardLocally = useCallback(
+    (id: string) => {
+      mutate((prev) => {
+        const board = prev.boards[id];
+        if (!board) return prev;
+        const listIds = new Set(board.listOrder);
+        const lists: Record<string, List> = {};
+        for (const [k, v] of Object.entries(prev.lists)) {
+          if (!listIds.has(k)) lists[k] = v;
+        }
+        const cards: Record<string, Card> = {};
+        for (const [k, v] of Object.entries(prev.cards)) {
+          if (!listIds.has(v.listId)) cards[k] = v;
+        }
+        const boards = { ...prev.boards };
+        delete boards[id];
+        return {
+          ...prev,
+          boards,
+          lists,
+          cards,
+          ui: {
+            ...prev.ui,
+            lastVisitedBoardId:
+              prev.ui.lastVisitedBoardId === id
+                ? null
+                : prev.ui.lastVisitedBoardId,
+          },
+        };
+      });
+    },
+    [mutate],
+  );
+
+  const deleteBoard = useCallback(
+    (id: string) => {
+      const board = dataRef.current.boards[id];
+      if (board && isServerBoard(board)) {
+        void (async () => {
+          try {
+            await deleteBoardOnServer(id);
+          } catch (err) {
+            setError(
+              getFriendlyErrorMessage(err, "Could not delete that board."),
+            );
+            return;
+          }
+          removeBoardLocally(id);
+        })();
+        return;
       }
-      const cards: Record<string, Card> = {};
-      for (const [k, v] of Object.entries(prev.cards)) {
-        if (!listIds.has(v.listId)) cards[k] = v;
-      }
-      const boards = { ...prev.boards };
-      delete boards[id];
-      return {
-        ...prev,
-        boards,
-        lists,
-        cards,
-        ui: {
-          ...prev.ui,
-          lastVisitedBoardId:
-            prev.ui.lastVisitedBoardId === id
-              ? null
-              : prev.ui.lastVisitedBoardId,
-        },
-      };
-    });
-  }, [mutate]);
+      removeBoardLocally(id);
+    },
+    [removeBoardLocally, setError],
+  );
 
   const renameBoard = (id: string, name: string) =>
     mutate((prev) => ({

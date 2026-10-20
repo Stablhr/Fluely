@@ -1,6 +1,7 @@
 import {Types} from 'mongoose';
 import {cardRepository} from '../repositories/card.repository';
 import {listRepository} from '../repositories/list.repository';
+import {mediaRepository} from '../repositories/media.repository';
 import {BoardDocument} from '../models/Board.model';
 import {CardCoverSize, CardDocument} from '../models/Card.model';
 import {bumpBoardRevision} from './boardRevision';
@@ -40,7 +41,21 @@ type MoveCardInput = {
   expectedRevision?: number;
 };
 
-function serializeCard(card: CardDocument) {
+async function serializeCard(card: CardDocument) {
+  const ids = [
+    ...(card.coverMediaId ? [card.coverMediaId.toString()] : []),
+    ...card.mediaIds.map(id => id.toString())
+  ];
+  const mediaDocs = await mediaRepository.findByIds(ids);
+  const coverMedia = card.coverMediaId
+    ? mediaDocs.find(doc => doc._id.equals(card.coverMediaId))
+    : undefined;
+  const cardMedia = card.mediaIds
+    .map(id => mediaDocs.find(doc => doc._id.equals(id)))
+    .filter((doc): doc is NonNullable<typeof doc> => Boolean(doc));
+
+  const imageUrl = coverMedia?.url ?? null;
+
   return {
     id: card._id.toString(),
     boardId: card.boardId.toString(),
@@ -59,7 +74,20 @@ function serializeCard(card: CardDocument) {
     archived: card.archived,
     done: card.done,
     createdAt: card.createdAt,
-    updatedAt: card.updatedAt
+    updatedAt: card.updatedAt,
+    // Consistent image field across REST and realtime payloads.
+    imageUrl,
+    image: imageUrl ? {url: imageUrl} : null,
+    coverImageUrl: imageUrl,
+    media: cardMedia.map(doc => ({
+      id: doc._id.toString(),
+      url: doc.url,
+      name: doc.originalName,
+      mimeType: doc.mimeType,
+      sizeBytes: doc.sizeBytes,
+      kind: doc.kind,
+      createdAt: doc.createdAt
+    }))
   };
 }
 
@@ -137,7 +165,7 @@ export const cardService = {
 
   async list(board: BoardDocument) {
     const cards = await cardRepository.listByBoard(board._id);
-    return cards.map(serializeCard);
+    return Promise.all(cards.map(serializeCard));
   },
 
   async create(actor: Actor, board: BoardDocument, input: CreateCardInput) {
@@ -188,7 +216,7 @@ export const cardService = {
       return {card, revision, activity};
     });
 
-    const body = {card: serializeCard(result.card), revision: result.revision};
+    const body = {card: await serializeCard(result.card), revision: result.revision};
     return body;
   },
 
@@ -256,7 +284,7 @@ export const cardService = {
       return {updated, revision, activity};
     });
 
-    const body = {card: serializeCard(result.updated), revision: result.revision};
+    const body = {card: await serializeCard(result.updated), revision: result.revision};
     return body;
   },
 
@@ -327,7 +355,7 @@ export const cardService = {
     });
 
     const body = {
-      card: serializeCard(result.moved),
+      card: await serializeCard(result.moved),
       listId: result.listId,
       revision: result.revision
     };

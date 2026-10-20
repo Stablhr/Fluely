@@ -47,5 +47,8 @@ export const activityLogRepository = {
     ActivityLogModel.find({boardId, revision: {$gt: since}})
       .sort({revision: 1, createdAt: 1})
       .limit(50)
-      .exec()
+      .exec(),
+
+  deleteForBoard: (boardId: Types.ObjectId, session?: ProductSession) =>
+    ActivityLogModel.deleteMany({boardId}, {session}).exec()
 };

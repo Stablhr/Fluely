@@ -10,6 +10,8 @@ import {
 import {assertBoardRevision} from './boardRevision';
 import {listRepository} from '../repositories/list.repository';
 import {cardRepository} from '../repositories/card.repository';
+import {mediaRepository} from '../repositories/media.repository';
+import {activityLogRepository} from '../repositories/activityLog.repository';
 import {listService} from './list.service';
 import {cardService} from './card.service';
 import {activityService} from './activity.service';
@@ -277,7 +279,7 @@ export const boardService = {
 
     return {
       lists: [...ordered, ...orphans].map(listService.serialize),
-      cards: cards.map(cardService.serialize),
+      cards: await Promise.all(cards.map(card => cardService.serialize(card))),
       revision: board.revision
     };
   },
@@ -383,8 +385,18 @@ export const boardService = {
   },
 
   async remove(actor: Actor, board: BoardDocument) {
+    // Owner-only: the route already enforces this, but the service checks too
+    // so a direct call cannot bypass it.
+    if (!board.ownerId.equals(actor.actorId)) {
+      throw new ApiError(403, ErrorCodes.FORBIDDEN, 'Only the board owner can do that');
+    }
+
     const result = await withProductTransaction(async session => {
       await boardCollaboratorRepository.deleteForBoard(board._id, session);
+      await listRepository.deleteForBoard(board._id, session);
+      await cardRepository.deleteForBoard(board._id, session);
+      await mediaRepository.deleteForBoard(board._id);
+      await activityLogRepository.deleteForBoard(board._id, session);
       await boardRepository.delete(board._id.toString(), session);
 
       const activity = await activityService.log(session, {
