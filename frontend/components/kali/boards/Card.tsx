@@ -37,7 +37,10 @@ function CardCoverBand({ card }: { card: Card }) {
       )
     }
     return (
-      <div className="relative -mx-2.5 -mt-2.5 mb-2 aspect-[4/5] w-[calc(100%+20px)] overflow-hidden rounded-t-xl">
+      <div
+        className="relative -mx-2.5 -mt-2.5 mb-2 overflow-hidden rounded-t-xl"
+        style={{ width: '254.4px', height: '318px' }}
+      >
         <img
           src={card.cover.dataUrl}
           alt=""
