@@ -239,14 +239,14 @@ export default function ShareModal({
               <Avatar
                 member={{
                   id: "owner",
-                  name: "You (owner)",
-                  color: colorFor("owner"),
+                  name: board.ownerName || "Owner",
+                  color: colorFor(board.ownerId || "owner"),
                 }}
                 size={34}
               />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-text-primary">
-                  You{" "}
+                  {board.ownerName || "Owner"}{" "}
                   <span className="ml-1 text-xs text-text-secondary">
                     (owner)
                   </span>

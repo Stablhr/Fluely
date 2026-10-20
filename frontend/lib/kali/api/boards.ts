@@ -41,6 +41,7 @@ export interface BoardDto {
   listOrder: string[];
   revision: number;
   ownerId: string;
+  ownerName?: string | null;
   workspaceId: string | null;
   access: BoardAccessLevel;
   archivedAt: string | null;
@@ -157,6 +158,7 @@ export function mergeServerBoard(
   | "background"
   | "access"
   | "ownerId"
+  | "ownerName"
   | "workspaceId"
   | "publicSlug"
   | "revision"
@@ -173,6 +175,7 @@ export function mergeServerBoard(
     background: dto.background || existing?.background || "",
     access: dto.access,
     ownerId: dto.ownerId,
+    ownerName: dto.ownerName ?? existing?.ownerName ?? null,
     workspaceId: dto.workspaceId,
     // The server withholds the slug while a board is not public; keeping the
     // local copy would let a revoked board keep resolving an old link.

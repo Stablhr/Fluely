@@ -74,8 +74,10 @@ type UpdateBoardInput = {
   expectedRevision?: number;
 };
 
-function serializeBoard(board: BoardRow) {
+async function serializeBoard(board: BoardRow) {
   const isPublic = board.visibility === 'public';
+  const owner = await userRepository.findById(board.ownerId.toString());
+  const ownerName = owner ? `${owner.firstName} ${owner.lastName}`.trim() : '';
   return {
     id: board._id.toString(),
     name: board.name,
@@ -94,6 +96,7 @@ function serializeBoard(board: BoardRow) {
     listOrder: (board.listOrder ?? []).map(id => id.toString()),
     revision: board.revision,
     ownerId: board.ownerId.toString(),
+    ownerName,
     workspaceId: board.workspaceId ? board.workspaceId.toString() : null,
     access: board.access,
     archivedAt: board.archivedAt,
@@ -126,16 +129,16 @@ async function allocatePublicSlug(): Promise<string> {
   );
 }
 
-function presentRows(
+async function presentRows(
   rows: BoardRow[],
   filter: {visibility?: BoardVisibility; search?: string}
 ) {
   const search = filter.search?.toLowerCase();
-  return rows
+  const filtered = rows
     .filter(row => !filter.visibility || row.visibility === filter.visibility)
     .filter(row => !search || row.name.toLowerCase().includes(search))
-    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-    .map(serializeBoard);
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  return Promise.all(filtered.map(serializeBoard));
 }
 
 export const boardService = {
@@ -175,7 +178,7 @@ export const boardService = {
       'Board created'
     );
 
-    return serializeBoard(toRow(board, 'owner'));
+    return await serializeBoard(toRow(board, 'owner'));
   },
 
   /**
@@ -224,7 +227,7 @@ export const boardService = {
         })
       ];
 
-      return presentRows(rows, filter);
+      return await presentRows(rows, filter);
     }
 
     const workspaceId = await primaryWorkspaceId(actor);
@@ -242,11 +245,11 @@ export const boardService = {
         .map(board => toRow(board, 'public-view'))
     ];
 
-    return presentRows(rows, filter);
+    return await presentRows(rows, filter);
   },
 
   async get(board: BoardDocument, level: BoardAccessLevel) {
-    return serializeBoard(toRow(board, level));
+    return await serializeBoard(toRow(board, level));
   },
 
   /**
@@ -305,7 +308,7 @@ export const boardService = {
 
     if (Object.keys(patch).length === 0) {
       const current = await boardRepository.findById(board._id.toString());
-      return serializeBoard(toRow(current!, level));
+      return await serializeBoard(toRow(current!, level));
     }
 
     const result = await withProductTransaction(async session => {
@@ -331,7 +334,7 @@ export const boardService = {
       return {updated: updated!, activity};
     });
 
-    const serialized = serializeBoard(toRow(result.updated, level));
+    const serialized = await serializeBoard(toRow(result.updated, level));
     return serialized;
   },
 
@@ -380,7 +383,7 @@ export const boardService = {
       return {updated: updated!, activity};
     });
 
-    const serialized = serializeBoard(toRow(result.updated, 'owner'));
+    const serialized = await serializeBoard(toRow(result.updated, 'owner'));
     return serialized;
   },
 
@@ -428,6 +431,6 @@ export const boardService = {
     }
 
     const level = await getBoardAccessLevel(actor, board);
-    return serializeBoard(toRow(board, level));
+    return await serializeBoard(toRow(board, level));
   }
 };

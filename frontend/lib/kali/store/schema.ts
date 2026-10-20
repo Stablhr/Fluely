@@ -132,6 +132,8 @@ export interface Board {
   access: BoardAccessLevel;
   /** Null while the board is local-only. */
   ownerId: string | null;
+  /** Display name of the board owner, when known. */
+  ownerName?: string | null;
   /** Null while local-only, or for a personal board with no workspace. */
   workspaceId: string | null;
   /** The addressable handle, present only while `visibility` is `public`. */
