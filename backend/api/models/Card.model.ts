@@ -34,6 +34,7 @@ export interface CardDocument extends mongoose.Document {
   location: string | null;
   watching: boolean;
   mediaIds: Types.ObjectId[];
+  comments: {id: string; authorId: Types.ObjectId | null; text: string; reactions: Record<string, number>; createdAt: Date}[];
   archived: boolean;
   done: boolean;
   createdAt: Date;
@@ -55,6 +56,18 @@ const CardSchema = new Schema<CardDocument>(
     location: {type: String, default: null, maxlength: 500},
     watching: {type: Boolean, default: false},
     mediaIds: {type: [Schema.Types.ObjectId], default: []},
+    comments: {
+      type: [
+        {
+          id: {type: String, required: true},
+          authorId: {type: Schema.Types.ObjectId, default: null},
+          text: {type: String, default: ''},
+          reactions: {type: Schema.Types.Mixed, default: {}},
+          createdAt: {type: Date, default: Date.now}
+        }
+      ],
+      default: []
+    },
     archived: {type: Boolean, default: false},
     done: {type: Boolean, default: false}
   },

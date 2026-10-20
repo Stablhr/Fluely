@@ -1,5 +1,6 @@
 import { httpClient } from "@/lib/api/httpClient";
 import type { Card, List } from "@/lib/kali/store/schema";
+import { YOU_ID } from "@/lib/kali/store/schema";
 
 /**
  * Board children: lists and cards.
@@ -82,6 +83,13 @@ export interface CardDto {
     mimeType: string;
     sizeBytes: number;
     kind: string;
+    createdAt: string;
+  }[];
+  comments?: {
+    id: string;
+    authorId: string | null;
+    text: string;
+    reactions: Record<string, number>;
     createdAt: string;
   }[];
 }
@@ -226,7 +234,16 @@ export function toCard(dto: CardDto, existing?: Card): Card {
     archived: dto.archived ?? false,
     done: dto.done ?? false,
     files,
-    comments: existing?.comments ?? [],
+    comments:
+      dto.comments !== undefined
+        ? dto.comments.map((c) => ({
+            id: c.id,
+            authorId: c.authorId ?? YOU_ID,
+            text: c.text,
+            reactions: c.reactions ?? {},
+            createdAt: c.createdAt ?? new Date().toISOString(),
+          }))
+        : existing?.comments ?? [],
     activity: existing?.activity ?? [],
     createdAt: existing?.createdAt ?? dto.createdAt,
     updatedAt: existing?.updatedAt ?? dto.updatedAt,
@@ -336,6 +353,13 @@ export interface CreateCardInput {
   coverSize?: "small" | "medium" | "large" | "full";
   coverMediaId?: string | null;
   mediaIds?: string[];
+  comments?: {
+    id: string;
+    authorId?: string | null;
+    text: string;
+    reactions?: Record<string, number>;
+    createdAt?: string;
+  }[];
   position?: number;
   expectedRevision?: number | null;
 }

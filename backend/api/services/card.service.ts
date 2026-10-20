@@ -15,6 +15,13 @@ import {ErrorCodes} from '../constants/errorCodes';
 type CardInput = {
   title?: string;
   desc?: string;
+  comments?: {
+    id: string;
+    authorId?: string | null;
+    text: string;
+    reactions?: Record<string, number>;
+    createdAt?: string;
+  }[];
   coverMediaId?: string | null;
   coverSize?: CardCoverSize;
   labelIds?: string[];
@@ -71,6 +78,13 @@ async function serializeCard(card: CardDocument) {
     location: card.location,
     watching: card.watching,
     mediaIds: card.mediaIds.map(id => id.toString()),
+    comments: (card.comments ?? []).map(c => ({
+      id: c.id,
+      authorId: c.authorId ? c.authorId.toString() : null,
+      text: c.text,
+      reactions: c.reactions ?? {},
+      createdAt: c.createdAt
+    })) as any,
     archived: card.archived,
     done: card.done,
     createdAt: card.createdAt,
@@ -189,7 +203,14 @@ export const cardService = {
           startDate: input.startDate ? new Date(input.startDate) : null,
           location: input.location ?? null,
           watching: input.watching ?? false,
-          mediaIds: (input.mediaIds ?? []).map(id => new Types.ObjectId(id))
+          mediaIds: (input.mediaIds ?? []).map(id => new Types.ObjectId(id)),
+          comments: (input.comments ?? []).map(c => ({
+            id: c.id,
+            authorId: c.authorId ? new Types.ObjectId(c.authorId) : null,
+            text: c.text,
+            reactions: c.reactions ?? {},
+            createdAt: c.createdAt ? new Date(c.createdAt) : new Date()
+          }))
         },
         session
       );
@@ -249,6 +270,15 @@ export const cardService = {
         patch.startDate = input.startDate ? new Date(input.startDate) : null;
       }
       if (input.location !== undefined) patch.location = input.location;
+      if (input.comments !== undefined) {
+        patch.comments = input.comments.map(c => ({
+          id: c.id,
+          authorId: c.authorId ? new Types.ObjectId(c.authorId) : null,
+          text: c.text,
+          reactions: c.reactions ?? {},
+          createdAt: c.createdAt ? new Date(c.createdAt) : new Date()
+        }));
+      }
 
       await cardRepository.update(cardId, board._id, patch, session);
       const updated = await requireCardForBoard(cardId, board._id, session);

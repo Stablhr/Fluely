@@ -16,6 +16,7 @@ type CreateCardInput = Pick<CardDocument, 'boardId' | 'listId' | 'title'> &
       | 'location'
       | 'watching'
       | 'mediaIds'
+      | 'comments'
       | 'archived'
       | 'done'
     >

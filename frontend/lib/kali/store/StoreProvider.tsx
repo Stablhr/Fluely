@@ -170,6 +170,15 @@ function toCardPatch(patch: Partial<Card>): Partial<CreateCardInput> {
       .map((file) => file.mediaId)
       .filter((id): id is string => Boolean(id));
   }
+  if (patch.comments !== undefined) {
+    out.comments = patch.comments.map((c) => ({
+      id: c.id,
+      authorId: c.authorId,
+      text: c.text,
+      reactions: c.reactions,
+      createdAt: c.createdAt,
+    }));
+  }
   return out;
 }
 
