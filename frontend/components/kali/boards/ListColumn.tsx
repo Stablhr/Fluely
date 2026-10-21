@@ -7,7 +7,7 @@ import { Check, GripVertical } from 'lucide-react'
 import type { Card, List } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import { useAdaptiveTheme, adaptiveVars } from '@/lib/kali/hooks/useAdaptiveTheme'
-import CardFace from './Card'
+import CardTile from './CardTile'
 import AddCardForm from './AddCardForm'
 import ListMenu from './ListMenu'
 import type { BoardFilter } from './FilterPanel'
@@ -157,7 +157,7 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
               }}
             >
               {cards.map((card, index) => (
-                <CardFace key={card.id} card={card} index={index} onOpenCard={onOpenCard} />
+                <CardTile key={card.id} card={card} index={index} onOpenCard={onOpenCard} />
               ))}
               {droppableProvided.placeholder}
               <AddCardForm listId={list.id} />
