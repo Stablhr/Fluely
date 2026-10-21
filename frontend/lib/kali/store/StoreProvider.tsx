@@ -1622,7 +1622,15 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     const card = dataRef.current.cards[id];
     if (!card || !canWrite(card.boardId)) return;
     if (isServerBoard(dataRef.current.boards[card.boardId])) {
-      const serverPatch = toCardPatch(patch);
+      const patchForServer = { ...patch };
+      if (patch.comments !== undefined) {
+        patchForServer.comments = patch.comments.map((comment) => ({
+          ...comment,
+          authorId:
+            comment.authorId === YOU_ID ? currentUser?.id ?? comment.authorId : comment.authorId,
+        }));
+      }
+      const serverPatch = toCardPatch(patchForServer);
       if (serverPatch.memberIds !== undefined) {
         serverPatch.memberIds = memberIdsToServer(
           serverPatch.memberIds,

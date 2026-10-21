@@ -77,8 +77,13 @@ export default function CardComments({ card, readOnly = false }: { card: Card; r
 
       <div className="mt-3 space-y-3">
         {card.comments.map((comment) => {
-          const author = store.data.members[comment.authorId]
-          if (!author) return null
+          const author =
+            store.data.members[comment.authorId] ?? {
+              id: comment.authorId,
+              name:
+                comment.authorId === store.currentUserId ? "You" : "Collaborator",
+              color: "#3971B8",
+            }
           const reactionEntries = Object.entries(comment.reactions).filter(([, c]) => c > 0)
           const pickerOpen = activePicker === comment.id
 
