@@ -74,7 +74,7 @@ function CardTile({ card, index, onOpenCard }: CardTileProps) {
               <img
                 src={imageCover}
                 alt=""
-                className="block aspect-square w-full object-cover"
+                className="block aspect-[4/3] w-full object-cover"
                 draggable={false}
               />
             </div>
