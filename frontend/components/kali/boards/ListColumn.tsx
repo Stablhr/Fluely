@@ -56,6 +56,10 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
   }
   const cards = allCards.filter((c) => matchesQuery(c) && matchesFilter(c))
 
+  // A list with cards fills the board height and scrolls inside. An empty one
+  // keeps its natural size -- a full-height empty box reads as broken.
+  const fillsHeight = cards.length > 0
+
   const commitRename = () => {
     setEditing(false)
     const trimmed = name.trim()
@@ -65,9 +69,9 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
 
   return (
     <div
-      className={`relative flex h-full max-h-full shrink-0 flex-col rounded-xl transition-[width] duration-200 ease-in-out ${
-        list.collapsed ? 'w-[46px] overflow-hidden' : 'w-[272px]'
-      }`}
+      className={`relative flex shrink-0 flex-col rounded-xl transition-[width] duration-200 ease-in-out ${
+        fillsHeight ? 'h-full max-h-full' : 'h-fit'
+      } ${list.collapsed ? 'w-[46px] overflow-hidden' : 'w-[272px]'}`}
       style={{ ...vars, background: bg, border: `1px solid ${theme.border}` }}
     >
       {/* Collapsed name overlay */}
