@@ -10,6 +10,7 @@ import type {
   Label,
   Collaborator,
   CollaboratorRole,
+  Member,
   SocialPost,
   SocialPostPlatform,
   SocialMediaAttachment,
@@ -19,6 +20,7 @@ import type {
 } from "./schema";
 import {
   BOARD_TEMPLATES,
+  MEMBER_COLORS,
   emptyData,
   YOU_ID,
   canWriteBoard,
@@ -61,6 +63,7 @@ import {
   moveCardOnServer,
   reorderCardsOnServer,
   reorderListsOnServer,
+  setCardMemberOnServer,
   toCard,
   toList,
   updateCardOnServer,
@@ -238,6 +241,72 @@ function memberIdToServer(
 function withLocalMemberIds(card: Card, youId: string | null | undefined): Card {
   const memberIds = memberIdsFromServer(card.memberIds, youId);
   return memberIds === card.memberIds ? card : { ...card, memberIds };
+}
+
+/** Stable, readable avatar colour for a board member with no local record. */
+function memberColorFor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  }
+  return MEMBER_COLORS[Math.abs(hash) % MEMBER_COLORS.length];
+}
+
+/**
+ * Owner plus accepted collaborators only. The owner is remapped to the local
+ * "you" id when it is the signed-in person, matching how card member ids are
+ * stored after `withLocalMemberIds`. Local-only members are appended so boards
+ * that have never left the browser still render their assignee.
+ */
+function boardMembersFor(
+  data: AppData,
+  boardId: string,
+  youId: string | null | undefined,
+): Member[] {
+  const board = data.boards[boardId];
+  if (!board) return Object.values(data.members);
+
+  const members: Member[] = [];
+  const seen = new Set<string>();
+  const add = (member: Member) => {
+    if (seen.has(member.id)) return;
+    seen.add(member.id);
+    members.push(member);
+  };
+
+  if (board.ownerId) {
+    const isYou = Boolean(youId && board.ownerId === youId);
+    const local = isYou ? data.members[YOU_ID] : undefined;
+    add({
+      id: isYou ? YOU_ID : board.ownerId,
+      name:
+        local?.name ||
+        board.ownerName?.trim() ||
+        "Board owner",
+      color: local?.color ?? memberColorFor(board.ownerId),
+    });
+  }
+
+  for (const collaborator of board.collaborators) {
+    if (collaborator.status !== "accepted") continue;
+    const isYou = Boolean(youId && collaborator.userId === youId);
+    const local = isYou ? data.members[YOU_ID] : undefined;
+    add({
+      id: isYou ? YOU_ID : collaborator.userId,
+      name:
+        local?.name ||
+        collaborator.name ||
+        collaborator.email ||
+        "Collaborator",
+      color: local?.color ?? memberColorFor(collaborator.userId),
+    });
+  }
+
+  // Local-only members, including the fallback "You" record. Kept last so the
+  // server roster wins the display name when both describe the same person.
+  for (const member of Object.values(data.members)) add(member);
+
+  return members;
 }
 
 /**
@@ -1680,6 +1749,78 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }));
   };
 
+  /**
+   * Owner-only card assignment. Applies optimistically for the owner, then
+   * writes through the narrow `/cards/:id/members` endpoint so the server can
+   * enforce the same rule and validate that the target is on the board.
+   */
+  const setCardMember = (
+    cardId: string,
+    memberId: string,
+    assign: boolean,
+  ) => {
+    const card = dataRef.current.cards[cardId];
+    if (!card) return;
+    const board = dataRef.current.boards[card.boardId];
+    if (!board || board.access !== "owner") return;
+
+    const serverMemberId =
+      memberId === YOU_ID ? currentUser?.id ?? null : memberId;
+    if (!serverMemberId) return;
+    const localMemberId =
+      serverMemberId === currentUser?.id ? YOU_ID : serverMemberId;
+
+    mutate((prev) => {
+      const current = prev.cards[cardId];
+      if (!current) return prev;
+      const memberIds = assign
+        ? current.memberIds.includes(localMemberId)
+          ? current.memberIds
+          : [...current.memberIds, localMemberId]
+        : current.memberIds.filter(
+            (id) => id !== localMemberId && id !== serverMemberId,
+          );
+      return {
+        ...prev,
+        cards: {
+          ...prev.cards,
+          [cardId]: { ...current, memberIds, updatedAt: now() },
+        },
+      };
+    });
+
+    if (!isServerBoard(board)) return;
+
+    void writeThrough(
+      board.id,
+      (revision) =>
+        setCardMemberOnServer(
+          board.id,
+          cardId,
+          serverMemberId,
+          assign ? "add" : "remove",
+          revision,
+        ).then((updated) => {
+          mutate((prev) => {
+            const current = prev.cards[cardId];
+            if (!current) return prev;
+            return {
+              ...prev,
+              cards: {
+                ...prev.cards,
+                [cardId]: withLocalMemberIds(
+                  toCard(updated, current),
+                  currentUser?.id,
+                ),
+              },
+            };
+          });
+          return updated.revision;
+        }),
+      "Could not update card assignments.",
+    );
+  };
+
   const moveCard = (cardId: string, destListId: string, destIndex: number) => {
     const card = dataRef.current.cards[cardId];
     const dest = dataRef.current.lists[destListId];
@@ -2298,6 +2439,13 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     (boardId: string): Collaborator[] =>
       dataRef.current.boards[boardId]?.collaborators ?? [],
     [],
+  );
+
+  /** The assignable roster: owner + accepted collaborators, no pending invites. */
+  const getBoardMembers = useCallback(
+    (boardId: string): Member[] =>
+      boardMembersFor(dataRef.current, boardId, currentUser?.id),
+    [currentUser?.id],
   );
 
   /**
@@ -3066,6 +3214,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     addCard,
     deleteCard,
     updateCard,
+    setCardMember,
     moveCard,
     addActivity,
     addBoardActivity,
@@ -3094,6 +3243,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     canManage,
     boardAccess,
     getCollaborators,
+    getBoardMembers,
     loadCollaborators,
     inviteCollaborator,
     setCollaboratorRole,

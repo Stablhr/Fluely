@@ -47,6 +47,22 @@ export const cardController = {
     }
   },
 
+  /** Owner-only route; the service re-checks and validates the target member. */
+  async setMember(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json(
+        await cardService.setMember(
+          actorFromRequest(req),
+          requireBoard(req),
+          req.params.cardId,
+          req.body
+        )
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async move(req: Request, res: Response, next: NextFunction) {
     try {
       res.status(200).json(

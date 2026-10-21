@@ -83,6 +83,8 @@ export interface Store {
   addCard: (listId: string, title: string) => string;
   deleteCard: (id: string) => void;
   updateCard: (id: string, patch: Partial<Card>) => void;
+  /** Owner-only. Adds or removes one accepted board member from a card. */
+  setCardMember: (cardId: string, memberId: string, assign: boolean) => void;
   moveCard: (cardId: string, destListId: string, destIndex: number) => void;
   addActivity: (cardId: string, text: string) => void;
   addBoardActivity: (boardId: string, text: string) => void;
@@ -135,6 +137,8 @@ export interface Store {
   boardAccess: (boardId: string) => BoardAccessLevel;
 
   getCollaborators: (boardId: string) => Collaborator[];
+  /** Owner + accepted collaborators, with the signed-in person keyed as "you". */
+  getBoardMembers: (boardId: string) => Member[];
   loadCollaborators: (boardId: string) => Promise<void>;
   inviteCollaborator: (
     boardId: string,

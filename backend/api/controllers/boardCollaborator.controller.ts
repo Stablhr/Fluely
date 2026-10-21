@@ -1,5 +1,6 @@
 import {NextFunction, Request, Response} from 'express';
 import {boardCollaboratorService} from '../services/boardCollaborator.service';
+import {boardMemberService} from '../services/boardMember.service';
 import {actorFromRequest} from '../utils/actor';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
@@ -17,6 +18,20 @@ export const boardCollaboratorController = {
     try {
       res.status(200).json({
         collaborators: await boardCollaboratorService.list(requireBoard(req))
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Owner + accepted collaborators only. Reused by the card assignment picker
+   * so it never falls back to a global user list or includes pending invites.
+   */
+  async listMembers(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json({
+        members: await boardMemberService.list(requireBoard(req))
       });
     } catch (error) {
       next(error);

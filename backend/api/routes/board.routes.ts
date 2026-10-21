@@ -19,6 +19,7 @@ import {
   boardVisibilityPatchSchema,
   cardCreateSchema,
   cardIdParamsSchema,
+  cardMemberPatchSchema,
   cardMoveSchema,
   cardPatchSchema,
   cardReorderSchema,
@@ -217,6 +218,19 @@ router.patch(
   cardController.update
 );
 
+/**
+ * Assignments are owner-only even though editing a card is not. A separate
+ * route keeps that narrower rule explicit and gives the UI a single endpoint
+ * that cannot be bypassed through the general card PATCH.
+ */
+router.patch(
+  '/:boardId/cards/:cardId/members',
+  authActionLimiter,
+  validateRequest({params: cardIdParamsSchema, body: cardMemberPatchSchema}),
+  requireBoardAccess('owner'),
+  cardController.setMember
+);
+
 /** Declared after the PATCH so "move" is never read as a card id. */
 router.post(
   '/:boardId/cards/:cardId/move',
@@ -235,6 +249,14 @@ router.delete(
 );
 
 // ── Collaborators ─────────────────────────────────────────────────
+router.get(
+  '/:boardId/members',
+  authReadLimiter,
+  validateRequest({params: boardIdParamsSchema}),
+  requireBoardAccess('read'),
+  boardCollaboratorController.listMembers
+);
+
 router.get(
   '/:boardId/collaborators',
   authReadLimiter,

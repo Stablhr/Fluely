@@ -6,6 +6,7 @@ import {BoardDocument} from '../models/Board.model';
 import {CardCoverSize, CardDocument} from '../models/Card.model';
 import {bumpBoardRevision} from './boardRevision';
 import {activityService} from './activity.service';
+import {boardMemberService} from './boardMember.service';
 import {withProductTransaction, ProductSession} from '../utils/transaction';
 import {ActivityActionType} from '../constants/product';
 import {Actor} from '../utils/actor';
@@ -47,6 +48,16 @@ type MoveCardInput = {
   cardOrder?: string[];
   expectedRevision?: number;
 };
+
+type SetCardMemberInput = {
+  userId: string;
+  action: 'add' | 'remove';
+  expectedRevision?: number;
+};
+
+function isBoardOwner(actor: Actor, board: BoardDocument): boolean {
+  return board.ownerId.equals(actor.actorId);
+}
 
 async function serializeCard(card: CardDocument) {
   const ids = [
@@ -183,6 +194,17 @@ export const cardService = {
   },
 
   async create(actor: Actor, board: BoardDocument, input: CreateCardInput) {
+    // Assignees are owner-managed, including on the initial create. Otherwise
+    // an editor could bypass the dedicated assignment route by creating a card
+    // that already names people.
+    if ((input.memberIds?.length ?? 0) > 0 && !isBoardOwner(actor, board)) {
+      throw new ApiError(
+        403,
+        ErrorCodes.FORBIDDEN,
+        'Only the board owner can assign members'
+      );
+    }
+
     const result = await withProductTransaction(async session => {
       // A card may only be filed under a list on its own board, so the target list
       // is proven before anything is written.
@@ -242,6 +264,17 @@ export const cardService = {
   },
 
   async update(actor: Actor, board: BoardDocument, cardId: string, input: CardInput) {
+    // The general card PATCH accepts memberIds for local imports and older
+    // clients, but assignment itself is an owner-only action. Editors keep
+    // their write access for everything else on the card.
+    if (input.memberIds !== undefined && !isBoardOwner(actor, board)) {
+      throw new ApiError(
+        403,
+        ErrorCodes.FORBIDDEN,
+        'Only the board owner can assign members'
+      );
+    }
+
     const result = await withProductTransaction(async session => {
       const before = await requireCardForBoard(cardId, board._id, session);
       const revision = await bumpBoardRevision(board._id, input.expectedRevision, session);
@@ -316,6 +349,92 @@ export const cardService = {
 
     const body = {card: await serializeCard(result.updated), revision: result.revision};
     return body;
+  },
+
+  /**
+   * Assigns or unassigns one board member. The route already requires the
+   * owner; the check here keeps the rule with the data write too. The target
+   * must be the owner or an accepted collaborator, never a pending invite or
+   * an arbitrary account id.
+   */
+  async setMember(
+    actor: Actor,
+    board: BoardDocument,
+    cardId: string,
+    input: SetCardMemberInput
+  ) {
+    if (!isBoardOwner(actor, board)) {
+      throw new ApiError(
+        403,
+        ErrorCodes.FORBIDDEN,
+        'Only the board owner can assign members'
+      );
+    }
+
+    // Removing stays allowed for a stale assignee (someone who has since left
+    // the board), so the owner can clean up a card. Adding must name a current
+    // owner or accepted collaborator.
+    if (
+      input.action === 'add' &&
+      !(await boardMemberService.isMember(board, input.userId))
+    ) {
+      throw new ApiError(
+        400,
+        ErrorCodes.VALIDATION_ERROR,
+        'That person is not a member of this board'
+      );
+    }
+
+    const memberId = new Types.ObjectId(input.userId);
+    const result = await withProductTransaction(async session => {
+      const before = await requireCardForBoard(cardId, board._id, session);
+      const revision = await bumpBoardRevision(
+        board._id,
+        input.expectedRevision,
+        session
+      );
+
+      const currentIds = before.memberIds.map(id => id.toString());
+      const memberIds =
+        input.action === 'add'
+          ? [...new Set([...currentIds, input.userId])].map(
+              id => new Types.ObjectId(id)
+            )
+          : currentIds
+              .filter(id => id !== input.userId)
+              .map(id => new Types.ObjectId(id));
+
+      await cardRepository.update(
+        cardId,
+        board._id,
+        {memberIds},
+        session
+      );
+      const updated = await requireCardForBoard(cardId, board._id, session);
+
+      const activity = await activityService.log(session, {
+        boardId: board._id,
+        actor,
+        actionType: 'card.assigned',
+        targetType: 'card',
+        targetId: cardId,
+        metadata: {
+          fields: ['memberIds'],
+          title: updated.title,
+          userId: memberId.toString(),
+          action: input.action,
+          memberIds: updated.memberIds.map(id => id.toString())
+        },
+        revision
+      });
+
+      return {updated, revision, activity};
+    });
+
+    return {
+      card: await serializeCard(result.updated),
+      revision: result.revision
+    };
   },
 
   /**

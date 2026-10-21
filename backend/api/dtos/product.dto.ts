@@ -207,6 +207,12 @@ export const cardPatchSchema = z.object({
   expectedRevision: z.number().int().positive().optional()
 }).refine(value => Object.keys(value).length > 0, 'At least one field is required');
 
+export const cardMemberPatchSchema = z.object({
+  userId: objectId,
+  action: z.enum(['add', 'remove']),
+  expectedRevision: z.number().int().positive().optional()
+});
+
 export const cardMoveSchema = z.object({
   listId: objectId,
   cardOrder: z.array(objectId).max(10000).optional(),

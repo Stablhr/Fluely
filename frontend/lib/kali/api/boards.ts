@@ -70,6 +70,16 @@ export interface CollaboratorDto {
   username: string | null;
 }
 
+/** Mirrors `BoardMember` in `boardMember.service.ts`: owner + accepted collaborators. */
+export interface BoardMemberDto {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  role: "owner" | CollaboratorRole;
+  status: "accepted";
+}
+
 /**
  * A pending invitation, as returned by `GET /boards/invitations`.
  *
@@ -290,6 +300,19 @@ export async function fetchCollaborators(
     `/boards/${boardId}/collaborators`,
   );
   return data.collaborators.map(toCollaborator);
+}
+
+/**
+ * The assignable roster: owner plus accepted collaborators. Pending invites
+ * are excluded server-side, so the card picker can use this list directly.
+ */
+export async function fetchBoardMembers(
+  boardId: string,
+): Promise<BoardMemberDto[]> {
+  const { data } = await httpClient.get<{ members: BoardMemberDto[] }>(
+    `/boards/${boardId}/members`,
+  );
+  return data.members;
 }
 
 /**

@@ -23,14 +23,17 @@ interface CardTileProps {
  * over the image. Cards without a cover are fully rounded.
  */
 function CardTile({ card, index, onOpenCard }: CardTileProps) {
-  const { data, canWrite } = useStore()
+  const { data, canWrite, getBoardMembers } = useStore()
   const mayWrite = canWrite(card.boardId)
   const board = data.boards[card.boardId]
   const labels = (card.labelIds
     .map((id) => board?.labels[id])
     .filter(Boolean)) as NonNullable<typeof board>['labels'][string][]
+  const memberById = new Map(
+    getBoardMembers(card.boardId).map((member) => [member.id, member]),
+  )
   const members = card.memberIds
-    .map((id) => data.members[id])
+    .map((id) => memberById.get(id) ?? data.members[id])
     .filter(Boolean) as typeof data.members[string][]
   const extraLabels = labels.length > 4 ? labels.length - 4 : 0
 

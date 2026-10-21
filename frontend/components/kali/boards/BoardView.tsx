@@ -31,7 +31,7 @@ export default function BoardView() {
   // Destructured so the effect below can depend on the function alone. The
   // `store` object itself is new on every render; depending on it would fetch
   // the board structure forever.
-  const { syncBoardStructure } = store
+  const { syncBoardStructure, loadCollaborators } = store
   const board = store.data.boards[boardId]
   const [search, setSearch] = useState('')
   const [openCardId, setOpenCardId] = useState<string | null>(null)
@@ -45,6 +45,7 @@ export default function BoardView() {
   // once when the board appears -- right after sign-in, when the boards query
   // resolves -- which is exactly when a pull is needed.
   const hasBoard = Boolean(board)
+  const hasServerBoard = Boolean(board?.ownerId && board.revision !== null)
 
   // Live sync is only for boards with a server row behind them: a local-only
   // board has no channel to join, and the public-board page is a different
@@ -55,6 +56,13 @@ export default function BoardView() {
     if (!hasBoard) return
     void syncBoardStructure(boardId)
   }, [boardId, hasBoard, syncBoardStructure])
+
+  // Cards store assignee ids, so the board needs the roster to draw avatars.
+  // Loaded once per board open; the poll keeps the structure itself current.
+  useEffect(() => {
+    if (!hasServerBoard) return
+    void loadCollaborators(boardId)
+  }, [boardId, hasServerBoard, loadCollaborators])
 
   if (!board) {
     return (

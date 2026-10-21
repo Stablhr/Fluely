@@ -398,6 +398,25 @@ export async function updateCardOnServer(
   return { ...data.card, revision: data.revision };
 }
 
+/** Owner-only. The server validates the target is an accepted board member. */
+export async function setCardMemberOnServer(
+  boardId: string,
+  cardId: string,
+  userId: string,
+  action: "add" | "remove",
+  expectedRevision?: number | null,
+): Promise<CardDto & WriteResult<CardDto>> {
+  const { data } = await httpClient.patch<{
+    card: CardDto;
+    revision: number;
+  }>(`/boards/${boardId}/cards/${cardId}/members`, {
+    userId,
+    action,
+    expectedRevision: expectedRevision ?? undefined,
+  });
+  return { ...data.card, revision: data.revision };
+}
+
 export async function deleteCardOnServer(
   boardId: string,
   cardId: string,
