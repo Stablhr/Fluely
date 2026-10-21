@@ -36,7 +36,7 @@ export default function CardCover({ card, readOnly = false, onOpenPanel }: CardC
           <button
             type="button"
             onClick={() => {
-              updateCard(card.id, { cover: null, coverSize: 'small' })
+              updateCard(card.id, { cover: null, coverSize: 'large' })
               addActivity(card.id, 'removed the cover')
             }}
             className="flex items-center gap-1 text-xs font-semibold text-text-secondary transition-colors duration-150 hover:text-danger-text"

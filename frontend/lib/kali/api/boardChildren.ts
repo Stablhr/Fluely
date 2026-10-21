@@ -107,8 +107,14 @@ export interface StructureDto {
   revision: number;
 }
 
+/**
+ * The server keeps four cover sizes; the client shows two: the portrait band
+ * ("large") and the thin strip ("small"). "medium" is the server's default for
+ * a card with a cover, so it maps to the portrait band -- only an explicit
+ * "small" shrinks the image.
+ */
 function toCoverSize(size: CardCoverSize | undefined): Card["coverSize"] {
-  return size === "large" || size === "full" ? "large" : "small";
+  return size === "small" ? "small" : "large";
 }
 
 /**

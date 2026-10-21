@@ -21,6 +21,9 @@ interface CardTileProps {
  * Cover images are rendered flush against the card's top edge, radius-clipped
  * by the card shell, with the title and metadata below -- nothing is layered
  * over the image. Cards without a cover are fully rounded.
+ *
+ * The cover keeps the original sizing: a portrait band for the default
+ * "large" size and a thin strip for "small", the size the cover panel picks.
  */
 function CardTile({ card, index, onOpenCard }: CardTileProps) {
   const { data, canWrite, getBoardMembers } = useStore()
@@ -37,11 +40,20 @@ function CardTile({ card, index, onOpenCard }: CardTileProps) {
     .filter(Boolean) as typeof data.members[string][]
   const extraLabels = labels.length > 4 ? labels.length - 4 : 0
 
-  const imageCover =
+  const explicitImageCover =
     card.cover && typeof card.cover !== 'string' && card.cover.type === 'image'
       ? card.cover.dataUrl
-      : card.files.find((file) => file.type === 'image')?.dataUrl
+      : null
+  // An attached image with no explicit cover still reads as the card's cover.
+  const imageCover =
+    explicitImageCover ??
+    card.files.find((file) => file.type === 'image')?.dataUrl ??
+    null
   const colorCover = typeof card.cover === 'string' ? card.cover : null
+  // The old cover sizing is back: "large" is a portrait band, "small" is a thin
+  // strip. A cover that was only ever an attachment has no explicit size and
+  // always shows the portrait band.
+  const coverStrip = explicitImageCover !== null && card.coverSize === 'small'
 
   const hasMeta =
     Boolean(card.dueDate) ||
@@ -73,17 +85,23 @@ function CardTile({ card, index, onOpenCard }: CardTileProps) {
           }}
         >
           {imageCover ? (
-            <div className="w-full shrink-0 overflow-hidden bg-black/10">
+            <div
+              className={`w-full shrink-0 overflow-hidden bg-black/10 ${
+                coverStrip ? 'h-8' : ''
+              }`}
+            >
               <img
                 src={imageCover}
                 alt=""
-                className="block aspect-[4/3] w-full object-cover"
+                className={`block w-full object-cover ${
+                  coverStrip ? 'h-8' : 'aspect-[4/5]'
+                }`}
                 draggable={false}
               />
             </div>
           ) : colorCover ? (
             <div
-              className="h-20 w-full shrink-0"
+              className="h-8 w-full shrink-0"
               style={{ background: colorCover }}
             />
           ) : null}

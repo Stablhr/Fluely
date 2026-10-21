@@ -381,7 +381,9 @@ function makeCard(list: List, title: string, extra: Partial<Card> = {}): Card {
     title,
     desc: "",
     cover: null,
-    coverSize: "small",
+    // The portrait band is the default cover; the thin strip is opt-in from
+    // the cover panel's size picker.
+    coverSize: "large",
     labelIds: [],
     memberIds: [],
     dueDate: null,

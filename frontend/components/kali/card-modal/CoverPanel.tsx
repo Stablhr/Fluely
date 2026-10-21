@@ -43,7 +43,7 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
   }
 
   const removeCover = () => {
-    store.updateCard(card.id, { cover: null, coverSize: 'small' })
+    store.updateCard(card.id, { cover: null, coverSize: 'large' })
     store.addActivity(card.id, 'removed the cover')
   }
 
@@ -79,7 +79,7 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
       store.updateCard(card.id, {
         files: [...card.files, attachment],
         cover: { type: 'image', dataUrl: media.url, mediaId: media.id },
-        coverSize: card.coverSize || 'small',
+        coverSize: card.coverSize || 'large',
       })
       store.addActivity(card.id, `attached ${file.name} as cover`)
     } catch (err) {
