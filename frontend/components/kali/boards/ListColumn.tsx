@@ -56,10 +56,6 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
   }
   const cards = allCards.filter((c) => matchesQuery(c) && matchesFilter(c))
 
-  // A list with cards fills the board height and scrolls inside. An empty one
-  // keeps its natural size -- a full-height empty box reads as broken.
-  const fillsHeight = cards.length > 0
-
   const commitRename = () => {
     setEditing(false)
     const trimmed = name.trim()
@@ -69,9 +65,9 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
 
   return (
     <div
-      className={`relative flex shrink-0 flex-col rounded-xl transition-[width] duration-200 ease-in-out ${
-        fillsHeight ? 'h-full max-h-full' : 'h-fit'
-      } ${list.collapsed ? 'w-[46px] overflow-hidden' : 'w-[272px]'}`}
+      className={`relative flex h-fit max-h-full shrink-0 flex-col rounded-xl transition-[width] duration-200 ease-in-out ${
+        list.collapsed ? 'w-[46px] overflow-hidden' : 'w-[272px]'
+      }`}
       style={{ ...vars, background: bg, border: `1px solid ${theme.border}` }}
     >
       {/* Collapsed name overlay */}
@@ -153,7 +149,7 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
             <div
               ref={droppableProvided.innerRef}
               {...droppableProvided.droppableProps}
-              className={`scroll-slim flex min-h-0 max-h-[calc(100vh-140px)] flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden rounded-b-xl px-2 pb-2 ${
+              className={`scroll-slim flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden rounded-b-xl px-2 pb-2 ${
                 snapshot.isDraggingOver ? 'bg-black/[0.04] ring-2 ring-inset ring-primary dark:bg-white/[0.06]' : ''
               }`}
               style={{
