@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Paperclip, ImageIcon, FileText, AlertTriangle } from 'lucide-react'
+import { Paperclip, FileText, AlertTriangle } from 'lucide-react'
 import type { Card, FileAttachment } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import { uid } from '@/lib/kali/utils/id'
@@ -19,12 +19,11 @@ export const MAX_FILE_SIZE = 50 * 1024 * 1024
 export default function CardAttachments({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
   const store = useStore()
   const fileRef = useRef<HTMLInputElement>(null)
-  const imageRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const addFile = async (file: File | undefined, type: 'file' | 'image' | 'video') => {
+  const addFile = async (file: File | undefined, type: 'file' | 'video') => {
     if (!file) return
     if (file.size > MAX_FILE_SIZE) {
       setError(
@@ -46,15 +45,7 @@ export default function CardAttachments({ card, readOnly = false }: { card: Card
         size: media.sizeBytes,
         addedAt: new Date().toISOString(),
       }
-      if (type === 'image') {
-        store.updateCard(card.id, {
-          files: [...card.files, attachment],
-          cover: { type: 'image', dataUrl: media.url, mediaId: media.id },
-          coverSize: 'large',
-        })
-      } else {
-        store.updateCard(card.id, { files: [...card.files, attachment] })
-      }
+      store.updateCard(card.id, { files: [...card.files, attachment] })
       store.addActivity(card.id, `attached ${file.name}`)
     } catch (error) {
       setError(getFriendlyErrorMessage(error, 'Could not upload that file. Please try again.'))
@@ -162,10 +153,6 @@ export default function CardAttachments({ card, readOnly = false }: { card: Card
             <Paperclip size={13} />
             {uploading ? 'Uploading…' : 'Attach file'}
           </button>
-          <button type="button" className={ghostClass} disabled={uploading} onClick={() => imageRef.current?.click()}>
-            <ImageIcon size={13} />
-            {uploading ? 'Uploading…' : 'Attach image'}
-          </button>
           <button type="button" className={ghostClass} disabled={uploading} onClick={() => videoRef.current?.click()}>
             <Paperclip size={13} />
             {uploading ? 'Uploading...' : 'Attach video'}
@@ -176,16 +163,6 @@ export default function CardAttachments({ card, readOnly = false }: { card: Card
             hidden
             onChange={(e) => {
               void addFile(e.target.files?.[0], 'file')
-              e.target.value = ''
-            }}
-          />
-          <input
-            ref={imageRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={(e) => {
-              void addFile(e.target.files?.[0], 'image')
               e.target.value = ''
             }}
           />
@@ -203,6 +180,7 @@ export default function CardAttachments({ card, readOnly = false }: { card: Card
 
         <p className="text-[11px] leading-snug text-text-muted">
           Uploads are stored on Cloudinary and shared with everyone on the board.
+          Add images from the cover panel.
         </p>
         </>
         )}

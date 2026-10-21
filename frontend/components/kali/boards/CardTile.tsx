@@ -70,7 +70,7 @@ function CardTile({ card, index, onOpenCard }: CardTileProps) {
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={() => !snapshot.isDragging && onOpenCard(card.id)}
-          className={`relative flex flex-col overflow-hidden rounded-xl ring-1 transition-shadow duration-150 ${
+          className={`relative flex shrink-0 flex-col overflow-hidden rounded-xl ring-1 transition-shadow duration-150 ${
             mayWrite ? 'cursor-pointer' : 'cursor-default'
           } ${
             snapshot.isDragging

@@ -65,7 +65,7 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
 
   return (
     <div
-      className={`relative shrink-0 flex-col rounded-xl transition-[width] duration-200 ease-in-out ${
+      className={`relative flex h-full max-h-full shrink-0 flex-col rounded-xl transition-[width] duration-200 ease-in-out ${
         list.collapsed ? 'w-[46px] overflow-hidden' : 'w-[272px]'
       }`}
       style={{ ...vars, background: bg, border: `1px solid ${theme.border}` }}
@@ -88,7 +88,7 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
       </div>
 
       {/* Expanded content (always rendered for layout height) */}
-      <div className={`flex min-h-full flex-col transition-opacity duration-200 ${
+      <div className={`flex min-h-0 flex-1 flex-col transition-opacity duration-200 ${
         list.collapsed ? 'pointer-events-none opacity-0' : 'opacity-100'
       }`}>
         <div
@@ -149,7 +149,7 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
             <div
               ref={droppableProvided.innerRef}
               {...droppableProvided.droppableProps}
-              className={`scroll-slim flex max-h-[calc(100vh-220px)] min-h-2 flex-1 flex-col gap-1.5 overflow-y-auto rounded-b-xl px-2 pb-2 sm:max-h-[calc(100vh-180px)] ${
+              className={`scroll-slim flex min-h-0 max-h-[calc(100vh-140px)] flex-1 flex-col gap-1.5 overflow-y-auto overflow-x-hidden rounded-b-xl px-2 pb-2 ${
                 snapshot.isDraggingOver ? 'bg-black/[0.04] ring-2 ring-inset ring-primary dark:bg-white/[0.06]' : ''
               }`}
               style={{

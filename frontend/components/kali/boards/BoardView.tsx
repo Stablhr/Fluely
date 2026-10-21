@@ -115,12 +115,12 @@ export default function BoardView() {
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className="scroll-slim flex h-full items-start gap-3 overflow-x-auto bg-board-canvas p-4"
+                className="scroll-slim flex h-full items-stretch gap-3 overflow-x-auto bg-board-canvas p-4"
               >
                 {lists.map((list, index) => (
                   <Draggable key={list.id} draggableId={list.id} index={index} isDragDisabled={!mayWrite}>
                     {(listProvided) => (
-                      <div ref={listProvided.innerRef} {...listProvided.draggableProps}>
+                      <div ref={listProvided.innerRef} {...listProvided.draggableProps} className="flex h-full min-h-0">
                         <ListColumn
                           list={list}
                           dragHandleProps={mayWrite ? listProvided.dragHandleProps : null}
@@ -133,7 +133,11 @@ export default function BoardView() {
                   </Draggable>
                 ))}
                 {provided.placeholder}
-                {mayWrite && <AddListForm boardId={boardId} />}
+                {mayWrite && (
+                  <div className="self-start">
+                    <AddListForm boardId={boardId} />
+                  </div>
+                )}
               </div>
             )}
           </Droppable>
