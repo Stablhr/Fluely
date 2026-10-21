@@ -50,6 +50,7 @@ import {
   respondToInvitation as respondToInvitationOnServer,
   setBoardVisibilityOnServer,
   setCollaboratorRoleOnServer,
+  updateBoardOnServer,
 } from "@/lib/kali/api/boards";
 import {
   createCardOnServer,
@@ -2164,7 +2165,15 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   };
 
   const addLabel = (boardId: string, name: string, color: string): string => {
-    if (!canWrite(boardId)) return "";
+    const board = dataRef.current.boards[boardId];
+    // Deduplicate case-insensitively: reuse an existing label with the same name.
+    if (board) {
+      const existing = Object.values(board.labels).find(
+        (label) => label.name.toLowerCase() === name.trim().toLowerCase(),
+      );
+      if (existing) return existing.id;
+    }
+
     const id = uid();
     mutate((prev) => {
       const board = prev.boards[boardId];
@@ -2186,6 +2195,37 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         },
       };
     });
+
+    const serverBoard = dataRef.current.boards[boardId];
+    if (serverBoard && isServerBoard(serverBoard)) {
+      const labels = Object.values({
+        ...serverBoard.labels,
+        [id]: { id, name, color },
+      }).map((label) => ({ id: label.id, name: label.name, color: label.color }));
+      void (async () => {
+        try {
+          const dto = await updateBoardOnServer(
+            boardId,
+            { labels },
+            serverBoard.revision,
+          );
+          mutate((prev) => {
+            const current = prev.boards[boardId];
+            if (!current) return prev;
+            return {
+              ...prev,
+              boards: {
+                ...prev.boards,
+                [boardId]: { ...current, ...mergeServerBoard(current, dto) },
+              },
+            };
+          });
+        } catch {
+          // ignore; local label still present
+        }
+      })();
+    }
+
     return id;
   };
 
@@ -2591,6 +2631,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       const board = dataRef.current.boards[boardId];
       if (board && board.revision !== null && response.revision > board.revision) {
         scheduleStructureSync(boardId);
+        void syncBoards();
       }
 
       return "ok";
@@ -2602,6 +2643,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       mergeActivity,
       replacePresence,
       scheduleStructureSync,
+      syncBoards,
       setError,
     ],
   );

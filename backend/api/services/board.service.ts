@@ -69,6 +69,7 @@ type UpdateBoardInput = {
   name?: string;
   description?: string;
   background?: string;
+  labels?: {id: string; name: string; color: string}[];
   listOrder?: string[];
   archivedAt?: string | null;
   expectedRevision?: number;
@@ -299,6 +300,7 @@ export const boardService = {
     if (input.name !== undefined) patch.name = input.name;
     if (input.description !== undefined) patch.description = input.description;
     if (input.background !== undefined) patch.background = input.background;
+    if (input.labels !== undefined) patch.labels = input.labels;
     if (input.archivedAt !== undefined) {
       patch.archivedAt = input.archivedAt ? new Date(input.archivedAt) : null;
     }

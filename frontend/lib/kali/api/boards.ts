@@ -253,6 +253,25 @@ export async function deleteBoardOnServer(boardId: string): Promise<void> {
   await httpClient.delete(`/boards/${boardId}`);
 }
 
+export async function updateBoardOnServer(
+  boardId: string,
+  patch: {
+    name?: string;
+    description?: string;
+    background?: string;
+    labels?: { id: string; name: string; color: string }[];
+    listOrder?: string[];
+    archivedAt?: string | null;
+  },
+  expectedRevision?: number | null,
+): Promise<BoardDto> {
+  const { data } = await httpClient.patch<{ board: BoardDto }>(
+    `/boards/${boardId}`,
+    { ...patch, expectedRevision: expectedRevision ?? undefined },
+  );
+  return data.board;
+}
+
 export async function setBoardVisibilityOnServer(
   boardId: string,
   visibility: Visibility,
