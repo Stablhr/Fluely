@@ -20,7 +20,7 @@ interface MentionMatch {
 
 function parseMentions(text: string): { type: 'text' | 'mention'; value: string; userId?: string }[] {
   const parts: { type: 'text' | 'mention'; value: string; userId?: string }[] = []
-  const regex = /@\[([0-9a-fA-F]{24})\]/g
+  const regex = /@\[([^\]]+)\]/g
   let lastIndex = 0
   let match: RegExpExecArray | null
   while ((match = regex.exec(text)) !== null) {
@@ -42,8 +42,9 @@ function MentionChip({ userId, members, currentUserId }: { userId: string; membe
     members.find((m) => m.id === userId) ??
     (currentUserId && userId === currentUserId
       ? members.find((m) => m.id === YOU_ID)
-      : undefined)
-  const name = member?.name ?? 'Unknown'
+      : undefined) ??
+    (userId === YOU_ID ? members.find((m) => m.id === YOU_ID) : undefined)
+  const name = member?.name ?? (userId === YOU_ID ? 'You' : 'Unknown')
   const removed = !member
   return (
     <span
@@ -65,6 +66,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
   const [mentionOpen, setMentionOpen] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionIndex, setMentionIndex] = useState(0)
+  const [mentionCursor, setMentionCursor] = useState(0)
   const commentRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const inputRef = useRef<HTMLInputElement>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
@@ -89,6 +91,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
       setMentionQuery(match[1])
       setMentionOpen(true)
       setMentionIndex(0)
+      setMentionCursor(cursor)
     } else {
       setMentionOpen(false)
     }
@@ -98,13 +101,18 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
     (member: Member) => {
       const input = inputRef.current
       if (!input) return
-      const cursor = input.selectionStart ?? text.length
+      const cursor = mentionCursor || input.selectionStart || text.length
       const before = text.slice(0, cursor)
       const after = text.slice(cursor)
       const match = before.match(/@(\w*)$/)
       if (!match) return
       const start = cursor - match[0].length
-      const newText = before.slice(0, start) + `@[${member.id}] ` + after
+      // Store the server user id in the token, not the local "you" key, so the
+      // backend can validate and notify. For the current user, resolve to their
+      // server id; otherwise the member id is already the server id.
+      const serverId =
+        member.id === YOU_ID ? (store.currentUserId ?? member.id) : member.id
+      const newText = before.slice(0, start) + `@[${serverId}] ` + after
       setText(newText)
       setMentionOpen(false)
       // Restore cursor
