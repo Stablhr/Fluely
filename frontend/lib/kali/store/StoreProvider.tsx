@@ -1828,26 +1828,30 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     const dest = dataRef.current.lists[destListId];
     if (!card || !dest || !canWrite(card.boardId)) return;
     if (isServerBoard(dataRef.current.boards[card.boardId])) {
-      // Only the destination index is sent; the server computes the new
-      // fractional position from the neighbours, so this write touches a single
-      // row and cannot clobber a concurrent move of a different card. The index
-      // is recomputed on every attempt (including the retry after a revision
-      // conflict), so a rapid follow-up move is never sent with a stale index.
+      // Send the fractional-indexing anchors (the cards this one is being
+      // dropped between) rather than a bare index: the server computes the
+      // new position from their *current* positions, so a concurrent move
+      // of another card between the same two neighbours never reorders or
+      // reverts this one. The index is kept as a fallback for legacy
+      // servers / deleted neighbours.
       void writeThrough(
         card.boardId,
         revision => {
           const latestCard = dataRef.current.cards[cardId];
           const latestDest = dataRef.current.lists[destListId];
-          const latestIndex =
-            latestCard && latestDest
-              ? Math.min(
-                  Math.max(destIndex, 0),
-                  (latestDest.cardOrder ?? []).filter((id) => id !== cardId).length,
-                )
-              : destIndex;
+          const latestSrc = latestCard ? dataRef.current.lists[latestCard.listId] : undefined;
+          const siblings =
+            latestCard && latestCard.listId === destListId
+              ? (latestSrc?.cardOrder ?? []).filter((id) => id !== cardId)
+              : (latestDest?.cardOrder ?? []).filter((id) => id !== cardId);
+          const clamped = Math.min(Math.max(destIndex, 0), siblings.length);
+          const beforeId = clamped > 0 ? siblings[clamped - 1] : undefined;
+          const afterId = clamped < siblings.length ? siblings[clamped] : undefined;
           return moveCardOnServer(card.boardId, cardId, {
             listId: destListId,
-            index: latestIndex,
+            beforeId,
+            afterId,
+            index: clamped,
             expectedRevision: revision,
           }).then(result => result.revision);
         },

@@ -215,9 +215,14 @@ export const cardMemberPatchSchema = z.object({
 
 export const cardMoveSchema = z.object({
   listId: objectId,
-  // Destination index within the target list. The server computes the new
-  // fractional position from the neighbours, so the client never has to send
-  // (and never races on) the whole list order.
+  // Fractional-indexing anchors: the cards the moved card is being dropped
+  // between. The server computes its new position from their current positions,
+  // which is what makes a move survive concurrent moves of other cards -- the
+  // anchors are stable ids, not a stale array index.
+  beforeId: objectId.optional(),
+  afterId: objectId.optional(),
+  // Destination index within the target list, used only as a fallback when the
+  // anchors are unavailable (legacy clients, deleted neighbours).
   index: z.number().int().min(0).max(100000).optional(),
   cardOrder: z.array(objectId).max(10000).optional(),
   expectedRevision: z.number().int().positive()

@@ -51,6 +51,8 @@ type CreateCardInput = Omit<CardInput, 'title' | 'expectedRevision'> & {
 
 type MoveCardInput = {
   listId: string;
+  beforeId?: string;
+  afterId?: string;
   index?: number;
   cardOrder?: string[];
   expectedRevision?: number;
@@ -533,28 +535,71 @@ export const cardService = {
       const siblings = (await orderedCardsForList(board._id, targetList._id, session, targetList))
         .filter(cardDoc => cardDoc._id.toString() !== cardId);
 
-      let index: number;
-      if (typeof input.index === 'number') {
-        index = Math.min(Math.max(input.index, 0), siblings.length);
-      } else if (input.cardOrder) {
-        const found = input.cardOrder.indexOf(cardId);
-        index = found === -1 ? siblings.length : Math.min(Math.max(found, 0), siblings.length);
-      } else {
-        index = siblings.length;
+      // Prefer the fractional-indexing anchors when the client sent them: the
+      // new position is computed from the neighbours' *current* positions, so
+      // a concurrent move of another card between the same two neighbours never
+      // reorders or reverts this one.
+      let beforePos: number | null | undefined;
+      let afterPos: number | null | undefined;
+      let useAnchors = false;
+      if (input.beforeId || input.afterId) {
+        const beforeCard = input.beforeId
+          ? siblings.find(cardDoc => cardDoc._id.toString() === input.beforeId)
+          : undefined;
+        const afterCard = input.afterId
+          ? siblings.find(cardDoc => cardDoc._id.toString() === input.afterId)
+          : undefined;
+        if (input.beforeId && !beforeCard) useAnchors = false;
+        else if (input.afterId && !afterCard) useAnchors = false;
+        else {
+          useAnchors = true;
+          beforePos = beforeCard?.position;
+          afterPos = afterCard?.position;
+        }
       }
 
-      const before = index > 0 ? siblings[index - 1]?.position : undefined;
-      const after = index < siblings.length ? siblings[index]?.position : undefined;
+      let index: number;
+      let position: number;
+      if (useAnchors) {
+        position = positionBetween(beforePos, afterPos);
+        // Keep `index` meaningful for the legacy array sync below.
+        if (input.beforeId && input.afterId) {
+          const beforeIndex = siblings.findIndex(cardDoc => cardDoc._id.toString() === input.beforeId);
+          index = beforeIndex === -1 ? siblings.length : beforeIndex + 1;
+        } else if (input.beforeId) {
+          const beforeIndex = siblings.findIndex(cardDoc => cardDoc._id.toString() === input.beforeId);
+          index = beforeIndex === -1 ? siblings.length : beforeIndex + 1;
+        } else if (input.afterId) {
+          const afterIndex = siblings.findIndex(cardDoc => cardDoc._id.toString() === input.afterId);
+          index = afterIndex === -1 ? siblings.length : afterIndex;
+        } else {
+          index = siblings.length;
+        }
+      } else {
+        if (typeof input.index === 'number') {
+          index = Math.min(Math.max(input.index, 0), siblings.length);
+        } else if (input.cardOrder) {
+          const found = input.cardOrder.indexOf(cardId);
+          index = found === -1 ? siblings.length : Math.min(Math.max(found, 0), siblings.length);
+        } else {
+          index = siblings.length;
+        }
+        beforePos = index > 0 ? siblings[index - 1]?.position : undefined;
+        afterPos = index < siblings.length ? siblings[index]?.position : undefined;
+        position = positionBetween(beforePos, afterPos);
+      }
 
-      let position = positionBetween(before, after);
-      if (needsRespace(before, after)) {
+      if (needsRespace(beforePos, afterPos)) {
         await respaceList(board._id, targetList._id, session, targetList);
         const refreshed = (await orderedCardsForList(board._id, targetList._id, session, targetList))
           .filter(cardDoc => cardDoc._id.toString() !== cardId);
-        position = positionBetween(
-          index > 0 ? refreshed[index - 1]?.position : undefined,
-          index < refreshed.length ? refreshed[index]?.position : undefined
-        );
+        const refreshedBefore = useAnchors
+          ? refreshed.find(cardDoc => cardDoc._id.toString() === input.beforeId)?.position
+          : index > 0 ? refreshed[index - 1]?.position : undefined;
+        const refreshedAfter = useAnchors
+          ? refreshed.find(cardDoc => cardDoc._id.toString() === input.afterId)?.position
+          : index < refreshed.length ? refreshed[index]?.position : undefined;
+        position = positionBetween(refreshedBefore, refreshedAfter);
       }
 
       await cardRepository.move(cardId, board._id, targetList._id, position, session);
