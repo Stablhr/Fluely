@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { MessageSquare, SmilePlus, AtSign, Trash2, Send } from 'lucide-react'
+import { MessageSquare, SmilePlus, Trash2, Send } from 'lucide-react'
 import EmojiPicker, { Theme } from 'emoji-picker-react'
 import type { Card, Member } from '@/lib/kali/store/schema'
 import { YOU_ID } from '@/lib/kali/store/schema'
@@ -42,10 +42,10 @@ function MentionChip({ userId, members, currentUserId }: { userId: string; membe
   const removed = !member
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-sm font-medium ${
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[13px] leading-4 font-medium ${
         removed
           ? 'bg-surface-alt text-text-muted'
-          : 'bg-primary-subtle text-primary-hover'
+          : 'bg-primary-subtle text-primary-text'
       }`}
     >
       @{name}
@@ -66,7 +66,6 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({})
   const inputRef = useRef<HTMLInputElement>(null)
   const replyInputRef = useRef<HTMLInputElement>(null)
-  const pickerRef = useRef<HTMLDivElement>(null)
   const commentRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const you = store.data.members[YOU_ID]
 
@@ -213,6 +212,20 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
     !readOnly &&
     (comment.authorId === YOU_ID || comment.authorId === store.currentUserId)
 
+  // Replying to a reply joins the same thread and pre-fills a mention of the
+  // person being replied to.
+  const startReply = (comment: typeof card.comments[number]) => {
+    const threadId = comment.parentId ?? comment.id
+    if (replyTo === threadId) {
+      setReplyTo(null)
+      setReplyText('')
+      return
+    }
+    setReplyTo(threadId)
+    const isMe = comment.authorId === YOU_ID || comment.authorId === store.currentUserId
+    setReplyText(comment.parentId && !isMe ? `@[${comment.authorId}] ` : '')
+  }
+
   const deleteComment = (commentId: string) => {
     const next = card.comments.filter((c) => c.id !== commentId && c.parentId !== commentId)
     store.updateCard(card.id, { comments: next })
@@ -256,7 +269,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
       ),
     )
 
-  const renderComment = (comment: typeof card.comments[number], isReply: boolean) => {
+  const renderComment = (comment: typeof card.comments[number]) => {
     const author =
       store.data.members[comment.authorId] ??
       boardMembers.find((m) => m.id === comment.authorId) ?? {
@@ -269,22 +282,21 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
 
     return (
       <div key={comment.id} ref={(el) => { commentRefs.current[comment.id] = el }} className="flex items-start gap-2 rounded-lg transition-all">
-        <Avatar member={author} size={isReply ? 28 : 36} />
+        <Avatar member={author} size={36} />
         <div className="min-w-0 flex-1">
-          {/* Bubble for parent, plain text for reply */}
-          <div className={isReply ? '' : 'rounded-2xl bg-brand-vanilla/15 px-4 py-3 dark:bg-brand-vanilla/10'}>
+          <div className="rounded-2xl bg-brand-vanilla/15 px-4 py-3 dark:bg-brand-vanilla/10">
             <div className="flex items-baseline gap-2">
-              <span className={`font-heading ${isReply ? 'text-sm font-medium' : 'text-sm font-semibold'} text-text-primary`}>{author.name}</span>
+              <span className="font-heading text-sm font-semibold text-text-primary">{author.name}</span>
               <span className="font-mono text-[11px] text-text-muted">{formatDateTime(comment.createdAt)}</span>
             </div>
-            <p className={`mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary ${isReply ? '' : ''}`}>
+            <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary">
               {renderMentionText(comment.text, boardMembers)}
             </p>
           </div>
 
           {/* Action row */}
           {!readOnly && (
-            <div className="mt-1 flex items-center gap-3 text-xs text-text-muted">
+            <div className="mt-1 flex items-center gap-3.5 text-xs text-text-muted">
               <button
                 type="button"
                 onClick={() => setActivePicker(pickerOpen ? null : comment.id)}
@@ -292,15 +304,13 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
               >
                 <SmilePlus size={13} />
               </button>
-              {!isReply && (
-                <button
-                  type="button"
-                  onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
-                  className="font-medium transition-colors hover:text-text-secondary"
-                >
-                  Reply
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => startReply(comment)}
+                className="font-medium transition-colors hover:text-text-secondary"
+              >
+                Reply
+              </button>
               {canDeleteComment(comment) && (
                 <button
                   type="button"
@@ -407,68 +417,66 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
           const hiddenCount = replies.length - visibleReplies.length
 
           return (
-            <div key={comment.id} className="space-y-2">
-              {renderComment(comment, false)}
+            <div key={comment.id} className="space-y-4">
+              {renderComment(comment)}
               {hiddenCount > 0 && (
                 <button
                   type="button"
                   onClick={() => setExpandedThreads((prev) => ({ ...prev, [comment.id]: true }))}
-                  className="ml-12 mt-2 text-xs font-medium text-primary-hover hover:underline sm:ml-9"
+                  className="ml-11 text-xs font-medium text-primary-hover hover:underline"
                 >
                   View {hiddenCount} earlier {hiddenCount === 1 ? 'reply' : 'replies'}
                 </button>
               )}
-              <div className="ml-11 space-y-2 sm:ml-9">
-                {visibleReplies.map((reply) => renderComment(reply, true))}
-                {replyTo === comment.id && !readOnly && (
-                  <div className="relative flex items-start gap-2">
-                    {you && <Avatar member={you} size={28} />}
-                    <div className="relative flex-1">
-                      <input
-                        ref={replyInputRef}
-                        autoFocus
-                        value={replyText}
-                        onChange={handleReplyChange}
-                        onKeyDown={(e) => handleKeyDown(e, 'reply', comment.id)}
-                        placeholder="Write a reply…"
-                        className="w-full rounded-full border border-border-strong bg-surface px-4 py-2 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:border-primary/20"
-                      />
-                      {mentionOpen && filteredMembers.length > 0 && (
-                        <div className="absolute bottom-full left-0 z-30 mb-1 max-h-48 w-64 overflow-y-auto rounded-lg border border-border bg-surface-elevated shadow-subtle">
-                          {filteredMembers.map((member, i) => (
-                            <button
-                              key={member.id}
-                              type="button"
-                              onClick={() => insertMention(member, 'reply')}
-                              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                                i === mentionIndex ? 'bg-primary-subtle' : 'hover:bg-surface-alt'
-                              }`}
-                            >
-                              <Avatar member={member} size={20} />
-                              <span className="truncate font-medium text-text-primary">{member.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => submit(comment.id, replyText)}
-                      disabled={!replyText.trim()}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors duration-150 hover:bg-primary-hover disabled:opacity-40"
-                    >
-                      <Send size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setReplyTo(null); setReplyText('') }}
-                      className="text-xs text-text-muted transition-colors hover:text-text-secondary"
-                    >
-                      Cancel
-                    </button>
+              {visibleReplies.map((reply) => renderComment(reply))}
+              {replyTo === comment.id && !readOnly && (
+                <div className="relative flex items-start gap-2">
+                  {you && <Avatar member={you} size={36} />}
+                  <div className="relative flex-1">
+                    <input
+                      ref={replyInputRef}
+                      autoFocus
+                      value={replyText}
+                      onChange={handleReplyChange}
+                      onKeyDown={(e) => handleKeyDown(e, 'reply', comment.id)}
+                      placeholder="Write a reply…"
+                      className="w-full rounded-2xl border border-border-strong bg-surface px-4 py-2.5 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:border-primary/20"
+                    />
+                    {mentionOpen && filteredMembers.length > 0 && (
+                      <div className="absolute bottom-full left-0 z-30 mb-1 max-h-48 w-64 overflow-y-auto rounded-lg border border-border bg-surface-elevated shadow-subtle">
+                        {filteredMembers.map((member, i) => (
+                          <button
+                            key={member.id}
+                            type="button"
+                            onClick={() => insertMention(member, 'reply')}
+                            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                              i === mentionIndex ? 'bg-primary-subtle' : 'hover:bg-surface-alt'
+                            }`}
+                          >
+                            <Avatar member={member} size={20} />
+                            <span className="truncate font-medium text-text-primary">{member.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => submit(comment.id, replyText)}
+                    disabled={!replyText.trim()}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors duration-150 hover:bg-primary-hover disabled:opacity-40"
+                  >
+                    <Send size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setReplyTo(null); setReplyText('') }}
+                    className="text-xs text-text-muted transition-colors hover:text-text-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           )
         })}
