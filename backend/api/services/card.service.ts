@@ -28,6 +28,7 @@ type CardInput = {
   comments?: {
     id: string;
     authorId?: string | null;
+    parentId?: string | null;
     text: string;
     reactions?: Record<string, number>;
     createdAt?: string;
@@ -431,7 +432,7 @@ export const cardService = {
           if (!textChanged) continue;
 
           const mentioned = new Set<string>();
-          const matches = comment.text.matchAll(/@\[([0-9a-fA-F]{24})\]/g);
+          const matches = comment.text.matchAll(/@\[([0-9a-fA-F]{24})(?:\|[^\]]*)?\]/g);
           for (const match of matches) mentioned.add(match[1]);
 
           if (mentioned.size === 0) continue;
@@ -449,7 +450,7 @@ export const cardService = {
           // Newly mentioned = those not already in the before comment.
           const previouslyMentioned = new Set<string>();
           if (oldComment) {
-            for (const m of oldComment.text.matchAll(/@\[([0-9a-fA-F]{24})\]/g)) {
+            for (const m of oldComment.text.matchAll(/@\[([0-9a-fA-F]{24})(?:\|[^\]]*)?\]/g)) {
               previouslyMentioned.add(m[1]);
             }
           }
@@ -468,7 +469,7 @@ export const cardService = {
           }
 
           // Create notifications.
-          const snippet = comment.text.replace(/@\[[0-9a-fA-F]{24}\]/g, '@user').slice(0, 100);
+          const snippet = comment.text.replace(/@\[[0-9a-fA-F]{24}(?:\|[^\]]*)?\]/g, '@user').slice(0, 100);
           await notificationService.notifyMention({
             mentionedUserIds: newlyMentioned,
             actorId: actor.actorId,

@@ -12,8 +12,8 @@ import { hasUserCommentReaction, toggleUserCommentReaction } from '@/lib/kali/ut
 import SectionLabel from '../shared/SectionLabel'
 import Avatar from '../shared/Avatar'
 
-function parseMentions(text: string): { type: 'text' | 'mention'; value: string; userId?: string }[] {
-  const parts: { type: 'text' | 'mention'; value: string; userId?: string }[] = []
+function parseMentions(text: string): { type: 'text' | 'mention'; value: string; userId?: string; name?: string }[] {
+  const parts: { type: 'text' | 'mention'; value: string; userId?: string; name?: string }[] = []
   const regex = /@\[([^\]]+)\]/g
   let lastIndex = 0
   let match: RegExpExecArray | null
@@ -21,7 +21,11 @@ function parseMentions(text: string): { type: 'text' | 'mention'; value: string;
     if (match.index > lastIndex) {
       parts.push({ type: 'text', value: text.slice(lastIndex, match.index) })
     }
-    parts.push({ type: 'mention', value: match[1], userId: match[1] })
+    const raw = match[1]
+    const pipe = raw.indexOf('|')
+    const userId = pipe >= 0 ? raw.slice(0, pipe) : raw
+    const name = pipe >= 0 ? raw.slice(pipe + 1) : undefined
+    parts.push({ type: 'mention', value: raw, userId, name })
     lastIndex = match.index + match[0].length
   }
   if (lastIndex < text.length) {
@@ -31,15 +35,28 @@ function parseMentions(text: string): { type: 'text' | 'mention'; value: string;
   return parts
 }
 
-function MentionChip({ userId, members, currentUserId }: { userId: string; members: Member[]; currentUserId: string | null }) {
+function MentionChip({
+  userId,
+  name,
+  members,
+  currentUserId,
+}: {
+  userId: string
+  name?: string
+  members: Member[]
+  currentUserId: string | null
+}) {
   const member =
     members.find((m) => m.id === userId) ??
     (currentUserId && userId === currentUserId
       ? members.find((m) => m.id === YOU_ID)
       : undefined) ??
     (userId === YOU_ID ? members.find((m) => m.id === YOU_ID) : undefined)
-  const name = member?.name ?? (userId === YOU_ID ? 'You' : 'Unknown')
-  const removed = !member
+  const displayName =
+    name ||
+    member?.name ||
+    (userId === YOU_ID || userId === currentUserId ? 'You' : 'Unknown')
+  const removed = !member && !name
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[13px] leading-4 font-medium ${
@@ -48,7 +65,7 @@ function MentionChip({ userId, members, currentUserId }: { userId: string; membe
           : 'bg-primary-subtle text-primary-text'
       }`}
     >
-      @{name}
+      @{displayName}
     </span>
   )
 }
@@ -120,7 +137,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
       if (!match) return
       const start = cursor - match[0].length
       const serverId = member.id === YOU_ID ? (store.currentUserId ?? member.id) : member.id
-      const newText = before.slice(0, start) + `@[${serverId}] ` + after
+      const newText = before.slice(0, start) + `@[${serverId}|${member.name}] ` + after
       setTextFn(newText)
       setMentionOpen(false)
       setTimeout(() => {
@@ -236,9 +253,11 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
   useEffect(() => {
     if (!mentionOpen) return
     const handler = (e: MouseEvent) => {
-      if (inputRef.current && !inputRef.current.contains(e.target as Node) && replyInputRef.current && !replyInputRef.current.contains(e.target as Node)) {
-        setMentionOpen(false)
-      }
+      const target = e.target as Node
+      if (inputRef.current?.contains(target)) return
+      if (replyInputRef.current?.contains(target)) return
+      if ((target as Element)?.closest?.('[data-mention-popover]')) return
+      setMentionOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -263,7 +282,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
   const renderMentionText = (text: string, members: Member[]) =>
     parseMentions(text).map((part, i) =>
       part.type === 'mention' && part.userId ? (
-        <MentionChip key={i} userId={part.userId} members={members} currentUserId={store.currentUserId} />
+        <MentionChip key={i} userId={part.userId} name={part.name} members={members} currentUserId={store.currentUserId} />
       ) : (
         <span key={i}>{part.value}</span>
       ),
@@ -386,7 +405,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
             className="w-full rounded-2xl border border-border-strong bg-surface px-4 py-3 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:border-primary/20"
           />
           {mentionOpen && filteredMembers.length > 0 && (
-            <div className="absolute bottom-full left-0 z-30 mb-1 max-h-48 w-64 overflow-y-auto rounded-lg border border-border bg-surface-elevated shadow-subtle">
+            <div data-mention-popover className="absolute bottom-full left-0 z-30 mb-1 max-h-48 w-64 overflow-y-auto rounded-lg border border-border bg-surface-elevated shadow-subtle">
               {filteredMembers.map((member, i) => (
                 <button
                   key={member.id}
@@ -400,6 +419,11 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                   <span className="truncate font-medium text-text-primary">{member.name}</span>
                 </button>
               ))}
+            </div>
+          )}
+          {text.trim() && text.includes('@') && (
+            <div className="mt-1 px-4 text-xs text-text-muted">
+              {renderMentionText(text, boardMembers)}
             </div>
           )}
         </div>
@@ -443,7 +467,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                       className="w-full rounded-2xl border border-border-strong bg-surface px-4 py-2.5 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:border-primary/20"
                     />
                     {mentionOpen && filteredMembers.length > 0 && (
-                      <div className="absolute bottom-full left-0 z-30 mb-1 max-h-48 w-64 overflow-y-auto rounded-lg border border-border bg-surface-elevated shadow-subtle">
+                      <div data-mention-popover className="absolute bottom-full left-0 z-30 mb-1 max-h-48 w-64 overflow-y-auto rounded-lg border border-border bg-surface-elevated shadow-subtle">
                         {filteredMembers.map((member, i) => (
                           <button
                             key={member.id}
@@ -459,6 +483,11 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                         ))}
                       </div>
                     )}
+                      {replyText.trim() && replyText.includes('@') && (
+                        <div className="mt-1 px-4 text-xs text-text-muted">
+                          {renderMentionText(replyText, boardMembers)}
+                        </div>
+                      )}
                   </div>
                   <button
                     type="button"
