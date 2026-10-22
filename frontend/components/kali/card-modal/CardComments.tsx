@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { MessageSquare, SmilePlus, AtSign } from 'lucide-react'
+import { MessageSquare, SmilePlus, AtSign, Trash2 } from 'lucide-react'
 import EmojiPicker, { Theme } from 'emoji-picker-react'
 import type { Card, Member } from '@/lib/kali/store/schema'
 import { YOU_ID } from '@/lib/kali/store/schema'
@@ -158,6 +158,16 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
     setMentionOpen(false)
   }
 
+  const canDeleteComment = (comment: { authorId: string }) =>
+    !readOnly &&
+    (comment.authorId === YOU_ID || comment.authorId === store.currentUserId)
+
+  const deleteComment = (commentId: string) => {
+    const next = card.comments.filter((c) => c.id !== commentId)
+    store.updateCard(card.id, { comments: next })
+    store.addActivity(card.id, 'deleted a comment')
+  }
+
   const toggleCommentReaction = (commentId: string, emoji: string) => {
     const comments = card.comments.map((c) => {
       if (c.id !== commentId) return c
@@ -309,7 +319,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                 )}
 
                 {!readOnly && (
-                <div className="relative mt-1" ref={pickerRef}>
+                <div className="relative mt-1 flex items-center gap-1" ref={pickerRef}>
                   <button
                     type="button"
                     onClick={() => setActivePicker(pickerOpen ? null : comment.id)}
@@ -319,6 +329,18 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                   >
                     <SmilePlus size={14} />
                   </button>
+
+                  {canDeleteComment(comment) && (
+                    <button
+                      type="button"
+                      onClick={() => deleteComment(comment.id)}
+                      aria-label="Delete comment"
+                      title="Delete comment"
+                      className="inline-flex items-center gap-1 rounded-md p-1 text-text-muted transition-colors duration-150 hover:bg-danger-subtle hover:text-danger-text"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
 
                   {pickerOpen && (
                     <div className="absolute left-0 top-8 z-30 max-w-[min(320px,100%)] animate-in">
