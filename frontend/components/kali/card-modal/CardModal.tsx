@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Eye, EyeOff, Trash2, Archive, Check, RotateCcw, MoreHorizontal, ArrowRight } from 'lucide-react'
+import { X, Eye, EyeOff, Trash2, Archive, Check, RotateCcw, MoreHorizontal, ArrowRight, ImageIcon } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import Modal from '../shared/Modal'
 import CardDescription from './CardDescription'
@@ -11,6 +11,8 @@ import CardDueDate from './CardDueDate'
 import CardLocation from './CardLocation'
 import CardAttachments from './CardAttachments'
 import CardComments from './CardComments'
+import ImageViewer, { type ViewerImage } from './ImageViewer'
+import { deleteMedia } from '@/lib/api/mediaApi'
 import CardActivity from './CardActivity'
 import CardCover from './CardCover'
 import CoverPanel from './CoverPanel'
@@ -31,6 +33,9 @@ export default function CardModal({ cardId, highlightCommentId, onClose }: CardM
   const [overflowOpen, setOverflowOpen] = useState(false)
   const [moveDialogOpen, setMoveDialogOpen] = useState(false)
   const [coverOpen, setCoverOpen] = useState(false)
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerStart, setViewerStart] = useState(0)
+  const [viewerTrigger, setViewerTrigger] = useState<HTMLElement | null>(null)
 
   const overflowRef = useRef<HTMLDivElement>(null)
 
@@ -54,6 +59,76 @@ export default function CardModal({ cardId, highlightCommentId, onClose }: CardM
   // A viewer gets a read-only card: the editors below would otherwise accept
   // input that the store guard silently drops.
   const mayWrite = canWrite(card.boardId)
+
+  const viewerImages: ViewerImage[] = []
+  if (card.cover && typeof card.cover !== 'string' && card.cover.type === 'image') {
+    const url = card.cover.dataUrl
+    const att = card.files.find((f) => f.type === 'image' && f.dataUrl === url)
+    viewerImages.push({
+      url,
+      name: att?.name ?? url.split('/').pop() ?? 'cover.jpg',
+      size: att?.size ?? 0,
+      mimeType: att?.mimeType,
+      addedAt: att?.addedAt ?? card.updatedAt,
+      isCover: true,
+      mediaId: card.cover.mediaId ?? att?.mediaId,
+      publicId: att?.publicId,
+    })
+  }
+  for (const f of card.files) {
+    if (f.type !== 'image') continue
+    if (viewerImages.some((v) => v.url === f.dataUrl)) continue
+    viewerImages.push({
+      url: f.dataUrl,
+      name: f.name,
+      size: f.size,
+      mimeType: f.mimeType,
+      addedAt: f.addedAt,
+      isCover: false,
+      mediaId: f.mediaId,
+      publicId: f.publicId,
+    })
+  }
+
+  const openViewerAt = (url: string, trigger: HTMLElement | null) => {
+    const idx = viewerImages.findIndex((v) => v.url === url)
+    setViewerStart(idx >= 0 ? idx : 0)
+    setViewerTrigger(trigger)
+    setViewerOpen(true)
+  }
+
+  const handleRemoveCoverFromViewer = () => {
+    updateCard(card.id, { cover: null, coverSize: 'large' })
+    addActivity(card.id, 'removed the cover')
+    setViewerOpen(false)
+  }
+
+  const handleDeleteFromViewer = async (img: ViewerImage) => {
+    const isActiveCover =
+      card.cover !== null &&
+      typeof card.cover !== 'string' &&
+      card.cover.type === 'image' &&
+      card.cover.dataUrl === img.url
+    const attachment = card.files.find((f) => f.dataUrl === img.url)
+    updateCard(card.id, {
+      files: card.files.filter((f) => f.dataUrl !== img.url),
+      ...(isActiveCover ? { cover: null } : {}),
+    })
+    addActivity(card.id, `removed ${img.name}`)
+    if (attachment?.mediaId) {
+      try {
+        await deleteMedia(attachment.mediaId)
+      } catch {
+        // best-effort
+      }
+    }
+  }
+
+  const closeViewer = () => {
+    setViewerOpen(false)
+    // return focus to the trigger
+    setTimeout(() => viewerTrigger?.focus(), 0)
+  }
 
   const commitTitle = () => {
     setEditingTitle(false)
@@ -106,7 +181,23 @@ export default function CardModal({ cardId, highlightCommentId, onClose }: CardM
                   style={{ background: card.cover as string }}
                 />
               ) : (
-                <img src={card.cover.dataUrl} alt="" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={(e) => openViewerAt(card.cover && typeof card.cover !== 'string' ? card.cover.dataUrl : '', e.currentTarget)}
+                  className="group relative block h-full w-full cursor-zoom-in overflow-hidden"
+                  aria-label="View cover image"
+                >
+                  <img
+                    src={card.cover.dataUrl}
+                    alt=""
+                    className="h-full w-full object-cover transition-[filter] duration-150 group-hover:brightness-90"
+                  />
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <span className="rounded-full bg-black/50 p-2 text-white">
+                      <ImageIcon size={18} />
+                    </span>
+                  </span>
+                </button>
               )}
             </div>
           )}
@@ -225,7 +316,11 @@ export default function CardModal({ cardId, highlightCommentId, onClose }: CardM
             <div className="mt-4 grid grid-cols-1 gap-5 sm:mt-5 sm:gap-7 md:grid-cols-[1fr_220px]">
               <div className="min-w-0 space-y-6">
                 <CardDescription card={card} readOnly={!mayWrite} />
-                <CardAttachments card={card} readOnly={!mayWrite} />
+                <CardAttachments
+                  card={card}
+                  readOnly={!mayWrite}
+                  onViewImage={(att, trigger) => openViewerAt(att.dataUrl, trigger)}
+                />
                 <CardComments card={card} readOnly={!mayWrite} highlightCommentId={highlightCommentId} />
               </div>
 
@@ -269,6 +364,16 @@ export default function CardModal({ cardId, highlightCommentId, onClose }: CardM
         open={coverOpen}
         onClose={() => setCoverOpen(false)}
       />
+      {viewerOpen && viewerImages.length > 0 && (
+        <ImageViewer
+          images={viewerImages}
+          startIndex={viewerStart}
+          canEdit={mayWrite}
+          onClose={closeViewer}
+          onRemoveCover={handleRemoveCoverFromViewer}
+          onDelete={handleDeleteFromViewer}
+        />
+      )}
     </Modal>
   )
 }

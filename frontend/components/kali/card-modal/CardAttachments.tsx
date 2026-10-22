@@ -16,7 +16,15 @@ import SectionLabel from '../shared/SectionLabel'
  */
 export const MAX_FILE_SIZE = 50 * 1024 * 1024
 
-export default function CardAttachments({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
+export default function CardAttachments({
+  card,
+  readOnly = false,
+  onViewImage,
+}: {
+  card: Card
+  readOnly?: boolean
+  onViewImage?: (attachment: FileAttachment, trigger: HTMLElement | null) => void
+}) {
   const store = useStore()
   const fileRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLInputElement>(null)
@@ -92,11 +100,18 @@ export default function CardAttachments({ card, readOnly = false }: { card: Card
           return (
           <div key={attachment.id} className="flex items-center gap-3 rounded-md bg-surface-alt px-3 py-2">
             {attachment.type === 'image' ? (
-              <img
-                src={attachment.dataUrl}
-                alt={attachment.name}
-                className="h-11 w-11 shrink-0 rounded-md object-cover"
-              />
+              <button
+                type="button"
+                onClick={(e) => onViewImage?.(attachment, e.currentTarget)}
+                className="h-11 w-11 shrink-0 overflow-hidden rounded-md transition-transform duration-150 hover:scale-[1.03] focus:outline-none focus:ring-2 focus:ring-primary"
+                aria-label={`View ${attachment.name}`}
+              >
+                <img
+                  src={attachment.dataUrl}
+                  alt={attachment.name}
+                  className="h-full w-full object-cover"
+                />
+              </button>
             ) : (
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-surface-elevated text-text-secondary">
                 <FileText size={16} />

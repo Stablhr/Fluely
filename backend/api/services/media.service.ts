@@ -1,8 +1,11 @@
 import path from 'path';
 import {Types} from 'mongoose';
 import {mediaRepository} from '../repositories/media.repository';
+import {boardRepository} from '../repositories/board.repository';
+import {getBoardAccessLevel, canWrite} from './boardAccess.service';
 import {mediaConfig, kindForMimeType} from '../config/media';
 import {ApiError} from '../utils/error';
+import {Actor} from '../utils/actor';
 import {ErrorCodes} from '../constants/errorCodes';
 import {MediaKind} from '../constants/product';
 import {paginationFrom, paginationMeta} from '../utils/pagination';
@@ -141,6 +144,18 @@ export const mediaService = {
     const existing = await mediaRepository.findByIdForOwner(id.toString(), ownerId);
     if (!existing) {
       throw new ApiError(404, ErrorCodes.MEDIA_NOT_FOUND, 'Attachment not found');
+    }
+
+    // Board-role enforcement: a viewer may not delete attachments on a board
+    // they only have read access to.
+    if (existing.boardId) {
+      const board = await boardRepository.findById(existing.boardId.toString());
+      if (board) {
+        const level = await getBoardAccessLevel({actorType: 'user', actorId: ownerId}, board);
+        if (!canWrite(level)) {
+          throw new ApiError(403, ErrorCodes.FORBIDDEN, 'You have view-only access to this board');
+        }
+      }
     }
 
     // Destroy first: if Cloudinary is unreachable the row survives and the
