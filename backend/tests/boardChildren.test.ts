@@ -16,6 +16,8 @@ jest.mock('../api/repositories/card.repository', () => ({
     findByIdForBoard: jest.fn(),
     findByListForBoard: jest.fn(),
     listByBoard: jest.fn(),
+    listOrderedForList: jest.fn(),
+    setPositions: jest.fn(),
     update: jest.fn(),
     move: jest.fn(),
     delete: jest.fn(),
@@ -153,6 +155,13 @@ beforeEach(() => {
   allowBump();
   mockedBoards.update.mockResolvedValue({matchedCount: 1} as never);
   installActivityLog();
+  // The new move path reads ordered siblings through listOrderedForList and
+  // re-spaces positions; keep the legacy mocks feeding it so the existing
+  // scenarios keep exercising the service contract.
+  mockedCards.listOrderedForList.mockImplementation(() =>
+    mockedCards.listByBoard(BOARD),
+  );
+  mockedCards.setPositions.mockResolvedValue(undefined as never);
 });
 
 describe('list writes', () => {
@@ -275,6 +284,7 @@ describe('card writes', () => {
       CARD.toString(),
       BOARD,
       OTHER_LIST,
+      -1024,
       undefined
     );
   });

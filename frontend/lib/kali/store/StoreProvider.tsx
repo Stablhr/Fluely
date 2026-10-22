@@ -1828,25 +1828,29 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     const dest = dataRef.current.lists[destListId];
     if (!card || !dest || !canWrite(card.boardId)) return;
     if (isServerBoard(dataRef.current.boards[card.boardId])) {
-      // The destination's whole new order is computed here rather than sent as
-      // an index: the source list has to be rewritten too, and the two are only
-      // consistent if the client states both sides at once.
-      const srcListId = card.listId;
-      const src = dataRef.current.lists[srcListId];
-      const destOrder =
-        srcListId === destListId
-          ? (src?.cardOrder ?? []).filter(x => x !== cardId)
-          : dest.cardOrder.filter(x => x !== cardId);
-      destOrder.splice(destIndex, 0, cardId);
-
+      // Only the destination index is sent; the server computes the new
+      // fractional position from the neighbours, so this write touches a single
+      // row and cannot clobber a concurrent move of a different card. The index
+      // is recomputed on every attempt (including the retry after a revision
+      // conflict), so a rapid follow-up move is never sent with a stale index.
       void writeThrough(
         card.boardId,
-        revision =>
-          moveCardOnServer(card.boardId, cardId, {
+        revision => {
+          const latestCard = dataRef.current.cards[cardId];
+          const latestDest = dataRef.current.lists[destListId];
+          const latestIndex =
+            latestCard && latestDest
+              ? Math.min(
+                  Math.max(destIndex, 0),
+                  (latestDest.cardOrder ?? []).filter((id) => id !== cardId).length,
+                )
+              : destIndex;
+          return moveCardOnServer(card.boardId, cardId, {
             listId: destListId,
-            cardOrder: destOrder,
+            index: latestIndex,
             expectedRevision: revision,
-          }).then(result => result.revision),
+          }).then(result => result.revision);
+        },
         "Could not move that card.",
       );
     }

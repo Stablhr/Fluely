@@ -23,6 +23,14 @@ export type CardCoverSize = (typeof CardCoverSizes)[number];
 export interface CardDocument extends mongoose.Document {
   boardId: Types.ObjectId;
   listId: Types.ObjectId;
+  /**
+   * Fractional order within the list. A card sits between its neighbours by
+   * value, so moving it is a one-row write that never touches a sibling --
+   * concurrent moves therefore cannot clobber each other. `null` on cards that
+   * predate the field; those lists fall back to `List.cardOrder` until the
+   * first write re-spaces them.
+   */
+  position: number | null;
   title: string;
   desc: string;
   coverMediaId: Types.ObjectId | null;
@@ -45,6 +53,7 @@ const CardSchema = new Schema<CardDocument>(
   {
     boardId: {type: Schema.Types.ObjectId, ref: 'Board', required: true, index: true},
     listId: {type: Schema.Types.ObjectId, ref: 'List', required: true, index: true},
+    position: {type: Number, default: null},
     title: {type: String, required: true, trim: true, maxlength: 300},
     desc: {type: String, default: '', maxlength: 20000},
     coverMediaId: {type: Schema.Types.ObjectId, ref: 'MediaAttachment', default: null},
@@ -76,6 +85,9 @@ const CardSchema = new Schema<CardDocument>(
 
 // Serves both "cards in this list" and "cards in this board".
 CardSchema.index({listId: 1, createdAt: 1});
+// The board structure reads every card of a board, then orders each list's
+// slice by this field.
+CardSchema.index({boardId: 1, position: 1});
 // Drives the calendar and schedule views, which scan by due date.
 CardSchema.index({boardId: 1, dueDate: 1});
 

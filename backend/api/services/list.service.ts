@@ -1,5 +1,7 @@
 import {Types} from 'mongoose';
 import {listRepository} from '../repositories/list.repository';
+import {cardRepository} from '../repositories/card.repository';
+import {POSITION_GAP} from '../utils/position';
 import {boardRepository} from '../repositories/board.repository';
 import {BoardDocument} from '../models/Board.model';
 import {ListDocument} from '../models/List.model';
@@ -30,7 +32,7 @@ type CreateListInput = {
   expectedRevision?: number;
 };
 
-function serializeList(list: ListDocument) {
+function serializeList(list: ListDocument, cardOrder?: string[]) {
   return {
     id: list._id.toString(),
     boardId: list.boardId.toString(),
@@ -39,7 +41,7 @@ function serializeList(list: ListDocument) {
     collapsed: list.collapsed,
     backgroundColor: list.backgroundColor,
     position: list.position,
-    cardOrder: (list.cardOrder ?? []).map(id => id.toString()),
+    cardOrder: (cardOrder ?? list.cardOrder ?? []).map(id => id.toString()),
     archivedAt: list.archivedAt,
     createdAt: list.createdAt,
     updatedAt: list.updatedAt
@@ -64,7 +66,7 @@ export const listService = {
 
   async list(board: BoardDocument) {
     const lists = await listRepository.listByBoard(board._id);
-    return lists.map(serializeList);
+    return lists.map(list => serializeList(list));
   },
 
   async create(actor: Actor, board: BoardDocument, input: CreateListInput) {
@@ -142,6 +144,13 @@ export const listService = {
         // a card id belonging to a different board.
         await assertOrderFitsList(board._id, listId, input.cardOrder);
         patch.cardOrder = input.cardOrder.map(id => new Types.ObjectId(id));
+        // Keep the fractional positions in sync so the next read (which derives
+        // the order from them) agrees with this explicit reorder.
+        await cardRepository.setPositions(
+          input.cardOrder.map((id, index) => ({id, position: index * POSITION_GAP})),
+          board._id,
+          session
+        );
       }
 
       await listRepository.update(listId, board._id, patch, session);

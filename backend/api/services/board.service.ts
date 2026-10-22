@@ -272,6 +272,33 @@ export const boardService = {
       cardRepository.listByBoard(board._id)
     ]);
 
+    // The legacy `cardOrder` array is only the authority for lists that have
+    // never been written since the position field landed. Once a list has any
+    // positioned card, the fractional positions win -- which is what makes a
+    // card move a single-row write instead of a whole-list rewrite.
+    const cardsByList = new Map<string, typeof cards>();
+    for (const card of cards) {
+      const key = card.listId.toString();
+      const bucket = cardsByList.get(key);
+      if (bucket) bucket.push(card);
+      else cardsByList.set(key, [card]);
+    }
+    const derivedOrder = new Map<string, string[]>();
+    for (const list of lists) {
+      const id = list._id.toString();
+      const bucket = cardsByList.get(id) ?? [];
+      if (bucket.every(card => typeof card.position === 'number')) {
+        derivedOrder.set(
+          id,
+          [...bucket]
+            .sort((left, right) => (left.position as number) - (right.position as number))
+            .map(card => card._id.toString())
+        );
+      } else {
+        derivedOrder.set(id, (list.cardOrder ?? []).map(cardId => cardId.toString()));
+      }
+    }
+
     const byPosition = new Map(lists.map(list => [list._id.toString(), list]));
     const ordered = (board.listOrder ?? [])
       .map(id => byPosition.get(id.toString()))
@@ -282,7 +309,9 @@ export const boardService = {
     const orphans = lists.filter(list => !board.listOrder.some(id => id.equals(list._id)));
 
     return {
-      lists: [...ordered, ...orphans].map(listService.serialize),
+      lists: [...ordered, ...orphans].map(list =>
+        listService.serialize(list, derivedOrder.get(list._id.toString()))
+      ),
       cards: await Promise.all(cards.map(card => cardService.serialize(card))),
       revision: board.revision
     };

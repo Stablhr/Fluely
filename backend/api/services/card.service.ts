@@ -6,6 +6,12 @@ import {BoardDocument} from '../models/Board.model';
 import {CardCoverSize, CardDocument} from '../models/Card.model';
 import {bumpBoardRevision} from './boardRevision';
 import {activityService} from './activity.service';
+import {
+  POSITION_GAP,
+  positionBetween,
+  needsRespace,
+  spacedPositions
+} from '../utils/position';
 import {boardMemberService} from './boardMember.service';
 import {withProductTransaction, ProductSession} from '../utils/transaction';
 import {ActivityActionType} from '../constants/product';
@@ -45,9 +51,61 @@ type CreateCardInput = Omit<CardInput, 'title' | 'expectedRevision'> & {
 
 type MoveCardInput = {
   listId: string;
+  index?: number;
   cardOrder?: string[];
   expectedRevision?: number;
 };
+
+/** Returns the list's cards in display order, backfilling positions if needed. */
+async function orderedCardsForList(
+  boardId: Types.ObjectId,
+  listId: Types.ObjectId,
+  session: ProductSession,
+  listDoc?: {cardOrder?: Types.ObjectId[]}
+): Promise<CardDocument[]> {
+  const list = listDoc ?? (await listRepository.findByIdForBoard(listId.toString(), boardId, session));
+  const cards = (await cardRepository.listOrderedForList(listId, boardId, session)) ?? [];
+  if (cards.every(card => typeof card.position === 'number')) {
+    return cards;
+  }
+
+  // Legacy cards without a position: space them out from the stored order
+  // (or, failing that, creation order) so the next read is positioned.
+  const ids = list
+    ? (list.cardOrder ?? []).map(id => id.toString()).filter(id => cards.some(card => card._id.toString() === id))
+    : [];
+  for (const card of cards) {
+    if (!ids.includes(card._id.toString())) ids.push(card._id.toString());
+  }
+  await cardRepository.setPositions(
+    ids.map((id, index) => ({id, position: index * POSITION_GAP})),
+    boardId,
+    session
+  );
+  return cardRepository.listOrderedForList(listId, boardId, session);
+}
+
+/** Re-space a list's cards evenly. Used as a fallback when a gap is exhausted. */
+async function respaceList(
+  boardId: Types.ObjectId,
+  listId: Types.ObjectId,
+  session: ProductSession,
+  listDoc?: {cardOrder?: Types.ObjectId[]}
+) {
+  const list = listDoc ?? (await listRepository.findByIdForBoard(listId.toString(), boardId, session));
+  const cards = (await cardRepository.listOrderedForList(listId, boardId, session)) ?? [];
+  const ids = list
+    ? (list.cardOrder ?? []).map(id => id.toString()).filter(id => cards.some(card => card._id.toString() === id))
+    : [];
+  for (const card of cards) {
+    if (!ids.includes(card._id.toString())) ids.push(card._id.toString());
+  }
+  await cardRepository.setPositions(
+    ids.map((id, index) => ({id, position: index * POSITION_GAP})),
+    boardId,
+    session
+  );
+}
 
 type SetCardMemberInput = {
   userId: string;
@@ -78,6 +136,7 @@ async function serializeCard(card: CardDocument) {
     id: card._id.toString(),
     boardId: card.boardId.toString(),
     listId: card.listId.toString(),
+    position: card.position,
     title: card.title,
     desc: card.desc,
     coverMediaId: card.coverMediaId ? card.coverMediaId.toString() : null,
@@ -208,13 +267,22 @@ export const cardService = {
     const result = await withProductTransaction(async session => {
       // A card may only be filed under a list on its own board, so the target list
       // is proven before anything is written.
-      await requireListForBoard(input.listId, board._id, session);
+      const targetList = await requireListForBoard(input.listId, board._id, session);
       const revision = await bumpBoardRevision(board._id, input.expectedRevision, session);
+
+      const siblings = await orderedCardsForList(board._id, new Types.ObjectId(input.listId), session, targetList);
+      const position =
+        siblings.length === 0
+          ? 0
+          : siblings[siblings.length - 1].position == null
+            ? siblings.length * POSITION_GAP
+            : siblings[siblings.length - 1].position! + POSITION_GAP;
 
       const card = await cardRepository.create(
         {
           boardId: board._id,
           listId: new Types.ObjectId(input.listId),
+          position,
           title: input.title,
           desc: input.desc ?? '',
           coverMediaId: input.coverMediaId ? new Types.ObjectId(input.coverMediaId) : null,
@@ -237,8 +305,9 @@ export const cardService = {
         session
       );
 
-      // Appending to the list's order is what makes the card visible; the list
-      // document is the only thing that knows where its cards sit.
+      // Keep the legacy array in sync for boards that have never been written
+      // since the position field landed, so a read that falls back to it still
+      // sees the new card.
       await listRepository.update(
         input.listId,
         board._id,
@@ -458,26 +527,52 @@ export const cardService = {
 
       const revision = await bumpBoardRevision(board._id, input.expectedRevision, session);
 
-      const sameList = card.listId.toString() === targetList._id.toString();
-      if (!sameList) {
+      // The move is now a single-row write: `listId` + `position`. No sibling
+      // card is touched, so concurrent moves to different cards can never
+      // clobber each other the way the old full-`cardOrder`-array write did.
+      const siblings = (await orderedCardsForList(board._id, targetList._id, session, targetList))
+        .filter(cardDoc => cardDoc._id.toString() !== cardId);
+
+      let index: number;
+      if (typeof input.index === 'number') {
+        index = Math.min(Math.max(input.index, 0), siblings.length);
+      } else if (input.cardOrder) {
+        const found = input.cardOrder.indexOf(cardId);
+        index = found === -1 ? siblings.length : Math.min(Math.max(found, 0), siblings.length);
+      } else {
+        index = siblings.length;
+      }
+
+      const before = index > 0 ? siblings[index - 1]?.position : undefined;
+      const after = index < siblings.length ? siblings[index]?.position : undefined;
+
+      let position = positionBetween(before, after);
+      if (needsRespace(before, after)) {
+        await respaceList(board._id, targetList._id, session, targetList);
+        const refreshed = (await orderedCardsForList(board._id, targetList._id, session, targetList))
+          .filter(cardDoc => cardDoc._id.toString() !== cardId);
+        position = positionBetween(
+          index > 0 ? refreshed[index - 1]?.position : undefined,
+          index < refreshed.length ? refreshed[index]?.position : undefined
+        );
+      }
+
+      await cardRepository.move(cardId, board._id, targetList._id, position, session);
+
+      // Keep the legacy array in sync for boards that have never been written
+      // since the position field landed, so a read that falls back to it still
+      // sees the moved card in its new place.
+      if (card.listId.toString() !== targetList._id.toString()) {
         const sourceOrder = (
           await listOrderOf(card.listId.toString(), board._id, session)
         ).filter(id => id.toString() !== cardId);
-        await listRepository.update(card.listId.toString(), board._id, {
-          cardOrder: sourceOrder
-        }, session);
+        await listRepository.update(card.listId.toString(), board._id, {cardOrder: sourceOrder}, session);
       }
-
-      const targetOrder = input.cardOrder
-        ? input.cardOrder.map(id => new Types.ObjectId(id))
-        : sameList
-          ? targetList.cardOrder
-          : [...targetList.cardOrder, card._id];
-
-      await listRepository.update(targetList._id.toString(), board._id, {
-        cardOrder: targetOrder
-      }, session);
-      await cardRepository.move(cardId, board._id, targetList._id, session);
+      const targetOrder = (await listOrderOf(targetList._id.toString(), board._id, session)).filter(
+        id => id.toString() !== cardId
+      );
+      targetOrder.splice(index, 0, new Types.ObjectId(cardId));
+      await listRepository.update(targetList._id.toString(), board._id, {cardOrder: targetOrder}, session);
 
       const moved = await requireCardForBoard(cardId, board._id, session);
 
@@ -527,6 +622,11 @@ export const cardService = {
       await listRepository.update(listId, board._id, {
         cardOrder: cardOrder.map(id => new Types.ObjectId(id))
       }, session);
+      await cardRepository.setPositions(
+        cardOrder.map((id, index) => ({id, position: index * POSITION_GAP})),
+        board._id,
+        session
+      );
       const updated = await requireListForBoard(listId, board._id, session);
 
       const activity = await activityService.log(session, {

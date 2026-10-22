@@ -215,6 +215,10 @@ export const cardMemberPatchSchema = z.object({
 
 export const cardMoveSchema = z.object({
   listId: objectId,
+  // Destination index within the target list. The server computes the new
+  // fractional position from the neighbours, so the client never has to send
+  // (and never races on) the whole list order.
+  index: z.number().int().min(0).max(100000).optional(),
   cardOrder: z.array(objectId).max(10000).optional(),
   expectedRevision: z.number().int().positive()
 });

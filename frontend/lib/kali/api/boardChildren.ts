@@ -71,6 +71,7 @@ export interface CardDto {
   mediaIds: string[];
   archived: boolean;
   done: boolean;
+  position?: number | null;
   createdAt: string;
   updatedAt: string;
   imageUrl?: string | null;
@@ -470,6 +471,7 @@ export async function moveCardOnServer(
   cardId: string,
   input: {
     listId: string;
+    index?: number;
     cardOrder?: string[];
     expectedRevision?: number | null;
   },
@@ -480,6 +482,8 @@ export async function moveCardOnServer(
     revision: number;
   }>(`/boards/${boardId}/cards/${cardId}/move`, {
     listId: input.listId,
+    index: input.index,
+    // `cardOrder` is still accepted for the legacy whole-list reorder path.
     cardOrder: input.cardOrder,
     expectedRevision: input.expectedRevision ?? undefined,
   });

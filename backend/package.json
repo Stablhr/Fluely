@@ -10,6 +10,7 @@
     "seed:admin": "tsx scripts/seed-admin.ts",
     "fix:slug-index": "tsx scripts/fix-public-slug-index.ts",
     "migrate:media-to-cloudinary": "tsx scripts/migrate-media-to-cloudinary.ts",
+    "migrate:card-positions": "tsx scripts/migrate-card-positions.ts",
     "lint": "eslint .",
     "test": "jest"
   },
