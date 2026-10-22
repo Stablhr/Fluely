@@ -88,6 +88,33 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
 
   const boardMembers = store.getBoardMembers(card.boardId)
 
+  // Convert composer text (which uses `@Name` for mentions) into the structured
+  // `@[id|Name]` form the store/backend expect, so ids never appear in the UI.
+  const toStructured = (input: string): string => {
+    let result = ''
+    let i = 0
+    while (i < input.length) {
+      if (input[i] === '@') {
+        let best: Member | null = null
+        for (const m of boardMembers) {
+          const candidate = '@' + m.name
+          if (input.startsWith(candidate, i) && (!best || m.name.length > best.name.length)) {
+            best = m
+          }
+        }
+        if (best) {
+          const serverId = best.id === YOU_ID ? (store.currentUserId ?? best.id) : best.id
+          result += `@[${serverId}|${best.name}]`
+          i += best.name.length + 1
+          continue
+        }
+      }
+      result += input[i]
+      i++
+    }
+    return result
+  }
+
   const filteredMembers = boardMembers.filter((m) =>
     m.name.toLowerCase().includes(mentionQuery.toLowerCase()),
   )
@@ -137,7 +164,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
       if (!match) return
       const start = cursor - match[0].length
       const serverId = member.id === YOU_ID ? (store.currentUserId ?? member.id) : member.id
-      const newText = before.slice(0, start) + `@[${serverId}|${member.name}] ` + after
+      const newText = before.slice(0, start) + `@${member.name} ` + after
       setTextFn(newText)
       setMentionOpen(false)
       setTimeout(() => {
@@ -183,8 +210,9 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
   }
 
   const submit = (parentId: string | null = null, body?: string) => {
-    const t = (body ?? text).trim()
-    if (!t) return
+    const raw = (body ?? text).trim()
+    if (!raw) return
+    const t = toStructured(raw)
     store.updateCard(card.id, {
       comments: [
         ...card.comments,
@@ -240,7 +268,11 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
     }
     setReplyTo(threadId)
     const isMe = comment.authorId === YOU_ID || comment.authorId === store.currentUserId
-    setReplyText(comment.parentId && !isMe ? `@[${comment.authorId}] ` : '')
+    const authorName =
+      boardMembers.find((m) => m.id === comment.authorId)?.name ||
+      store.data.members[comment.authorId]?.name ||
+      (isMe ? 'You' : 'Unknown')
+    setReplyText(comment.parentId && !isMe ? `@${authorName} ` : '')
   }
 
   const deleteComment = (commentId: string) => {
@@ -423,7 +455,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
           )}
           {text.trim() && text.includes('@') && (
             <div className="mt-1 px-4 text-xs text-text-muted">
-              {renderMentionText(text, boardMembers)}
+              {renderMentionText(toStructured(text), boardMembers)}
             </div>
           )}
         </div>
@@ -485,7 +517,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                     )}
                       {replyText.trim() && replyText.includes('@') && (
                         <div className="mt-1 px-4 text-xs text-text-muted">
-                          {renderMentionText(replyText, boardMembers)}
+                          {renderMentionText(toStructured(replyText), boardMembers)}
                         </div>
                       )}
                   </div>
