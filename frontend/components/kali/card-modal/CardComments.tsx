@@ -270,7 +270,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
 
       <div className="mt-3 space-y-3">
         {card.comments
-          .filter((c) => !c.parentId)
+          .filter((c) => !c.parentId || !card.comments.some((p) => p.id === c.parentId))
           .map((comment) => {
           const boardMembers = store.getBoardMembers(card.boardId)
           const author =
@@ -405,7 +405,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                       }
                     const replyParts = parseMentions(reply.text)
                     return (
-                      <div key={reply.id} className="mt-2 flex items-start gap-2 pl-4">
+                      <div key={reply.id} className="mt-2 flex items-start gap-2 border-l-2 border-primary/20 pl-3">
                         <Avatar member={replyAuthor} size={20} />
                         <div className="min-w-0 flex-1">
                           <div className="rounded-lg bg-surface px-3 py-2">

@@ -178,6 +178,7 @@ function toCardPatch(patch: Partial<Card>): Partial<CreateCardInput> {
     out.comments = patch.comments.map((c) => ({
       id: c.id,
       authorId: c.authorId,
+      parentId: c.parentId ?? null,
       text: c.text,
       reactions: c.reactions,
       createdAt: c.createdAt,
