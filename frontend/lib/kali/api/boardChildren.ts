@@ -489,6 +489,8 @@ export async function moveCardOnServer(
     afterId?: string;
     index?: number;
     cardOrder?: string[];
+    /** Place the card at the end of the target list. */
+    appendToEnd?: boolean;
     expectedRevision?: number | null;
   },
 ): Promise<{ card: CardDto; listId: string; revision: number }> {
@@ -503,6 +505,7 @@ export async function moveCardOnServer(
     index: input.index,
     // `cardOrder` is still accepted for the legacy whole-list reorder path.
     cardOrder: input.cardOrder,
+    appendToEnd: input.appendToEnd,
     expectedRevision: input.expectedRevision ?? undefined,
   });
   return data;

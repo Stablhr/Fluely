@@ -34,6 +34,18 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
             >
               <Icon size={15} className="shrink-0" />
               <span className="flex-1">{t.message}</span>
+              {t.action && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    t.action?.onClick()
+                    removeToast(t.id)
+                  }}
+                  className="shrink-0 rounded px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide underline-offset-2 transition-opacity hover:opacity-70"
+                >
+                  {t.action.label}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => removeToast(t.id)}

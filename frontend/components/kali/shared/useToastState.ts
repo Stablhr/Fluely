@@ -2,19 +2,40 @@ import { createContext, useContext, useCallback, useState, useRef, useEffect } f
 
 type ToastType = 'success' | 'error' | 'info'
 
+/**
+ * An optional button on a toast.
+ *
+ * Used for the "Undo" affordance on a move: the toast stays up long enough
+ * for the action to be worth taking, and clicking it reverses the change.
+ */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+export interface ToastOptions {
+  action?: ToastAction;
+  /** How long the toast stays up, in milliseconds. */
+  duration?: number;
+}
+
 interface Toast {
   id: number
   message: string
   type: ToastType
+  action?: ToastAction
+  duration: number
 }
 
 export interface ToastContextValue {
-  toast: (message: string, type?: ToastType) => void
+  toast: (message: string, type?: ToastType, options?: ToastOptions) => void
 }
 
 export const ToastContext = createContext<ToastContextValue | null>(null)
 
 let toastId = 0
+
+const DEFAULT_DURATION = 3000
 
 export function useToastState() {
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -29,12 +50,16 @@ export function useToastState() {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  const toast = useCallback((message: string, type: ToastType = 'success') => {
-    const id = ++toastId
-    setToasts((prev) => [...prev.slice(-4), { id, message, type }])
-    const timer = setTimeout(() => removeToast(id), 3000)
-    timersRef.current.set(id, timer)
-  }, [removeToast])
+  const toast = useCallback(
+    (message: string, type: ToastType = 'success', options?: ToastOptions) => {
+      const id = ++toastId
+      const duration = options?.duration ?? DEFAULT_DURATION
+      setToasts((prev) => [...prev.slice(-4), { id, message, type, action: options?.action, duration }])
+      const timer = setTimeout(() => removeToast(id), duration)
+      timersRef.current.set(id, timer)
+    },
+    [removeToast],
+  )
 
   useEffect(() => {
     const timers = timersRef.current

@@ -8,6 +8,7 @@ import {bumpBoardRevision} from './boardRevision';
 import {activityService} from './activity.service';
 import {
   POSITION_GAP,
+  positionAtEnd,
   positionBetween,
   needsRespace,
   spacedPositions
@@ -59,6 +60,8 @@ type MoveCardInput = {
   afterId?: string;
   index?: number;
   cardOrder?: string[];
+  /** Place the card at the end of the target list. */
+  appendToEnd?: boolean;
   expectedRevision?: number;
 };
 
@@ -674,17 +677,32 @@ export const cardService = {
           index = siblings.length;
         }
       } else {
-        if (typeof input.index === 'number') {
+        if (input.appendToEnd) {
+          // Append to the end of the list. The position comes from the shared
+          // position utility, using the *current* position of the list's last
+          // card, so a card moved here lands after everything else even when
+          // the client's view of the list was stale.
+          index = siblings.length;
+          beforePos = siblings.length > 0 ? siblings[siblings.length - 1]?.position : undefined;
+          afterPos = undefined;
+          position = positionAtEnd(beforePos);
+        } else if (typeof input.index === 'number') {
           index = Math.min(Math.max(input.index, 0), siblings.length);
+          beforePos = index > 0 ? siblings[index - 1]?.position : undefined;
+          afterPos = index < siblings.length ? siblings[index]?.position : undefined;
+          position = positionBetween(beforePos, afterPos);
         } else if (input.cardOrder) {
           const found = input.cardOrder.indexOf(cardId);
           index = found === -1 ? siblings.length : Math.min(Math.max(found, 0), siblings.length);
+          beforePos = index > 0 ? siblings[index - 1]?.position : undefined;
+          afterPos = index < siblings.length ? siblings[index]?.position : undefined;
+          position = positionBetween(beforePos, afterPos);
         } else {
           index = siblings.length;
+          beforePos = index > 0 ? siblings[index - 1]?.position : undefined;
+          afterPos = index < siblings.length ? siblings[index]?.position : undefined;
+          position = positionBetween(beforePos, afterPos);
         }
-        beforePos = index > 0 ? siblings[index - 1]?.position : undefined;
-        afterPos = index < siblings.length ? siblings[index]?.position : undefined;
-        position = positionBetween(beforePos, afterPos);
       }
 
       if (needsRespace(beforePos, afterPos)) {

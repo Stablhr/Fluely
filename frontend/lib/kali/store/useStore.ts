@@ -86,6 +86,20 @@ export interface Store {
   /** Owner-only. Adds or removes one accepted board member from a card. */
   setCardMember: (cardId: string, memberId: string, assign: boolean) => void;
   moveCard: (cardId: string, destListId: string, destIndex: number) => void;
+  /**
+   * Moves a card to another list, placing it at the end unless an index is
+   * given. Resolves with the outcome so the caller can undo or report it.
+   */
+  moveCardToList: (
+    cardId: string,
+    destListId: string,
+    options?: { index?: number },
+  ) => Promise<{
+    ok: boolean;
+    error?: string;
+    /** Where the card came from, so the caller can undo the move. */
+    previous?: { listId: string; index: number };
+  }>;
   addActivity: (cardId: string, text: string) => void;
   addBoardActivity: (boardId: string, text: string) => void;
   setBoardSettings: (

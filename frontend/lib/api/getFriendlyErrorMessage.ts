@@ -81,6 +81,8 @@ export function getFriendlyErrorMessage(
         return "That person is no longer a collaborator on this board.";
       case "COLLABORATOR_EXISTS":
         return "That person is already a collaborator on this board.";
+      case "LIST_NOT_FOUND":
+        return "That list no longer exists.";
       case "CANNOT_INVITE_SELF":
         return "You cannot invite yourself to a board you already own.";
       case "CANNOT_MODIFY_OWNER":

@@ -12,6 +12,7 @@ import CardLocation from './CardLocation'
 import CardAttachments from './CardAttachments'
 import CardComments from './CardComments'
 import ImageViewer, { type ViewerImage } from './ImageViewer'
+import MoveToListMenu, { type MoveToListTarget } from './MoveToListMenu'
 import { deleteMedia } from '@/lib/api/mediaApi'
 import CardActivity from './CardActivity'
 import CardCover from './CardCover'
@@ -27,7 +28,8 @@ interface CardModalProps {
 }
 
 export default function CardModal({ cardId, highlightCommentId, onClose }: CardModalProps) {
-  const { data, updateCard, addActivity, deleteCard, archiveCard, toggleDone, canWrite } = useStore()
+  const store = useStore()
+const { data, updateCard, addActivity, deleteCard, archiveCard, toggleDone, canWrite } = store
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState('')
   const [overflowOpen, setOverflowOpen] = useState(false)
@@ -59,6 +61,14 @@ export default function CardModal({ cardId, highlightCommentId, onClose }: CardM
   // A viewer gets a read-only card: the editors below would otherwise accept
   // input that the store guard silently drops.
   const mayWrite = canWrite(card.boardId)
+
+  // Lists on this board in board order; archived lists live in
+  // board.archivedLists and are never offered as a destination.
+  const boardLists = store.getLists(card.boardId)
+
+  // When there is no cover image the move-to-list pill sits at the top-left of
+  // the header area, so push the title block down clear of it.
+  const coverPadding = card.cover ? 'p-4 sm:p-6' : 'px-4 pb-4 pt-14 sm:px-6 sm:pb-6 sm:pt-16'
 
   const viewerImages: ViewerImage[] = []
   if (card.cover && typeof card.cover !== 'string' && card.cover.type === 'image') {
@@ -160,6 +170,21 @@ export default function CardModal({ cardId, highlightCommentId, onClose }: CardM
   return (
     <Modal open onClose={onClose} className="max-w-2xl max-h-[85vh] sm:max-h-[80vh] h-full">
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        {/* Move-to-list pill */}
+        <MoveToListMenu
+          cardId={card.id}
+          currentListId={card.listId}
+          lists={boardLists.map((l) => ({
+            id: l.id,
+            name: l.name,
+            count: store.getCards(l.id).length,
+          }))}
+          canEdit={mayWrite}
+          onMove={(listId, options) =>
+            store.moveCardToList(card.id, listId, options)
+          }
+        />
+
         {/* Close button */}
         <button
           type="button"
@@ -210,7 +235,7 @@ export default function CardModal({ cardId, highlightCommentId, onClose }: CardM
             </div>
           )}
 
-          <div className="p-4 sm:p-6">
+          <div className={coverPadding}>
             <div className="flex flex-wrap items-start gap-2 sm:gap-3">
               <div className="min-w-0 flex-1">
                 {editingTitle && mayWrite ? (

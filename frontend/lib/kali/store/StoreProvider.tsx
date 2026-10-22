@@ -982,7 +982,15 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       boardId: string,
       send: (revision: number | undefined) => Promise<number | undefined>,
       failureMessage: string,
-    ) => {
+      /**
+       * Lets a caller that renders its own failure message opt out of the
+       * global error banner, and gives it the raw error to inspect.
+       */
+      options?: {
+        surfaceGlobalError?: boolean;
+        onError?: (error: unknown) => void;
+      },
+    ): Promise<{ ok: boolean; error?: unknown }> => {
       // Count this write as in-flight up front, so a concurrent sync defers
       // until it settles rather than merging over its optimistic state.
       inflightChildWritesRef.current += 1;
@@ -991,6 +999,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       // of racing on the single revision counter (which is what surfaced the
       // "Someone else changed this board" toast and the resulting revert).
       const previous = boardWriteQueuesRef.current.get(boardId) ?? Promise.resolve();
+      let failure: unknown = null;
       const run = previous.then(async () => {
         let failed = false;
         try {
@@ -1014,7 +1023,11 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           }
         } catch (err) {
           failed = true;
-          setError(getFriendlyErrorMessage(err, failureMessage));
+          failure = err;
+          if (options?.surfaceGlobalError !== false) {
+            setError(getFriendlyErrorMessage(err, failureMessage));
+          }
+          options?.onError?.(err);
         } finally {
           if (failed) void syncBoardStructure(boardId);
         }
@@ -1033,6 +1046,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           inflightChildWritesRef.current - 1,
         );
       }
+
+      return failure ? { ok: false, error: failure } : { ok: true };
     },
     [applyRevision, syncBoardStructure, setError],
   );
@@ -1943,6 +1958,167 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           : prev.boards,
       };
     });
+  };
+
+  /**
+   * Moves a card to another list and reports whether it worked.
+   *
+   * Unlike `moveCard`, which is fire-and-forget for drag-and-drop, this
+   * resolves with the outcome so a caller can undo the move or report the
+   * failure. The card is placed at the end of the target list unless an
+   * explicit index is given (which is how Undo puts a card back exactly where
+   * it was).
+   */
+  const moveCardToList = async (
+    cardId: string,
+    destListId: string,
+    options?: { index?: number },
+  ): Promise<{
+    ok: boolean;
+    error?: string;
+    /** Where the card came from, so the caller can undo the move. */
+    previous?: { listId: string; index: number };
+  }> => {
+    const card = dataRef.current.cards[cardId];
+    const dest = dataRef.current.lists[destListId];
+    if (!card || !dest) return { ok: false, error: "That list no longer exists." };
+    if (!canWrite(card.boardId)) {
+      return { ok: false, error: "You do not have edit access to this board." };
+    }
+    if (card.listId === destListId) return { ok: true };
+
+    const srcListId = card.listId;
+    const src = dataRef.current.lists[srcListId];
+    if (!src) return { ok: false, error: "That list no longer exists." };
+
+    // Where the card sat in the list it is leaving, so Undo can put it back.
+    const previousIndex = Math.max(src.cardOrder.indexOf(cardId), 0);
+
+    // The card's neighbours in the destination list decide its new position.
+    // Without an explicit index the card goes last, which the server resolves
+    // from its own view of the list so a stale client cannot misplace it.
+    const destSiblings = dest.cardOrder.filter((id) => id !== cardId);
+    const targetIndex =
+      options?.index === undefined
+        ? destSiblings.length
+        : Math.min(Math.max(options.index, 0), destSiblings.length);
+    const beforeId = targetIndex > 0 ? destSiblings[targetIndex - 1] : undefined;
+    const afterId = targetIndex < destSiblings.length ? destSiblings[targetIndex] : undefined;
+
+    // Remember enough to put the card back if the server refuses the move.
+    const previous = {
+      srcListId,
+      srcOrder: [...src.cardOrder],
+      destOrder: [...dest.cardOrder],
+    };
+
+    mutate((prev) => {
+      const current = prev.cards[cardId];
+      const source = prev.lists[srcListId];
+      const target = prev.lists[destListId];
+      if (!current || !source || !target) return prev;
+      const srcOrder = source.cardOrder.filter((id) => id !== cardId);
+      const destOrder = target.cardOrder.filter((id) => id !== cardId);
+      destOrder.splice(targetIndex, 0, cardId);
+      const board = prev.boards[current.boardId];
+      const boardActivity =
+        board && srcListId !== destListId
+          ? [
+              {
+                id: uid(),
+                text: `Moved '${current.title}' from ${source.name} to ${target.name}`,
+                createdAt: now(),
+              },
+              ...(board.activity ?? []),
+            ]
+          : (board?.activity ?? []);
+      return {
+        ...prev,
+        lists: {
+          ...prev.lists,
+          [srcListId]: { ...source, cardOrder: srcOrder },
+          [destListId]: { ...target, cardOrder: destOrder },
+        },
+        cards: {
+          ...prev.cards,
+          [cardId]: {
+            ...current,
+            listId: destListId,
+            updatedAt: now(),
+            activity: [
+              { id: uid(), text: `moved this card to ${target.name}`, createdAt: now() },
+              ...current.activity,
+            ],
+          },
+        },
+        boards: board
+          ? {
+              ...prev.boards,
+              [current.boardId]: {
+                ...board,
+                activity: boardActivity,
+                updatedAt: now(),
+              },
+            }
+          : prev.boards,
+      };
+    });
+
+    if (!isServerBoard(dataRef.current.boards[card.boardId])) {
+      return { ok: true, previous: { listId: srcListId, index: previousIndex } };
+    }
+
+    const result = await writeThrough(
+      card.boardId,
+      revision =>
+        moveCardOnServer(card.boardId, cardId, {
+          listId: destListId,
+          beforeId,
+          afterId,
+          index: targetIndex,
+          appendToEnd: options?.index === undefined,
+          expectedRevision: revision,
+        }).then(moved => moved.revision),
+      "Could not move that card.",
+      // The caller renders its own message, so the global error banner would
+      // only duplicate it.
+      { surfaceGlobalError: false },
+    );
+
+    if (!result.ok) {
+      // Put the card back where it was: the server never applied the move.
+      mutate((prev) => {
+        const current = prev.cards[cardId];
+        if (!current) return prev;
+        return {
+          ...prev,
+          lists: {
+            ...prev.lists,
+            [previous.srcListId]: {
+              ...(prev.lists[previous.srcListId] ?? src),
+              cardOrder: previous.srcOrder,
+            },
+            [destListId]: {
+              ...(prev.lists[destListId] ?? dest),
+              cardOrder: previous.destOrder,
+            },
+          },
+          cards: {
+            ...prev.cards,
+            [cardId]: { ...current, listId: previous.srcListId, updatedAt: now() },
+          },
+        };
+      });
+      return {
+        ok: false,
+        error: getFriendlyErrorMessage(
+          result.error,
+          "That list no longer exists.",
+        ),
+      };
+    }
+
+    return { ok: true, previous: { listId: srcListId, index: previousIndex } };
   };
 
   const addActivity = (cardId: string, text: string) => {
@@ -3251,6 +3427,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     updateCard,
     setCardMember,
     moveCard,
+    moveCardToList,
     addActivity,
     addBoardActivity,
     setBoardSettings,

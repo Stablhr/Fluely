@@ -222,6 +222,10 @@ export const cardMoveSchema = z.object({
   // anchors are stable ids, not a stale array index.
   beforeId: objectId.optional(),
   afterId: objectId.optional(),
+  // Place the card at the end of the target list. The server derives the
+  // position from the list's current last card, so the card always lands after
+  // everything else even if the client had a stale view of the list.
+  appendToEnd: z.boolean().optional(),
   // Destination index within the target list, used only as a fallback when the
   // anchors are unavailable (legacy clients, deleted neighbours).
   index: z.number().int().min(0).max(100000).optional(),

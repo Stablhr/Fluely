@@ -31,6 +31,18 @@ export function positionAfter(before: number | null | undefined): number {
   return (before ?? -POSITION_GAP) + POSITION_GAP;
 }
 
+/**
+ * Position for a card appended to the end of a list.
+ *
+ * `last` is the position of the card currently last in the list, or
+ * null/undefined when the list is empty. An empty list starts at
+ * `POSITION_GAP`, so the first card of a fresh list sits where the next
+ * one would follow rather than below the implicit zero.
+ */
+export function positionAtEnd(last: number | null | undefined): number {
+  return last === null || last === undefined ? POSITION_GAP : last + POSITION_GAP;
+}
+
 /** Position between two neighbours, or at either end of the list. */
 export function positionBetween(
   before: number | null | undefined,
