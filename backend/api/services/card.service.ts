@@ -156,6 +156,7 @@ async function serializeCard(card: CardDocument) {
     comments: (card.comments ?? []).map(c => ({
       id: c.id,
       authorId: c.authorId ? c.authorId.toString() : null,
+      parentId: c.parentId ?? null,
       text: c.text,
       reactions: c.reactions ?? {},
       createdAt: c.createdAt
@@ -302,6 +303,7 @@ export const cardService = {
           comments: (input.comments ?? []).map(c => ({
             id: c.id,
             authorId: c.authorId ? new Types.ObjectId(c.authorId) : null,
+            parentId: c.parentId ?? null,
             text: c.text,
             reactions: c.reactions ?? {},
             createdAt: c.createdAt ? new Date(c.createdAt) : new Date()
@@ -381,6 +383,7 @@ export const cardService = {
         patch.comments = input.comments.map(c => ({
           id: c.id,
           authorId: c.authorId ? new Types.ObjectId(c.authorId) : null,
+          parentId: c.parentId ?? null,
           text: c.text,
           reactions: c.reactions ?? {},
           createdAt: c.createdAt ? new Date(c.createdAt) : new Date()

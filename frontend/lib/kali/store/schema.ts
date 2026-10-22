@@ -86,6 +86,7 @@ export interface FileAttachment {
 export interface CommentItem {
   id: string;
   authorId: string;
+  parentId: string | null;
   text: string;
   reactions: Reactions;
   createdAt: string;

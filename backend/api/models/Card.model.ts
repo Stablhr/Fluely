@@ -42,7 +42,7 @@ export interface CardDocument extends mongoose.Document {
   location: string | null;
   watching: boolean;
   mediaIds: Types.ObjectId[];
-  comments: {id: string; authorId: Types.ObjectId | null; text: string; reactions: Record<string, number>; createdAt: Date}[];
+  comments: {id: string; authorId: Types.ObjectId | null; parentId: string | null; text: string; reactions: Record<string, number>; createdAt: Date}[];
   archived: boolean;
   done: boolean;
   createdAt: Date;
@@ -70,6 +70,7 @@ const CardSchema = new Schema<CardDocument>(
         {
           id: {type: String, required: true},
           authorId: {type: Schema.Types.ObjectId, default: null},
+          parentId: {type: String, default: null},
           text: {type: String, default: ''},
           reactions: {type: Schema.Types.Mixed, default: {}},
           createdAt: {type: Date, default: Date.now}

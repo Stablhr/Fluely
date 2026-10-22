@@ -62,6 +62,8 @@ function MentionChip({ userId, members, currentUserId }: { userId: string; membe
 export default function CardComments({ card, readOnly = false, highlightCommentId }: { card: Card; readOnly?: boolean; highlightCommentId?: string | null }) {
   const store = useStore()
   const [text, setText] = useState('')
+  const [replyTo, setReplyTo] = useState<string | null>(null)
+  const [replyText, setReplyText] = useState('')
   const [activePicker, setActivePicker] = useState<string | null>(null)
   const [mentionOpen, setMentionOpen] = useState(false)
   const [mentionQuery, setMentionQuery] = useState('')
@@ -152,17 +154,22 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
     }
   }
 
-  const submit = () => {
-    const t = text.trim()
+  const submit = (parentId: string | null = null, body?: string) => {
+    const t = (body ?? text).trim()
     if (!t) return
     store.updateCard(card.id, {
       comments: [
         ...card.comments,
-        { id: uid(), authorId: YOU_ID, text: t, reactions: {}, createdAt: new Date().toISOString() },
+        { id: uid(), authorId: YOU_ID, parentId, text: t, reactions: {}, createdAt: new Date().toISOString() },
       ],
     })
-    store.addActivity(card.id, 'added a comment')
-    setText('')
+    store.addActivity(card.id, parentId ? 'replied to a comment' : 'added a comment')
+    if (parentId) {
+      setReplyText('')
+      setReplyTo(null)
+    } else {
+      setText('')
+    }
     setMentionOpen(false)
   }
 
@@ -262,7 +269,9 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
       )}
 
       <div className="mt-3 space-y-3">
-        {card.comments.map((comment) => {
+        {card.comments
+          .filter((c) => !c.parentId)
+          .map((comment) => {
           const boardMembers = store.getBoardMembers(card.boardId)
           const author =
             store.data.members[comment.authorId] ??
@@ -350,6 +359,16 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                     </button>
                   )}
 
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)}
+                      className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-text-muted transition-colors duration-150 hover:bg-surface-alt hover:text-text-secondary"
+                    >
+                      Reply
+                    </button>
+                  )}
+
                   {pickerOpen && (
                     <div className="absolute left-0 top-8 z-30 max-w-[min(320px,100%)] animate-in">
                       <EmojiPicker
@@ -368,6 +387,77 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                     </div>
                   )}
                 </div>
+                )}
+
+                {/* Replies */}
+                {card.comments
+                  .filter((c) => c.parentId === comment.id)
+                  .map((reply) => {
+                    const replyAuthor =
+                      store.data.members[reply.authorId] ??
+                      boardMembers.find((m) => m.id === reply.authorId) ?? {
+                        id: reply.authorId,
+                        name:
+                          reply.authorId === store.currentUserId || reply.authorId === YOU_ID
+                            ? "You"
+                            : "Unknown",
+                        color: "#3971B8",
+                      }
+                    const replyParts = parseMentions(reply.text)
+                    return (
+                      <div key={reply.id} className="mt-2 flex items-start gap-2 pl-4">
+                        <Avatar member={replyAuthor} size={20} />
+                        <div className="min-w-0 flex-1">
+                          <div className="rounded-lg bg-surface px-3 py-2">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-xs font-semibold text-text-primary">{replyAuthor.name}</span>
+                              <span className="font-mono text-[10.5px] text-text-muted">
+                                {formatDateTime(reply.createdAt)}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary">
+                              {replyParts.map((part, i) =>
+                                part.type === 'mention' && part.userId ? (
+                                  <MentionChip key={i} userId={part.userId} members={boardMembers} currentUserId={store.currentUserId} />
+                                ) : (
+                                  <span key={i}>{part.value}</span>
+                                ),
+                              )}
+                            </p>
+                          </div>
+                          {!readOnly && canDeleteComment(reply) && (
+                            <button
+                              type="button"
+                              onClick={() => deleteComment(reply.id)}
+                              className="mt-1 inline-flex items-center gap-1 rounded-md p-1 text-xs text-text-muted transition-colors duration-150 hover:bg-danger-subtle hover:text-danger-text"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                {/* Reply input */}
+                {replyTo === comment.id && !readOnly && (
+                  <div className="mt-2 flex items-start gap-2 pl-4">
+                    {you && <Avatar member={you} size={20} />}
+                    <input
+                      autoFocus
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') submit(comment.id, replyText)
+                        if (e.key === 'Escape') {
+                          setReplyTo(null)
+                          setReplyText('')
+                        }
+                      }}
+                      placeholder="Write a reply…"
+                      className="flex-1 rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:border-primary/20"
+                    />
+                  </div>
                 )}
               </div>
             </div>

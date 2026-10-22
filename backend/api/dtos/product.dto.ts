@@ -200,6 +200,7 @@ export const cardPatchSchema = z.object({
   comments: z.array(z.object({
     id: requiredText(80),
     authorId: objectId.nullable().optional(),
+    parentId: requiredText(80).nullable().optional(),
     text: text(10000),
     reactions: z.record(z.number()).optional(),
     createdAt: z.string().datetime({offset: true}).optional()

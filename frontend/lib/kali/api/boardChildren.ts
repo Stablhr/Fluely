@@ -89,6 +89,7 @@ export interface CardDto {
   comments?: {
     id: string;
     authorId: string | null;
+    parentId: string | null;
     text: string;
     reactions: Record<string, number>;
     createdAt: string;
@@ -246,6 +247,7 @@ export function toCard(dto: CardDto, existing?: Card): Card {
         ? dto.comments.map((c) => ({
             id: c.id,
             authorId: c.authorId ?? YOU_ID,
+            parentId: c.parentId ?? null,
             text: c.text,
             reactions: c.reactions ?? {},
             createdAt: c.createdAt ?? new Date().toISOString(),
@@ -363,6 +365,7 @@ export interface CreateCardInput {
   comments?: {
     id: string;
     authorId?: string | null;
+    parentId?: string | null;
     text: string;
     reactions?: Record<string, number>;
     createdAt?: string;
