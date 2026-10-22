@@ -165,7 +165,10 @@ function toCardPatch(patch: Partial<Card>): Partial<CreateCardInput> {
   if (patch.cover !== undefined) {
     if (patch.cover === null) {
       out.coverMediaId = null;
-    } else if (typeof patch.cover === "object" && patch.cover?.type === "image") {
+    } else if (
+      typeof patch.cover === "object" &&
+      (patch.cover.type === "image" || patch.cover.type === "video")
+    ) {
       out.coverMediaId = patch.cover.mediaId ?? null;
     }
   }

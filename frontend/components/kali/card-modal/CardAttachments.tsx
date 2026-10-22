@@ -43,12 +43,16 @@ export default function CardAttachments({
     setError(null)
     try {
       const media = await uploadMediaFile(file, { boardId: card.boardId, cardId: card.id })
+      // The server reports the real kind; trust it over the picker's intent so
+      // an image dropped into the file slot still opens in the viewer.
+      const kind = media.kind ?? type
       const attachment: FileAttachment = {
         id: uid(),
         name: file.name,
-        type,
+        type: kind === 'image' ? 'image' : kind === 'video' ? 'video' : 'file',
         dataUrl: media.url,
         mediaId: media.id,
+        publicId: media.publicId,
         mimeType: media.mimeType,
         size: media.sizeBytes,
         addedAt: new Date().toISOString(),
@@ -68,7 +72,7 @@ export default function CardAttachments({
       !!attachment &&
       card.cover !== null &&
       typeof card.cover !== 'string' &&
-      card.cover.type === 'image' &&
+      (card.cover.type === 'image' || card.cover.type === 'video') &&
       card.cover.dataUrl === attachment.dataUrl
 
     store.updateCard(card.id, {
@@ -95,7 +99,7 @@ export default function CardAttachments({
           const isCover =
             card.cover !== null &&
             typeof card.cover !== 'string' &&
-            card.cover.type === 'image' &&
+            (card.cover.type === 'image' || card.cover.type === 'video') &&
             card.cover.dataUrl === attachment.dataUrl
           return (
           <div key={attachment.id} className="flex items-center gap-3 rounded-md bg-surface-alt px-3 py-2">
@@ -112,6 +116,14 @@ export default function CardAttachments({
                   className="h-full w-full object-cover"
                 />
               </button>
+            ) : attachment.type === 'video' ? (
+              <video
+                src={attachment.dataUrl}
+                className="h-11 w-11 shrink-0 rounded-md bg-black object-cover"
+                muted
+                playsInline
+                preload="metadata"
+              />
             ) : (
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-surface-elevated text-text-secondary">
                 <FileText size={16} />

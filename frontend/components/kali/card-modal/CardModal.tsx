@@ -107,7 +107,7 @@ export default function CardModal({ cardId, highlightCommentId, onClose }: CardM
     const isActiveCover =
       card.cover !== null &&
       typeof card.cover !== 'string' &&
-      card.cover.type === 'image' &&
+      (card.cover.type === 'image' || card.cover.type === 'video') &&
       card.cover.dataUrl === img.url
     const attachment = card.files.find((f) => f.dataUrl === img.url)
     updateCard(card.id, {
@@ -179,6 +179,14 @@ export default function CardModal({ cardId, highlightCommentId, onClose }: CardM
                 <div
                   className="h-full w-full"
                   style={{ background: card.cover as string }}
+                />
+              ) : card.cover.type === 'video' ? (
+                <video
+                  src={card.cover.dataUrl}
+                  className="h-full w-full bg-black object-cover"
+                  controls
+                  playsInline
+                  preload="metadata"
                 />
               ) : (
                 <button

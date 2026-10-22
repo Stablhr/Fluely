@@ -100,7 +100,17 @@ export interface ActivityItem {
 
 export type Reactions = Record<string, number>;
 
-export type Cover = string | { type: "image"; dataUrl: string; mediaId?: string } | null;
+/**
+ * A card's cover.
+ *
+ * A string is a solid colour. An object is an uploaded asset -- a photo or a
+ * video -- kept by its media id so the server can restore the same cover for
+ * every collaborator.
+ */
+export type Cover =
+  | string
+  | { type: "image" | "video"; dataUrl: string; mediaId?: string }
+  | null;
 
 export interface BoardSettings {
   commentPermission: "members" | "anyone";

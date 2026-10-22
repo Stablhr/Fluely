@@ -40,20 +40,21 @@ function CardTile({ card, index, onOpenCard }: CardTileProps) {
     .filter(Boolean) as typeof data.members[string][]
   const extraLabels = labels.length > 4 ? labels.length - 4 : 0
 
-  const explicitImageCover =
-    card.cover && typeof card.cover !== 'string' && card.cover.type === 'image'
-      ? card.cover.dataUrl
+  const explicitCover =
+    card.cover && typeof card.cover !== 'string'
+      ? { url: card.cover.dataUrl, isVideo: card.cover.type === 'video' }
       : null
-  // An attached image with no explicit cover still reads as the card's cover.
-  const imageCover =
-    explicitImageCover ??
-    card.files.find((file) => file.type === 'image')?.dataUrl ??
-    null
+  // An attached image (or video) with no explicit cover still reads as the
+  // card's cover, the same way a photo does.
+  const fallbackCover =
+    card.files.find((file) => file.type === 'image' || file.type === 'video') ?? null
+  const imageCover = explicitCover?.url ?? fallbackCover?.dataUrl ?? null
+  const coverIsVideo = explicitCover?.isVideo ?? fallbackCover?.type === 'video'
   const colorCover = typeof card.cover === 'string' ? card.cover : null
   // The old cover sizing is back: "large" is a portrait band, "small" is a thin
   // strip. A cover that was only ever an attachment has no explicit size and
   // always shows the portrait band.
-  const coverStrip = explicitImageCover !== null && card.coverSize === 'small'
+  const coverStrip = explicitCover !== null && card.coverSize === 'small'
 
   const hasMeta =
     Boolean(card.dueDate) ||
@@ -90,14 +91,27 @@ function CardTile({ card, index, onOpenCard }: CardTileProps) {
                 coverStrip ? 'h-8' : ''
               }`}
             >
-              <img
-                src={imageCover}
-                alt=""
-                className={`block w-full object-cover ${
-                  coverStrip ? 'h-8' : 'aspect-[4/5]'
-                }`}
-                draggable={false}
-              />
+              {coverIsVideo ? (
+                <video
+                  src={imageCover}
+                  className={`block w-full bg-black object-cover ${
+                    coverStrip ? 'h-8' : 'aspect-[4/5]'
+                  }`}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  draggable={false}
+                />
+              ) : (
+                <img
+                  src={imageCover}
+                  alt=""
+                  className={`block w-full object-cover ${
+                    coverStrip ? 'h-8' : 'aspect-[4/5]'
+                  }`}
+                  draggable={false}
+                />
+              )}
             </div>
           ) : colorCover ? (
             <div

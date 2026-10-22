@@ -35,7 +35,12 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
 
   const imageCoverUrl = card.cover !== null && typeof card.cover !== 'string' ? card.cover.dataUrl : null
   const activeColor = typeof card.cover === 'string' ? card.cover : null
-  const imageAttachments = card.files.filter((f) => f.type === 'image')
+  const isVideoCover =
+    card.cover !== null && typeof card.cover !== 'string' && card.cover.type === 'video'
+  // Images and videos can both act as a cover, the same way an image can.
+  const coverCandidates = card.files.filter(
+    (f) => f.type === 'image' || f.type === 'video',
+  )
 
   const setCoverSize = (size: 'large' | 'small') => {
     store.updateCard(card.id, { coverSize: size })
@@ -47,9 +52,13 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
     store.addActivity(card.id, 'removed the cover')
   }
 
-  const setImageCover = (attachment: FileAttachment) => {
+  const setMediaCover = (attachment: FileAttachment) => {
     store.updateCard(card.id, {
-      cover: { type: 'image', dataUrl: attachment.dataUrl, mediaId: attachment.mediaId },
+      cover: {
+        type: attachment.type === 'video' ? 'video' : 'image',
+        dataUrl: attachment.dataUrl,
+        mediaId: attachment.mediaId,
+      },
     })
     store.addActivity(card.id, 'changed the cover image')
   }
@@ -66,10 +75,11 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
     setError(null)
     try {
       const media = await uploadMediaFile(file, { boardId: card.boardId, cardId: card.id })
+      const kind = media.kind ?? (file.type.startsWith('video/') ? 'video' : 'image')
       const attachment: FileAttachment = {
         id: uid(),
         name: file.name,
-        type: 'image',
+        type: kind === 'video' ? 'video' : 'image',
         dataUrl: media.url,
         mediaId: media.id,
         mimeType: media.mimeType,
@@ -78,7 +88,11 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
       }
       store.updateCard(card.id, {
         files: [...card.files, attachment],
-        cover: { type: 'image', dataUrl: media.url, mediaId: media.id },
+        cover: {
+          type: kind === 'video' ? 'video' : 'image',
+          dataUrl: media.url,
+          mediaId: media.id,
+        },
         coverSize: card.coverSize || 'large',
       })
       store.addActivity(card.id, `attached ${file.name} as cover`)
@@ -124,7 +138,17 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
               >
                 <div className="h-16 w-12 rounded-lg bg-surface-alt overflow-hidden">
                   {imageCoverUrl ? (
-                    <img src={imageCoverUrl} alt="" className="h-full w-full object-cover" />
+                    isVideoCover ? (
+                      <video
+                        src={imageCoverUrl}
+                        className="h-full w-full bg-black object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img src={imageCoverUrl} alt="" className="h-full w-full object-cover" />
+                    )
                   ) : (
                     <div
                       className="h-full w-full"
@@ -145,7 +169,17 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
               >
                 <div className="h-4 w-12 rounded-lg overflow-hidden">
                   {imageCoverUrl ? (
-                    <img src={imageCoverUrl} alt="" className="h-full w-full object-cover" />
+                    isVideoCover ? (
+                      <video
+                        src={imageCoverUrl}
+                        className="h-full w-full bg-black object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img src={imageCoverUrl} alt="" className="h-full w-full object-cover" />
+                    )
                   ) : (
                     <div
                       className="h-full w-full"
@@ -173,11 +207,11 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
           {/* Attachments */}
           <section>
             <p className={sectionTitle}>Attachments</p>
-            {imageAttachments.length === 0 ? (
-              <p className="mt-2 text-xs text-text-muted">No image attachments yet.</p>
+            {coverCandidates.length === 0 ? (
+              <p className="mt-2 text-xs text-text-muted">No image or video attachments yet.</p>
             ) : (
               <div className="mt-2 grid grid-cols-3 gap-2">
-                {imageAttachments.map((att) => {
+                {coverCandidates.map((att) => {
                   const isActiveCover =
                     imageCoverUrl !== null && imageCoverUrl === att.dataUrl
                   return (
@@ -185,18 +219,28 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
                       key={att.id}
                       type="button"
                       title={att.name}
-                      onClick={() => setImageCover(att)}
+                      onClick={() => setMediaCover(att)}
                       className={`relative aspect-square overflow-hidden rounded-lg transition-transform duration-150 active:scale-[0.98] ${
                         isActiveCover
                           ? 'ring-2 ring-primary ring-offset-1'
                           : 'ring-1 ring-border hover:ring-primary'
                       }`}
                     >
-                      <img
-                        src={att.dataUrl}
-                        alt={att.name}
-                        className="h-full w-full object-cover"
-                      />
+                      {att.type === 'video' ? (
+                        <video
+                          src={att.dataUrl}
+                          className="h-full w-full bg-black object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        <img
+                          src={att.dataUrl}
+                          alt={att.name}
+                          className="h-full w-full object-cover"
+                        />
+                      )}
                       {isActiveCover && (
                         <span className="absolute bottom-0.5 left-0.5 rounded bg-primary px-1 py-0.5 text-[9px] font-bold text-primary-foreground">
                           Cover
@@ -211,7 +255,7 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
 
           {/* Upload */}
           <section>
-            <p className={sectionTitle}>Upload a cover image</p>
+            <p className={sectionTitle}>Upload a cover image or video</p>
             {error && (
               <p className="animate-in mt-2 flex items-center gap-1.5 rounded-md bg-danger-subtle px-3 py-2 text-xs font-medium text-danger-text">
                 <AlertTriangle size={14} className="shrink-0" />
@@ -225,12 +269,12 @@ export default function CoverPanel({ card, open, onClose }: CoverPanelProps) {
               className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-surface-alt px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition-colors duration-150 hover:bg-primary-subtle hover:text-primary-hover active:scale-[0.98] disabled:opacity-40"
             >
               <ImageIcon size={13} />
-              {uploading ? 'Uploading…' : 'Upload image'}
+              {uploading ? 'Uploading…' : 'Upload image or video'}
             </button>
             <input
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               hidden
               onChange={(e) => {
                 void uploadCover(e.target.files?.[0])

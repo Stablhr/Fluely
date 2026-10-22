@@ -46,5 +46,50 @@ export const mediaController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  async signature(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actor = actorFromRequest(req);
+      const body = (req.body ?? {}) as {boardId?: string; cardId?: string};
+      const result = await mediaService.signature(actor.actorId, {
+        boardId: body.boardId,
+        cardId: body.cardId
+      });
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async register(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actor = actorFromRequest(req);
+      const body = (req.body ?? {}) as {
+        boardId?: string;
+        cardId?: string;
+        name: string;
+        url: string;
+        publicId: string;
+        mimeType: string;
+        sizeBytes: number;
+        resourceType: string;
+      };
+      const item = await mediaService.register(
+        actor.actorId,
+        {
+          name: body.name,
+          url: body.url,
+          publicId: body.publicId,
+          mimeType: body.mimeType,
+          sizeBytes: body.sizeBytes,
+          resourceType: body.resourceType
+        },
+        {boardId: body.boardId, cardId: body.cardId}
+      );
+      res.status(201).json({item});
+    } catch (error) {
+      next(error);
+    }
   }
 };

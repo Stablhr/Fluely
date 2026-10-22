@@ -170,6 +170,9 @@ async function serializeCard(card: CardDocument) {
     imageUrl,
     image: imageUrl ? {url: imageUrl} : null,
     coverImageUrl: imageUrl,
+    // The cover's media kind, so a client can tell a photo cover from a video
+    // cover and render the right element.
+    coverKind: coverMedia?.kind ?? null,
     media: cardMedia.map(doc => ({
       id: doc._id.toString(),
       url: doc.url,

@@ -57,7 +57,7 @@ export const env = {
   ),
   MEDIA_ALLOWED_MIME_TYPES: (
     parsed.data.MEDIA_ALLOWED_MIME_TYPES ??
-    'image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,audio/mpeg,audio/ogg,audio/wav,application/pdf,text/plain'
+    'image/jpeg,image/png,image/gif,image/webp,image/avif,image/heic,image/svg+xml,video/mp4,video/webm,video/quicktime,video/x-m4v,video/3gpp,video/mpeg,video/ogg,audio/mpeg,audio/ogg,audio/wav,audio/mp4,application/pdf,text/plain'
   )
     .split(',')
     .map(value => value.trim().toLowerCase())

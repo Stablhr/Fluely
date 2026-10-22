@@ -77,6 +77,8 @@ export interface CardDto {
   imageUrl?: string | null;
   image?: { url: string } | null;
   coverImageUrl?: string | null;
+  /** Media kind of the cover, so a video cover renders as a video. */
+  coverKind?: string | null;
   media?: {
     id: string;
     url: string;
@@ -192,19 +194,23 @@ export function toCard(dto: CardDto, existing?: Card): Card {
 
   // Server-owned cover: when the server knows about a cover image, adopt it;
   // when it does not, keep a locally-set color cover but drop a stale image
-  // cover so a removed cover does not linger.
+  // cover so a removed cover does not linger. A video cover is kept as a video
+  // so it renders with a player rather than a broken image.
+  const coverKind = dto.coverKind ?? "image";
+  const coverType = coverKind === "video" ? ("video" as const) : ("image" as const);
   const cover =
     dto.coverMediaId
       ? {
-          type: "image" as const,
+          type: coverType,
           dataUrl:
             imageUrl ??
-            (existing?.cover && typeof existing.cover !== "string" && existing.cover.type === "image"
+            (existing?.cover && typeof existing.cover !== "string" &&
+            existing.cover.type === coverType
               ? existing.cover.dataUrl
               : ""),
           mediaId: dto.coverMediaId,
         }
-      : existing?.cover && typeof existing.cover === "object" && existing.cover.type === "image"
+      : existing?.cover && typeof existing.cover === "object"
         ? null
         : existing?.cover ?? null;
 
@@ -216,7 +222,12 @@ export function toCard(dto: CardDto, existing?: Card): Card {
       ? dto.media.map((m) => ({
           id: m.id,
           name: m.name,
-          type: m.kind === "image" ? ("image" as const) : ("file" as const),
+          type:
+            m.kind === "image"
+              ? ("image" as const)
+              : m.kind === "video"
+                ? ("video" as const)
+                : ("file" as const),
           dataUrl: m.url,
           mediaId: m.id,
           mimeType: m.mimeType,

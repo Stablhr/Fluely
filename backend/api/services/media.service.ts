@@ -2,10 +2,11 @@ import path from 'path';
 import {Types} from 'mongoose';
 import {mediaRepository} from '../repositories/media.repository';
 import {boardRepository} from '../repositories/board.repository';
+import {cloudinary, isCloudinaryConfigured} from '../config/cloudinary';
+import {env} from '../config/env';
 import {getBoardAccessLevel, canWrite} from './boardAccess.service';
 import {mediaConfig, kindForMimeType} from '../config/media';
 import {ApiError} from '../utils/error';
-import {Actor} from '../utils/actor';
 import {ErrorCodes} from '../constants/errorCodes';
 import {MediaKind} from '../constants/product';
 import {paginationFrom, paginationMeta} from '../utils/pagination';
@@ -30,6 +31,7 @@ function serialize(doc: {
   kind: string;
   originalName: string;
   url?: string | null;
+  publicId?: string | null;
   mimeType: string;
   sizeBytes: number;
   createdAt: Date;
@@ -41,6 +43,7 @@ function serialize(doc: {
     kind: doc.kind,
     name: doc.originalName,
     url: doc.url ?? '',
+    publicId: doc.publicId ?? '',
     mimeType: doc.mimeType,
     sizeBytes: doc.sizeBytes,
     createdAt: doc.createdAt
@@ -168,5 +171,129 @@ export const mediaService = {
     }
 
     await mediaRepository.deleteByIdForOwner(id.toString(), ownerId);
+  },
+
+  /**
+   * Returns signed upload parameters so the browser can upload large files
+   * (e.g. videos) directly to Cloudinary, bypassing the serverless body limit.
+   */
+  async signature(
+    ownerId: Types.ObjectId,
+    scope: {boardId?: string; cardId?: string}
+  ) {
+    if (!isCloudinaryConfigured) {
+      throw new ApiError(
+        503,
+        ErrorCodes.INTERNAL_ERROR,
+        'Media storage is not configured'
+      );
+    }
+    const folder = folderForMedia(scope);
+    const timestamp = Math.round(Date.now() / 1000);
+    // Every parameter the browser sends to Cloudinary must appear here, or the
+    // signature will not match and Cloudinary rejects the upload. The resource
+    // type comes from the upload endpoint (`/auto/upload`), so it is not
+    // signed.
+    const params: Record<string, unknown> = {
+      timestamp,
+      folder,
+      use_filename: 'true',
+      unique_filename: 'true'
+    };
+    const secret = env.CLOUDINARY_API_SECRET as string;
+    const signature = cloudinary.utils.api_sign_request(params, secret);
+    return {
+      cloudName: env.CLOUDINARY_CLOUD_NAME as string,
+      apiKey: env.CLOUDINARY_API_KEY as string,
+      timestamp,
+      signature,
+      folder
+    };
+  },
+
+  /**
+   * Registers a media asset that was uploaded directly to Cloudinary by the
+   * browser, creating the MediaAttachment row. Board access is verified.
+   *
+   * The kind is derived from the MIME type rather than trusted from the
+   * client, so a video can never be recorded as an image (which would break
+   * `destroy` later).
+   */
+  async register(
+    ownerId: Types.ObjectId,
+    data: {
+      name: string;
+      url: string;
+      publicId: string;
+      mimeType: string;
+      sizeBytes: number;
+      resourceType: string;
+    },
+    scope: {boardId?: string; cardId?: string}
+  ) {
+    const mimeType = data.mimeType.toLowerCase();
+    if (!mediaConfig.allowedMimeTypes.includes(mimeType)) {
+      throw new ApiError(
+        415,
+        ErrorCodes.UNSUPPORTED_MEDIA_TYPE,
+        `Unsupported file type: ${data.mimeType}`
+      );
+    }
+    if (data.sizeBytes > mediaConfig.maxFileSizeBytes) {
+      throw new ApiError(
+        413,
+        ErrorCodes.FILE_TOO_LARGE,
+        `File is larger than the ${Math.round(mediaConfig.maxFileSizeBytes / 1024 / 1024)}MB limit`
+      );
+    }
+
+    const boardId = scope.boardId ? parseObjectId(scope.boardId, 'boardId') : null;
+    const cardId = scope.cardId ? parseObjectId(scope.cardId, 'cardId') : null;
+
+    if (boardId) {
+      const board = await boardRepository.findById(boardId.toString());
+      if (board) {
+        const level = await getBoardAccessLevel({actorType: 'user', actorId: ownerId}, board);
+        if (!canWrite(level)) {
+          throw new ApiError(403, ErrorCodes.FORBIDDEN, 'You have view-only access to this board');
+        }
+      }
+    }
+
+    const usedBytes = await mediaRepository.usedBytes(ownerId);
+    const currentBytes = usedBytes[0]?.total ?? 0;
+    if (currentBytes + data.sizeBytes > mediaConfig.quotaBytes) {
+      throw new ApiError(
+        413,
+        ErrorCodes.QUOTA_EXCEEDED,
+        `Upload would exceed the ${Math.round(mediaConfig.quotaBytes / 1024 / 1024)}MB storage quota`
+      );
+    }
+
+    const kind = kindForMimeType(mimeType);
+    // Cloudinary's `auto` upload reports the real resource type, but fall back
+    // to the derived kind so a video is never stored as an image.
+    const resourceType: CloudinaryResourceType =
+      data.resourceType === 'video' || data.resourceType === 'raw'
+        ? data.resourceType
+        : kind === 'video'
+          ? 'video'
+          : kind === 'image'
+            ? 'image'
+            : 'raw';
+
+    const created = await mediaRepository.create({
+      ownerId,
+      boardId,
+      cardId,
+      kind: kind as MediaKind,
+      resourceType,
+      originalName: path.basename(data.name),
+      url: data.url,
+      publicId: data.publicId,
+      mimeType: data.mimeType,
+      sizeBytes: data.sizeBytes
+    });
+    return serialize(created);
   }
 };

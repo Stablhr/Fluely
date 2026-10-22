@@ -285,6 +285,24 @@ export const mediaListQuerySchema = paginationQuerySchema.extend({
   search: text(200).optional()
 });
 
+/** Scope for a direct-to-Cloudinary upload (video / large files). */
+export const mediaSignatureSchema = z.object({
+  boardId: objectId.optional(),
+  cardId: objectId.optional()
+});
+
+/** Registers an asset the browser uploaded straight to Cloudinary. */
+export const mediaRegisterSchema = z.object({
+  boardId: objectId.optional(),
+  cardId: objectId.optional(),
+  name: requiredText(200),
+  url: requiredText(2000),
+  publicId: requiredText(500),
+  mimeType: requiredText(120),
+  sizeBytes: z.coerce.number().int().min(0).max(1024 * 1024 * 1024),
+  resourceType: z.enum(['image', 'video', 'raw', 'auto']).default('auto')
+});
+
 export const socialAccountCreateSchema = z.object({
   platform: z.enum(['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube']),
   handle: requiredText(100),
