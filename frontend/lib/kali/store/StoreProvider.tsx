@@ -468,6 +468,10 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
    * mid-write are re-scheduled instead, and run once nothing is outstanding.
    */
   const inflightChildWritesRef = useRef(0);
+  // Serializes board writes per board so a rapid burst of drags/edits can't
+  // race on the single revision counter. Each `writeThrough` call chains onto
+  // the previous one for the same board instead of firing in parallel.
+  const boardWriteQueuesRef = useRef(new Map<string, Promise<void>>());
 
   /**
    * Held in a ref so `syncBoardStructure` can re-schedule itself without a
@@ -975,38 +979,55 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       send: (revision: number | undefined) => Promise<number | undefined>,
       failureMessage: string,
     ) => {
+      // Count this write as in-flight up front, so a concurrent sync defers
+      // until it settles rather than merging over its optimistic state.
       inflightChildWritesRef.current += 1;
-      let failed = false;
-      try {
+
+      // Serialize per board: a rapid burst of drags/edits waits its turn instead
+      // of racing on the single revision counter (which is what surfaced the
+      // "Someone else changed this board" toast and the resulting revert).
+      const previous = boardWriteQueuesRef.current.get(boardId) ?? Promise.resolve();
+      const run = previous.then(async () => {
+        let failed = false;
         try {
-          const revision = await send(
-            dataRef.current.boards[boardId]?.revision ?? undefined,
-          );
-          applyRevision(boardId, revision);
+          let attempts = 0;
+          while (true) {
+            try {
+              const revision = await send(
+                dataRef.current.boards[boardId]?.revision ?? undefined,
+              );
+              applyRevision(boardId, revision);
+              break;
+            } catch (err) {
+              if (!isRevisionConflict(err) || attempts >= 3) throw err;
+              attempts += 1;
+              // Re-read for the revision AND the structure, so the retry's send
+              // computes its anchors from the server's current view rather than
+              // a stale local copy.
+              const structure = await fetchStructure(boardId);
+              applyRevision(boardId, structure.revision);
+            }
+          }
         } catch (err) {
-          if (!isRevisionConflict(err)) throw err;
-          // Re-read for the revision only -- the structure itself is left for
-          // the poll or a later sync, so a write still in flight is not merged
-          // over here. The retry then carries the revision the server holds.
-          const structure = await fetchStructure(boardId);
-          applyRevision(boardId, structure.revision);
-          const revision = await send(
-            dataRef.current.boards[boardId]?.revision ?? undefined,
-          );
-          applyRevision(boardId, revision);
+          failed = true;
+          setError(getFriendlyErrorMessage(err, failureMessage));
+        } finally {
+          if (failed) void syncBoardStructure(boardId);
         }
-      } catch (err) {
-        failed = true;
-        setError(getFriendlyErrorMessage(err, failureMessage));
+      });
+
+      // Swallow a rejection so one failed write doesn't break the queue for
+      // the next one.
+      const settled = run.then(() => {}, () => {});
+      boardWriteQueuesRef.current.set(boardId, settled);
+
+      try {
+        await run;
       } finally {
-        // Count the write out before reacting to its failure, so the re-read
-        // that recovers from a conflict is not itself deferred by the write it
-        // is recovering from.
         inflightChildWritesRef.current = Math.max(
           0,
           inflightChildWritesRef.current - 1,
         );
-        if (failed) void syncBoardStructure(boardId);
       }
     },
     [applyRevision, syncBoardStructure, setError],
