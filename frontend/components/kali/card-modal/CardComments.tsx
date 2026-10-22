@@ -37,8 +37,12 @@ function parseMentions(text: string): { type: 'text' | 'mention'; value: string;
   return parts
 }
 
-function MentionChip({ userId, members }: { userId: string; members: Member[] }) {
-  const member = members.find((m) => m.id === userId)
+function MentionChip({ userId, members, currentUserId }: { userId: string; members: Member[]; currentUserId: string | null }) {
+  const member =
+    members.find((m) => m.id === userId) ??
+    (currentUserId && userId === currentUserId
+      ? members.find((m) => m.id === YOU_ID)
+      : undefined)
   const name = member?.name ?? 'Unknown'
   const removed = !member
   return (
@@ -241,11 +245,17 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
 
       <div className="mt-3 space-y-3">
         {card.comments.map((comment) => {
+          const boardMembers = store.getBoardMembers(card.boardId)
           const author =
-            store.data.members[comment.authorId] ?? {
+            store.data.members[comment.authorId] ??
+            boardMembers.find((m) => m.id === comment.authorId) ??
+            {
               id: comment.authorId,
               name:
-                comment.authorId === store.currentUserId ? "You" : "Collaborator",
+                comment.authorId === store.currentUserId ||
+                comment.authorId === YOU_ID
+                  ? "You"
+                  : "Unknown",
               color: "#3971B8",
             }
           const reactionEntries = Object.entries(comment.reactions).filter(([, c]) => c > 0)
@@ -266,7 +276,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                   <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary">
                     {parts.map((part, i) =>
                       part.type === 'mention' && part.userId ? (
-                        <MentionChip key={i} userId={part.userId} members={boardMembers} />
+                        <MentionChip key={i} userId={part.userId} members={boardMembers} currentUserId={store.currentUserId} />
                       ) : (
                         <span key={i}>{part.value}</span>
                       ),
