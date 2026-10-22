@@ -2,6 +2,8 @@ import {Types} from 'mongoose';
 import {notificationRepository} from '../repositories/notification.repository';
 import {userRepository} from '../repositories/user.repository';
 import {boardRepository} from '../repositories/board.repository';
+import {cardRepository} from '../repositories/card.repository';
+import {listRepository} from '../repositories/list.repository';
 import {emailService} from './email.service';
 import {boardInvitationEmailTemplate} from '../templates/boardInvitationEmail';
 import {boardInvitationResponseEmailTemplate} from '../templates/boardInvitationResponseEmail';
@@ -52,28 +54,60 @@ export const notificationService = {
     // another notification.
     const boardIds = [...new Set(rows.map(row => row.boardId.toString()))];
     const actorIds = [...new Set(rows.map(row => row.actorId.toString()))];
+    const cardIds = [...new Set(rows.map(row => row.cardId?.toString()).filter(Boolean))] as string[];
     const [boards, actors] = await Promise.all([
       boardRepository.listByIds(boardIds.map(id => new Types.ObjectId(id))),
       Promise.all(actorIds.map(id => userRepository.findById(id)))
     ]);
-    const boardById = new Map(boards.map(board => [board._id.toString(), board.name]));
+    const boardById = new Map(boards.map(board => [board._id.toString(), board]));
     const actorById = new Map(
       actorIds.map((id, index) => [id, displayName(actors[index])])
     );
 
+    // Fetch the cards (and their lists) referenced by mention notifications.
+    const cardById = new Map<string, {title: string; listId: string; listName: string}>();
+    await Promise.all(
+      cardIds.map(async (cardId) => {
+        const row = rows.find(r => r.cardId?.toString() === cardId);
+        if (!row) return;
+        try {
+          const card = await cardRepository.findByIdForBoard(cardId, row.boardId);
+          if (!card) return;
+          let listName = '';
+          try {
+            const list = await listRepository.findByIdForBoard(card.listId.toString(), row.boardId);
+            listName = list?.name ?? '';
+          } catch {
+            listName = '';
+          }
+          cardById.set(cardId, {title: card.title, listId: card.listId.toString(), listName});
+        } catch {
+          // ignore
+        }
+      })
+    );
+
     return {
       unreadCount,
-      notifications: rows.map(row => ({
-        id: row._id.toString(),
-        type: row.type,
-        boardId: row.boardId.toString(),
-        collaboratorId: row.collaboratorId?.toString() ?? null,
-        boardName: boardById.get(row.boardId.toString()) ?? '',
-        actorName: actorById.get(row.actorId.toString()) ?? '',
-        read: row.read,
-        readAt: row.readAt,
-        createdAt: row.createdAt
-      }))
+      notifications: rows.map(row => {
+        const card = row.cardId ? cardById.get(row.cardId.toString()) : null;
+        return {
+          id: row._id.toString(),
+          type: row.type,
+          boardId: row.boardId.toString(),
+          collaboratorId: row.collaboratorId?.toString() ?? null,
+          cardId: row.cardId?.toString() ?? null,
+          commentId: row.commentId ?? null,
+          snippet: row.snippet ?? null,
+          listName: card?.listName ?? '',
+          cardTitle: card?.title ?? '',
+          boardName: boardById.get(row.boardId.toString())?.name ?? '',
+          actorName: actorById.get(row.actorId.toString()) ?? '',
+          read: row.read,
+          readAt: row.readAt,
+          createdAt: row.createdAt
+        };
+      })
     };
   },
 
@@ -174,5 +208,41 @@ export const notificationService = {
       html: template.html,
       what: 'invitation response'
     });
+  },
+
+  /**
+   * Mention-side: one notification per mentioned user per comment. Dedup and
+   * self-exclusion happen in the caller; this just persists + (best-effort)
+   * emails. `mentionedUserIds` must already be validated as board members.
+   */
+  async notifyMention(params: {
+    mentionedUserIds: string[];
+    actorId: Types.ObjectId;
+    boardId: Types.ObjectId;
+    cardId: Types.ObjectId;
+    commentId: string;
+    snippet: string;
+    boardName: string;
+  }) {
+    const actor = await userRepository.findById(params.actorId.toString());
+    const actorName = displayName(actor) || 'Someone';
+
+    await Promise.all(
+      params.mentionedUserIds.map(async (mentionedUserId) => {
+        // Skip self-mentions.
+        if (mentionedUserId === params.actorId.toString()) return;
+        await notificationRepository.create({
+          userId: new Types.ObjectId(mentionedUserId),
+          type: 'mention',
+          actorId: params.actorId,
+          boardId: params.boardId,
+          cardId: params.cardId,
+          commentId: params.commentId,
+          snippet: params.snippet.slice(0, 100)
+        });
+      })
+    );
+
+    return {actorName};
   }
 };

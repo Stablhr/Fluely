@@ -111,6 +111,7 @@ export type ActivityTargetType = (typeof ActivityTargetTypes)[number];
 export const NotificationTypes = [
   'board_invitation',
   'board_invitation_accepted',
-  'board_invitation_declined'
+  'board_invitation_declined',
+  'mention'
 ] as const;
 export type NotificationType = (typeof NotificationTypes)[number];

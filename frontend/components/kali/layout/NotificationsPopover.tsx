@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Bell, Check, Clock, Handshake, X } from 'lucide-react'
+import { AtSign, Bell, Check, Clock, Handshake, X } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import { useToast } from '@/components/kali/shared/useToastState'
 import type { AppNotification, AppNotificationType } from '@/lib/kali/store/useStore'
@@ -11,6 +11,7 @@ const ICONS: Record<AppNotificationType, typeof Bell> = {
   board_invitation: Handshake,
   board_invitation_accepted: Check,
   board_invitation_declined: X,
+  mention: AtSign,
 }
 
 function relativeTime(iso: string): string {
@@ -37,6 +38,12 @@ function headline(notification: AppNotification): string {
       return `${who} accepted your invitation to ${board}`
     case 'board_invitation_declined':
       return `${who} declined your invitation to ${board}`
+    case 'mention': {
+      const where = notification.cardTitle
+        ? `${notification.boardName || board} › ${notification.listName || 'list'} › ${notification.cardTitle}`
+        : (notification.boardName || board)
+      return `${who} mentioned you in ${where}`
+    }
   }
 }
 
@@ -240,16 +247,20 @@ export default function NotificationsPopover() {
                       </div>
                     )}
 
-                    {!isInvitation && notification.type === 'board_invitation_accepted' && (
+                    {!isInvitation && (
                       <Link
-                        href={`/boards/${notification.boardId}`}
+                        href={
+                          notification.type === 'mention' && notification.cardId
+                            ? `/boards/${notification.boardId}?card=${notification.cardId}&comment=${notification.commentId ?? ''}`
+                            : `/boards/${notification.boardId}`
+                        }
                         onClick={() => {
                           void markNotificationRead(notification.id)
                           setOpen(false)
                         }}
                         className="mt-2 inline-block text-[12px] font-semibold text-primary transition-colors hover:text-primary/80"
                       >
-                        Open board
+                        {notification.type === 'mention' ? 'Open card' : 'Open board'}
                       </Link>
                     )}
                   </div>

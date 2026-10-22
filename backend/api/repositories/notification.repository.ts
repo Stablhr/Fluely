@@ -12,7 +12,17 @@ export const notificationRepository = {
     actorId: Types.ObjectId;
     boardId: Types.ObjectId;
     collaboratorId?: Types.ObjectId | null;
-  }) => NotificationModel.create({...data, collaboratorId: data.collaboratorId ?? null}),
+    cardId?: Types.ObjectId | null;
+    commentId?: string | null;
+    snippet?: string | null;
+  }) =>
+    NotificationModel.create({
+      ...data,
+      collaboratorId: data.collaboratorId ?? null,
+      cardId: data.cardId ?? null,
+      commentId: data.commentId ?? null,
+      snippet: data.snippet ?? null
+    }),
 
   listForUser: (userId: Types.ObjectId, limit = LIST_LIMIT) =>
     NotificationModel.find({userId}).sort({createdAt: -1}).limit(limit).exec(),
@@ -50,6 +60,15 @@ export const notificationRepository = {
       userId,
       boardId,
       type: 'board_invitation'
+    }).exec(),
+
+  /** Drop the unread mention notifications tied to a deleted comment. */
+  deleteMentionsForComment: (cardId: Types.ObjectId, commentId: string) =>
+    NotificationModel.deleteMany({
+      cardId,
+      commentId,
+      type: 'mention',
+      read: false
     }).exec()
 };
 

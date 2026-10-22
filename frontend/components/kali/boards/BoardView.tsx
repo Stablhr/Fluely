@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import type { DropResult } from '@hello-pangea/dnd'
 import { useStore } from '@/lib/kali/store/useStore'
@@ -27,6 +27,7 @@ export default function BoardView() {
   const params = useParams<{ boardId?: string | string[] }>()
   const rawBoardId = params.boardId
   const boardId = Array.isArray(rawBoardId) ? (rawBoardId[0] ?? '') : (rawBoardId ?? '')
+  const searchParams = useSearchParams()
   const store = useStore()
   // Destructured so the effect below can depend on the function alone. The
   // `store` object itself is new on every render; depending on it would fetch
@@ -35,6 +36,7 @@ export default function BoardView() {
   const board = store.data.boards[boardId]
   const [search, setSearch] = useState('')
   const [openCardId, setOpenCardId] = useState<string | null>(null)
+  const [highlightCommentId, setHighlightCommentId] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [viewsOpen, setViewsOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -63,6 +65,17 @@ export default function BoardView() {
     if (!hasServerBoard) return
     void loadCollaborators(boardId)
   }, [boardId, hasServerBoard, loadCollaborators])
+
+  // Open a card (and optionally highlight a comment) when arriving from a
+  // notification link such as an @mention.
+  useEffect(() => {
+    const cardId = searchParams.get('card')
+    const commentId = searchParams.get('comment')
+    if (cardId) {
+      setOpenCardId(cardId)
+      setHighlightCommentId(commentId || null)
+    }
+  }, [searchParams])
 
   if (!board) {
     return (
@@ -162,7 +175,7 @@ export default function BoardView() {
         <MapView boardId={boardId} search={search} filter={filter} onOpenCard={setOpenCardId} />
       )}
 
-      {openCardId && <CardModal cardId={openCardId} onClose={() => setOpenCardId(null)} />}
+      {openCardId && <CardModal cardId={openCardId} highlightCommentId={highlightCommentId} onClose={() => setOpenCardId(null)} />}
       <BoardMenuDrawer board={board} open={menuOpen} onClose={() => setMenuOpen(false)} />
     </div>
   )

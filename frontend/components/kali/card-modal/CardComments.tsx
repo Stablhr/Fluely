@@ -1,9 +1,9 @@
 'use client'
 
-import { useRef, useState } from 'react'
-import { MessageSquare, SmilePlus } from 'lucide-react'
+import { useRef, useState, useEffect, useCallback } from 'react'
+import { MessageSquare, SmilePlus, AtSign } from 'lucide-react'
 import EmojiPicker, { Theme } from 'emoji-picker-react'
-import type { Card } from '@/lib/kali/store/schema'
+import type { Card, Member } from '@/lib/kali/store/schema'
 import { YOU_ID } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import { uid } from '@/lib/kali/utils/id'
@@ -12,12 +12,133 @@ import { hasUserCommentReaction, toggleUserCommentReaction } from '@/lib/kali/ut
 import SectionLabel from '../shared/SectionLabel'
 import Avatar from '../shared/Avatar'
 
-export default function CardComments({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
+interface MentionMatch {
+  userId: string
+  name: string
+  member: Member
+}
+
+function parseMentions(text: string): { type: 'text' | 'mention'; value: string; userId?: string }[] {
+  const parts: { type: 'text' | 'mention'; value: string; userId?: string }[] = []
+  const regex = /@\[([0-9a-fA-F]{24})\]/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', value: text.slice(lastIndex, match.index) })
+    }
+    parts.push({ type: 'mention', value: match[1], userId: match[1] })
+    lastIndex = match.index + match[0].length
+  }
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', value: text.slice(lastIndex) })
+  }
+  if (parts.length === 0) parts.push({ type: 'text', value: text })
+  return parts
+}
+
+function MentionChip({ userId, members }: { userId: string; members: Member[] }) {
+  const member = members.find((m) => m.id === userId)
+  const name = member?.name ?? 'Unknown'
+  const removed = !member
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-sm font-medium ${
+        removed
+          ? 'bg-surface-alt text-text-muted'
+          : 'bg-primary-subtle text-primary-hover'
+      }`}
+    >
+      @{name}
+    </span>
+  )
+}
+
+export default function CardComments({ card, readOnly = false, highlightCommentId }: { card: Card; readOnly?: boolean; highlightCommentId?: string | null }) {
   const store = useStore()
   const [text, setText] = useState('')
   const [activePicker, setActivePicker] = useState<string | null>(null)
+  const [mentionOpen, setMentionOpen] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const commentRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const inputRef = useRef<HTMLInputElement>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
   const you = store.data.members[YOU_ID]
+
+  const boardMembers = store.getBoardMembers(card.boardId)
+  const memberMap = new Map(boardMembers.map((m) => [m.id, m]))
+
+  const filteredMembers = boardMembers.filter((m) =>
+    m.name.toLowerCase().includes(mentionQuery.toLowerCase()),
+  )
+
+  // Detect @ trigger
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setText(value)
+    const cursor = e.target.selectionStart ?? value.length
+    // Find the last @ before cursor with no space after it
+    const before = value.slice(0, cursor)
+    const match = before.match(/@(\w*)$/)
+    if (match) {
+      setMentionQuery(match[1])
+      setMentionOpen(true)
+      setMentionIndex(0)
+    } else {
+      setMentionOpen(false)
+    }
+  }
+
+  const insertMention = useCallback(
+    (member: Member) => {
+      const input = inputRef.current
+      if (!input) return
+      const cursor = input.selectionStart ?? text.length
+      const before = text.slice(0, cursor)
+      const after = text.slice(cursor)
+      const match = before.match(/@(\w*)$/)
+      if (!match) return
+      const start = cursor - match[0].length
+      const newText = before.slice(0, start) + `@[${member.id}] ` + after
+      setText(newText)
+      setMentionOpen(false)
+      // Restore cursor
+      setTimeout(() => {
+        const pos = start + `@[${member.id}] `.length
+        input.setSelectionRange(pos, pos)
+        input.focus()
+      }, 0)
+    },
+    [text],
+  )
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mentionOpen && filteredMembers.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setMentionIndex((i) => Math.min(i + 1, filteredMembers.length - 1))
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setMentionIndex((i) => Math.max(i - 1, 0))
+        return
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        insertMention(filteredMembers[mentionIndex])
+        return
+      }
+      if (e.key === 'Escape') {
+        setMentionOpen(false)
+        return
+      }
+    }
+    if (e.key === 'Enter' && !mentionOpen) {
+      submit()
+    }
+  }
 
   const submit = () => {
     const t = text.trim()
@@ -30,6 +151,7 @@ export default function CardComments({ card, readOnly = false }: { card: Card; r
     })
     store.addActivity(card.id, 'added a comment')
     setText('')
+    setMentionOpen(false)
   }
 
   const toggleCommentReaction = (commentId: string, emoji: string) => {
@@ -56,22 +178,64 @@ export default function CardComments({ card, readOnly = false }: { card: Card; r
     store.addActivity(card.id, `Reacted ${emoji} to a comment`)
   }
 
+  // Close mention popover on outside click
+  useEffect(() => {
+    if (!mentionOpen) return
+    const handler = (e: MouseEvent) => {
+      if (inputRef.current && !inputRef.current.contains(e.target as Node)) {
+        setMentionOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [mentionOpen])
+
+  // Highlight a comment when arriving from a mention notification.
+  useEffect(() => {
+    if (!highlightCommentId) return
+    const el = commentRefs.current[highlightCommentId]
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', 'ring-primary')
+      const t = setTimeout(() => el.classList.remove('ring-2', 'ring-primary'), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [highlightCommentId, card.comments])
+
   return (
     <section>
       <SectionLabel icon={<MessageSquare size={14} />}>Comments</SectionLabel>
 
       {!readOnly && (
-      <div className="mt-2 flex items-start gap-2">
+      <div className="relative mt-2 flex items-start gap-2">
         {you && <Avatar member={you} size={24} />}
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') submit()
-          }}
-          placeholder="Write a comment…"
-          className="flex-1 rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:ring-primary/20"
-        />
+        <div className="relative flex-1">
+          <input
+            ref={inputRef}
+            value={text}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Write a comment…"
+            className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:border-primary/20"
+          />
+          {mentionOpen && filteredMembers.length > 0 && (
+            <div className="absolute bottom-full left-0 z-30 mb-1 max-h-48 w-64 overflow-y-auto rounded-lg border border-border bg-surface-elevated shadow-subtle">
+              {filteredMembers.map((member, i) => (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => insertMention(member)}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                    i === mentionIndex ? 'bg-primary-subtle' : 'hover:bg-surface-alt'
+                  }`}
+                >
+                  <Avatar member={member} size={20} />
+                  <span className="truncate font-medium text-text-primary">{member.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       )}
 
@@ -86,9 +250,10 @@ export default function CardComments({ card, readOnly = false }: { card: Card; r
             }
           const reactionEntries = Object.entries(comment.reactions).filter(([, c]) => c > 0)
           const pickerOpen = activePicker === comment.id
+          const parts = parseMentions(comment.text)
 
           return (
-            <div key={comment.id} className="flex items-start gap-2">
+            <div key={comment.id} ref={(el) => { commentRefs.current[comment.id] = el }} className="flex items-start gap-2 rounded-lg transition-all">
               <Avatar member={author} size={24} />
               <div className="min-w-0 flex-1">
                 <div className="rounded-lg bg-surface-alt px-3 py-2">
@@ -99,7 +264,13 @@ export default function CardComments({ card, readOnly = false }: { card: Card; r
                     </span>
                   </div>
                   <p className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary">
-                    {comment.text}
+                    {parts.map((part, i) =>
+                      part.type === 'mention' && part.userId ? (
+                        <MentionChip key={i} userId={part.userId} members={boardMembers} />
+                      ) : (
+                        <span key={i}>{part.value}</span>
+                      ),
+                    )}
                   </p>
                 </div>
 
@@ -142,7 +313,7 @@ export default function CardComments({ card, readOnly = false }: { card: Card; r
                   {pickerOpen && (
                     <div className="absolute left-0 top-8 z-30 max-w-[min(320px,100%)] animate-in">
                       <EmojiPicker
-                        onEmojiClick={(emojiData) => {
+                        onEmojiClick={(emojiData: any) => {
                           toggleCommentReaction(comment.id, emojiData.emoji)
                           setActivePicker(null)
                         }}
@@ -162,6 +333,7 @@ export default function CardComments({ card, readOnly = false }: { card: Card; r
             </div>
           )
         })}
+
         {card.comments.length === 0 && (
           <p className="text-xs text-text-muted">No comments yet.</p>
         )}

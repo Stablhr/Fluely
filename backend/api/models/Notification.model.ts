@@ -10,6 +10,10 @@ export interface NotificationDocument extends mongoose.Document {
   boardId: Types.ObjectId;
   /** The invitation row this is about; lets the UI wire Accept/Decline directly. */
   collaboratorId: Types.ObjectId | null;
+  /** Where a mention happened (nullable for non-mention notifications). */
+  cardId: Types.ObjectId | null;
+  commentId: string | null;
+  snippet: string | null;
   read: boolean;
   readAt: Date | null;
   createdAt: Date;
@@ -23,6 +27,9 @@ const NotificationSchema = new Schema<NotificationDocument>(
     actorId: {type: Schema.Types.ObjectId, ref: 'User', required: true},
     boardId: {type: Schema.Types.ObjectId, ref: 'Board', required: true, index: true},
     collaboratorId: {type: Schema.Types.ObjectId, ref: 'BoardCollaborator', default: null},
+    cardId: {type: Schema.Types.ObjectId, ref: 'Card', default: null},
+    commentId: {type: String, default: null},
+    snippet: {type: String, default: null, maxlength: 200},
     read: {type: Boolean, required: true, default: false},
     readAt: {type: Date, default: null}
   },

@@ -13,6 +13,9 @@ import {
   spacedPositions
 } from '../utils/position';
 import {boardMemberService} from './boardMember.service';
+import {notificationService} from './notification.service';
+import {mentionRepository} from '../repositories/mention.repository';
+import {notificationRepository} from '../repositories/notification.repository';
 import {withProductTransaction, ProductSession} from '../utils/transaction';
 import {ActivityActionType} from '../constants/product';
 import {Actor} from '../utils/actor';
@@ -386,6 +389,94 @@ export const cardService = {
 
       await cardRepository.update(cardId, board._id, patch, session);
       const updated = await requireCardForBoard(cardId, board._id, session);
+
+      // @mentions: when a comment is saved, notify newly-mentioned board
+      // members. The client sends the comment text with `@[userId]` tokens; the
+      // server is the source of truth for who is actually a board member, so
+      // every mentioned id is validated against the roster here.
+      if (input.comments !== undefined) {
+        const beforeComments = before.comments ?? [];
+        const afterComments = input.comments ?? [];
+        const beforeById = new Map(beforeComments.map(c => [c.id, c]));
+        const afterIds = new Set(afterComments.map(c => c.id));
+
+        // Comments that disappeared: drop their unread mention notifications.
+        for (const oldComment of beforeComments) {
+          if (!afterIds.has(oldComment.id)) {
+            await notificationRepository.deleteMentionsForComment(
+              new Types.ObjectId(cardId),
+              oldComment.id
+            );
+            await mentionRepository.deleteByComment(
+              new Types.ObjectId(cardId),
+              oldComment.id
+            );
+          }
+        }
+
+        const list = await listRepository.findByIdForBoard(
+          updated.listId.toString(),
+          board._id,
+          session
+        );
+        const listName = list?.name ?? '';
+        const cardTitle = updated.title;
+
+        for (const comment of afterComments) {
+          const oldComment = beforeById.get(comment.id);
+          const textChanged = !oldComment || oldComment.text !== comment.text;
+          if (!textChanged) continue;
+
+          const mentioned = new Set<string>();
+          const matches = comment.text.matchAll(/@\[([0-9a-fA-F]{24})\]/g);
+          for (const match of matches) mentioned.add(match[1]);
+
+          if (mentioned.size === 0) continue;
+
+          // Only notify users who are currently board members; discard the rest.
+          const validMentioned: string[] = [];
+          for (const userId of mentioned) {
+            if (userId === (comment.authorId ?? actor.actorId.toString())) continue;
+            if (await boardMemberService.isMember(board, userId)) {
+              validMentioned.push(userId);
+            }
+          }
+          if (validMentioned.length === 0) continue;
+
+          // Newly mentioned = those not already in the before comment.
+          const previouslyMentioned = new Set<string>();
+          if (oldComment) {
+            for (const m of oldComment.text.matchAll(/@\[([0-9a-fA-F]{24})\]/g)) {
+              previouslyMentioned.add(m[1]);
+            }
+          }
+          const newlyMentioned = validMentioned.filter(id => !previouslyMentioned.has(id));
+          if (newlyMentioned.length === 0) continue;
+
+          // Persist mention rows (idempotent).
+          for (const userId of newlyMentioned) {
+            await mentionRepository.upsert({
+              boardId: board._id,
+              cardId: new Types.ObjectId(cardId),
+              commentId: comment.id,
+              mentionedUserId: new Types.ObjectId(userId),
+              mentionedBy: actor.actorId
+            });
+          }
+
+          // Create notifications.
+          const snippet = comment.text.replace(/@\[[0-9a-fA-F]{24}\]/g, '@user').slice(0, 100);
+          await notificationService.notifyMention({
+            mentionedUserIds: newlyMentioned,
+            actorId: actor.actorId,
+            boardId: board._id,
+            cardId: new Types.ObjectId(cardId),
+            commentId: comment.id,
+            snippet,
+            boardName: board.name
+          });
+        }
+      }
 
       const actionType = actionTypeForCardPatch(patch);
       const metadata: Record<string, unknown> = {

@@ -20,10 +20,11 @@ import CardSocialPosts from '../social/CardSocialPosts'
 
 interface CardModalProps {
   cardId: string
+  highlightCommentId?: string | null
   onClose: () => void
 }
 
-export default function CardModal({ cardId, onClose }: CardModalProps) {
+export default function CardModal({ cardId, highlightCommentId, onClose }: CardModalProps) {
   const { data, updateCard, addActivity, deleteCard, archiveCard, toggleDone, canWrite } = useStore()
   const [editingTitle, setEditingTitle] = useState(false)
   const [title, setTitle] = useState('')
@@ -225,7 +226,7 @@ export default function CardModal({ cardId, onClose }: CardModalProps) {
               <div className="min-w-0 space-y-6">
                 <CardDescription card={card} readOnly={!mayWrite} />
                 <CardAttachments card={card} readOnly={!mayWrite} />
-                <CardComments card={card} readOnly={!mayWrite} />
+                <CardComments card={card} readOnly={!mayWrite} highlightCommentId={highlightCommentId} />
               </div>
 
               <aside className="min-w-0 space-y-5">
