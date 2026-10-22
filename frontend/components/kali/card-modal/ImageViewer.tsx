@@ -49,11 +49,40 @@ function formatDate(d: string): string {
 function cloudinaryDownloadUrl(url: string, filename: string): string {
   // Insert the attachment flag into the Cloudinary delivery URL so the browser
   // downloads instead of navigating. Preserve the original filename.
-  const safe = filename.replace(/[^\w.\- ]/g, '')
+  const safe = filename.replace(/[^\w.\- ]/g, '').replace(/ /g, '_')
   if (url.includes('/upload/')) {
-    return url.replace('/upload/', `/upload/fl_attachment:${encodeURIComponent(safe)}/`)
+    return url.replace('/upload/', `/upload/fl_attachment:${safe}/`)
   }
   return url
+}
+
+async function downloadFile(url: string, filename: string) {
+  const downloadUrl = cloudinaryDownloadUrl(url, filename)
+  // Try a fetch -> blob download first (works cross-origin for CORS-enabled
+  // hosts like Cloudinary). Fall back to navigating the attachment URL.
+  try {
+    const res = await fetch(downloadUrl, { mode: 'cors' })
+    if (!res.ok) throw new Error('fetch failed')
+    const blob = await res.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(objectUrl)
+    return
+  } catch {
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = filename
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  }
 }
 
 function displayedUrl(url: string): string {
@@ -252,14 +281,14 @@ export default function ImageViewer({ images, startIndex, canEdit, onClose, onRe
             <ExternalLink size={16} />
             Open in new tab
           </a>
-          <a
-            href={cloudinaryDownloadUrl(img.url, img.name)}
-            download={img.name}
+          <button
+            type="button"
+            onClick={() => void downloadFile(img.url, img.name)}
             className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white transition-colors duration-150 hover:bg-white/10"
           >
             <Download size={16} />
             Download
-          </a>
+          </button>
           {canEdit && isCover && (
             <button
               type="button"
