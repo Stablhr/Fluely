@@ -12,7 +12,10 @@ import {notificationService} from './notification.service';
 import {activityService} from './activity.service';
 import {bumpBoardRevision} from './boardRevision';
 import {withProductTransaction, ProductSession} from '../utils/transaction';
+import {createSecureToken, hashToken} from '../utils/crypto';
+import {env} from '../config/env';
 import {logger} from '../logging/logger';
+import {boardInvitationEmailTemplate} from '../templates/boardInvitationEmail';
 
 type Person = {
   firstName: string;
@@ -109,46 +112,43 @@ export const boardCollaboratorService = {
         'That person already has access to this board'
       );
     }
+    if (existing && existing.status === 'pending') {
+      throw new ApiError(
+        409,
+        ErrorCodes.COLLABORATOR_EXISTS,
+        'An invitation is already pending for this person'
+      );
+    }
+
+    const token = createSecureToken();
+    const tokenHash = hashToken(token);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     const result = await withProductTransaction(async session => {
-      let row;
-      if (existing) {
-        await boardCollaboratorRepository.update(
-          existing._id.toString(),
-          {
-            role,
-            status: 'pending',
-            invitedBy: actor.actorId,
-            invitedAt: new Date(),
-            respondedAt: null
-          },
-          session
-        );
-        row = await boardCollaboratorRepository.find(board._id, invitee._id, session);
-      } else {
-        row = await boardCollaboratorRepository.create(
-          {
-            boardId: board._id,
-            userId: invitee._id,
-            role,
-            status: 'pending',
-            invitedBy: actor.actorId
-          },
-          session
-        );
-      }
+      const row = await boardCollaboratorRepository.create(
+        {
+          boardId: board._id,
+          userId: invitee._id,
+          role,
+          status: 'pending',
+          invitedBy: actor.actorId,
+          inviteTokenHash: tokenHash,
+          expiresAt
+        },
+        session
+      );
 
       const activity = await activityService.log(session, {
         boardId: board._id,
         actor,
         actionType: 'collaborator.invited',
         targetType: 'collaborator',
-        targetId: row!._id.toString(),
+        targetId: row._id.toString(),
         metadata: {email, role, userId: invitee._id.toString()},
         revision: board.revision
       });
 
-      return {row: row!, activity};
+      return {row, activity, token};
     });
 
     logger.info(
@@ -167,7 +167,9 @@ export const boardCollaboratorService = {
       boardId: board._id,
       collaboratorId: result.row._id,
       boardName: board.name,
-      role
+      role,
+      token: result.token,
+      expiresAt
     });
 
     return serializeCollaborator(result.row, invitee);
@@ -341,6 +343,78 @@ export const boardCollaboratorService = {
     };
   },
 
+  /** Owner-only: regenerate the invite token and resend the email. */
+  async resend(
+    actor: Actor,
+    board: BoardDocument,
+    collaboratorId: string
+  ) {
+    const row = await findRowOrThrow(board, collaboratorId);
+    if (row.status !== 'pending') {
+      throw new ApiError(400, ErrorCodes.VALIDATION_ERROR, 'Only pending invitations can be resent');
+    }
+    // Rate limit: at most once per minute.
+    const since = Date.now() - row.invitedAt.getTime();
+    if (since < 60 * 1000) {
+      throw new ApiError(429, ErrorCodes.RATE_LIMIT_EXCEEDED, 'Please wait before resending');
+    }
+
+    const invitee = await userRepository.findById(row.userId.toString());
+    if (!invitee) {
+      throw new ApiError(404, ErrorCodes.USER_NOT_FOUND, 'Invitee no longer exists');
+    }
+
+    const token = createSecureToken();
+    const tokenHash = hashToken(token);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await boardCollaboratorRepository.update(
+      row._id.toString(),
+      {
+        inviteTokenHash: tokenHash,
+        expiresAt,
+        invitedAt: new Date(),
+        invitedBy: actor.actorId
+      }
+    );
+
+    const inviter = await userRepository.findById(actor.actorId.toString());
+    const inviterName = inviter ? `${inviter.firstName} ${inviter.lastName}`.trim() : 'Someone';
+
+    const template = boardInvitationEmailTemplate({
+      recipientName: invitee.firstName,
+      inviterName,
+      boardName: board.name,
+      role: row.role as 'editor' | 'viewer',
+      acceptUrl: `${env.FRONTEND_URL}/invite?token=${encodeURIComponent(token)}`,
+      expiresAt
+    });
+
+    // Best-effort email.
+    try {
+      const {emailService} = await import('./email.service');
+      await emailService.sendEmail({
+        to: invitee.email,
+        subject: template.subject,
+        text: template.text,
+        html: template.html
+      });
+    } catch (err) {
+      logger.warn({err}, 'Could not resend invitation email');
+    }
+
+    await notificationRepository.deleteInvitationsForBoard(invitee._id, board._id);
+    await notificationRepository.create({
+      userId: invitee._id,
+      type: 'board_invitation',
+      actorId: actor.actorId,
+      boardId: board._id,
+      collaboratorId: row._id
+    });
+
+    return {message: 'Invitation resent'};
+  },
+
   /** Invitations waiting on the signed-in person. */
   async listPendingForUser(actor: Actor) {
     const rows = await boardCollaboratorRepository.listPendingForUser(actor.actorId);
@@ -374,5 +448,64 @@ export const boardCollaboratorService = {
         invitedByName: ownerNameByBoardId.get(boardId) ?? ''
       };
     });
+  },
+
+  /** Look up an invitation by its (raw) token. Returns details for the
+   *  acceptance screen, or throws a typed error for expired/used/invalid. */
+  async getByToken(token: string) {
+    const hash = hashToken(token);
+    const row = await boardCollaboratorRepository.findByTokenHash(hash);
+    if (!row) {
+      throw new ApiError(404, ErrorCodes.INVITATION_NOT_FOUND, 'This invitation is invalid or has already been used');
+    }
+    if (row.status !== 'pending') {
+      throw new ApiError(409, ErrorCodes.VALIDATION_ERROR, `This invitation was already ${row.status}`);
+    }
+    if (row.expiresAt && row.expiresAt.getTime() < Date.now()) {
+      // Mark expired for clarity.
+      await boardCollaboratorRepository.setStatus(row._id.toString(), 'expired', new Date());
+      throw new ApiError(410, ErrorCodes.INVITATION_EXPIRED, 'This invitation has expired');
+    }
+
+    const board = await boardRepository.findById(row.boardId.toString());
+    const inviter = await userRepository.findById(row.invitedBy.toString());
+    const invitee = await userRepository.findById(row.userId.toString());
+
+    return {
+      id: row._id.toString(),
+      boardId: row.boardId.toString(),
+      boardName: board?.name ?? '',
+      role: row.role,
+      inviterName: inviter ? `${inviter.firstName} ${inviter.lastName}`.trim() : '',
+      inviteeEmail: invitee?.email ?? '',
+      expiresAt: row.expiresAt
+    };
+  },
+
+  /** Accept or decline using a token. Handles wrong-account mismatch. */
+  async respondByToken(token: string, actor: Actor, decision: CollaboratorStatus) {
+    const hash = hashToken(token);
+    const row = await boardCollaboratorRepository.findByTokenHash(hash);
+    if (!row) {
+      throw new ApiError(404, ErrorCodes.INVITATION_NOT_FOUND, 'This invitation is invalid or has already been used');
+    }
+    if (row.status !== 'pending') {
+      throw new ApiError(409, ErrorCodes.VALIDATION_ERROR, `This invitation was already ${row.status}`);
+    }
+    if (row.expiresAt && row.expiresAt.getTime() < Date.now()) {
+      await boardCollaboratorRepository.setStatus(row._id.toString(), 'expired', new Date());
+      throw new ApiError(410, ErrorCodes.INVITATION_EXPIRED, 'This invitation has expired');
+    }
+    // Wrong-account guard: the signed-in user must be the invitee.
+    if (!row.userId.equals(actor.actorId)) {
+      throw new ApiError(
+        403,
+        ErrorCodes.FORBIDDEN,
+        'This invitation was sent to a different account. Sign in with the invited email to accept it.'
+      );
+    }
+
+    // Delegate to the existing respond flow by collaborator id.
+    return boardCollaboratorService.respond(actor, row._id.toString(), decision);
   }
 };

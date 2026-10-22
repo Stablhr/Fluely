@@ -273,6 +273,14 @@ router.post(
   boardCollaboratorController.invite
 );
 
+router.post(
+  '/:boardId/collaborators/:collaboratorId/resend',
+  authActionLimiter,
+  validateRequest({params: collaboratorIdParamsSchema}),
+  requireBoardAccess('owner'),
+  boardCollaboratorController.resend
+);
+
 router.patch(
   '/:boardId/collaborators/:collaboratorId',
   authActionLimiter,

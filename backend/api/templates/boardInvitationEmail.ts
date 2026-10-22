@@ -142,6 +142,8 @@ export function boardInvitationEmailTemplate(params: {
   inviterName: string;
   boardName: string;
   role: 'editor' | 'viewer';
+  acceptUrl?: string;
+  expiresAt?: Date;
 }) {
   return renderInviteEmail({
     appName: params.appName,
@@ -149,7 +151,7 @@ export function boardInvitationEmailTemplate(params: {
     inviterName: params.inviterName,
     boardName: params.boardName,
     role: params.role,
-    acceptUrl: '#',
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    acceptUrl: params.acceptUrl ?? '#',
+    expiresAt: params.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   });
 }

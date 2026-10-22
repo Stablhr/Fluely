@@ -38,6 +38,40 @@ export const boardCollaboratorController = {
     }
   },
 
+  async getByToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json(await boardCollaboratorService.getByToken(req.params.token));
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async respondByToken(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actor = actorFromRequest(req);
+      res.status(200).json(
+        await boardCollaboratorService.respondByToken(
+          req.params.token,
+          actor,
+          req.body.decision
+        )
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async resend(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actor = actorFromRequest(req);
+      res.status(200).json(
+        await boardCollaboratorService.resend(actor, requireBoard(req), req.params.collaboratorId)
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async invite(req: Request, res: Response, next: NextFunction) {
     try {
       const actor = actorFromRequest(req);

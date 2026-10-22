@@ -43,7 +43,7 @@ export function canManageBoard(access: BoardAccessLevel): boolean {
 /** Collaborator roles. `editor` can write, `viewer` is read-only. */
 export type CollaboratorRole = "editor" | "viewer";
 
-export type CollaboratorStatus = "pending" | "accepted" | "declined";
+export type CollaboratorStatus = "pending" | "accepted" | "declined" | "expired";
 
 /**
  * A person invited to a board.

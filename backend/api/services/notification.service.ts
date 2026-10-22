@@ -1,4 +1,5 @@
 import {Types} from 'mongoose';
+import {env} from '../config/env';
 import {notificationRepository} from '../repositories/notification.repository';
 import {userRepository} from '../repositories/user.repository';
 import {boardRepository} from '../repositories/board.repository';
@@ -138,6 +139,8 @@ export const notificationService = {
     collaboratorId: Types.ObjectId;
     boardName: string;
     role: 'editor' | 'viewer';
+    token?: string;
+    expiresAt?: Date;
   }) {
     const inviter = await userRepository.findById(params.inviterId.toString());
     const inviterName = displayName(inviter) || 'Someone';
@@ -154,11 +157,16 @@ export const notificationService = {
       collaboratorId: params.collaboratorId
     });
 
+    const acceptUrl = params.token
+      ? `${env.FRONTEND_URL}/invite?token=${encodeURIComponent(params.token)}`
+      : `${env.FRONTEND_URL}/boards`;
     const template = boardInvitationEmailTemplate({
       recipientName: params.invitee.firstName,
       inviterName,
       boardName: params.boardName,
-      role: params.role
+      role: params.role,
+      acceptUrl,
+      expiresAt: params.expiresAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     });
     await sendBestEffortEmail({
       to: params.invitee.email,

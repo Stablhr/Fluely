@@ -18,6 +18,10 @@ export interface BoardCollaboratorDocument extends mongoose.Document {
   invitedBy: Types.ObjectId;
   invitedAt: Date;
   respondedAt: Date | null;
+  /** Hashed single-use invite token. Null after the invite is answered. */
+  inviteTokenHash: string | null;
+  /** When the invite token expires. Null after answered. */
+  expiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,7 +49,9 @@ const BoardCollaboratorSchema = new Schema<BoardCollaboratorDocument>(
     },
     invitedBy: {type: Schema.Types.ObjectId, ref: 'User', required: true},
     invitedAt: {type: Date, required: true, default: Date.now},
-    respondedAt: {type: Date, default: null}
+    respondedAt: {type: Date, default: null},
+    inviteTokenHash: {type: String, default: null, select: false},
+    expiresAt: {type: Date, default: null}
   },
   {timestamps: true}
 );

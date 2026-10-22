@@ -13,7 +13,7 @@ export type AccessTarget = Pick<
 
 export type CollaborationRecord = {
   role: 'editor' | 'viewer';
-  status: 'pending' | 'accepted' | 'declined';
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
 };
 
 /**

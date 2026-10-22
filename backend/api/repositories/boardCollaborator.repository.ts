@@ -16,6 +16,8 @@ export const boardCollaboratorRepository = {
       status?: CollaboratorStatus;
       invitedBy: Types.ObjectId;
       invitedAt?: Date;
+      inviteTokenHash?: string | null;
+      expiresAt?: Date | null;
     },
     session?: ProductSession
   ) =>
@@ -34,6 +36,9 @@ export const boardCollaboratorRepository = {
     session
       ? BoardCollaboratorModel.findOne({boardId, userId}).session(session).exec()
       : BoardCollaboratorModel.findOne({boardId, userId}).exec(),
+
+  findByTokenHash: (tokenHash: string) =>
+    BoardCollaboratorModel.findOne({inviteTokenHash: tokenHash}).exec(),
 
   /**
    * By row id, scoped to the board.

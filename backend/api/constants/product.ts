@@ -15,7 +15,7 @@ export const CollaboratorRoles = ['editor', 'viewer'] as const;
 export type CollaboratorRole = (typeof CollaboratorRoles)[number];
 
 /** Lifecycle of a board invitation. Only 'accepted' grants any access. */
-export const CollaboratorStatuses = ['pending', 'accepted', 'declined'] as const;
+export const CollaboratorStatuses = ['pending', 'accepted', 'declined', 'expired'] as const;
 export type CollaboratorStatus = (typeof CollaboratorStatuses)[number];
 
 /**

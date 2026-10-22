@@ -19,6 +19,7 @@ import type {
 import { useStore } from "@/lib/kali/store/useStore";
 import Modal from "../shared/Modal";
 import Avatar from "../shared/Avatar";
+import { resendInvite } from "@/lib/kali/api/invitations";
 
 const ROLE_OPTIONS: CollaboratorRole[] = ["editor", "viewer"];
 
@@ -70,6 +71,7 @@ export default function ShareModal({
   const [openRoleId, setOpenRoleId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [inviteDone, setInviteDone] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -81,6 +83,22 @@ export default function ShareModal({
   // invitation and belongs in the other tab.
   const accepted = collaborators.filter((c) => c.status === "accepted");
   const pending = collaborators.filter((c) => c.status === "pending");
+  const past = collaborators.filter(
+    (c) => c.status === "declined" || c.status === "expired",
+  );
+
+  const handleResend = async (person: Collaborator) => {
+    if (resendingId) return
+    setResendingId(person.id)
+    try {
+      await resendInvite(board.id, person.id)
+      await loadCollaborators(board.id)
+    } catch {
+      setErrorMsg("Could not resend the invitation.")
+    } finally {
+      setResendingId(null)
+    }
+  }
 
   // Read through the prop as well as the store, so a board whose rows have just
   // arrived still renders them without waiting for the parent to re-render.
@@ -386,15 +404,65 @@ export default function ShareModal({
                         </p>
                       </div>
                       {mayManage && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => void handleResend(person)}
+                            disabled={resendingId === person.id}
+                            aria-label={`Resend invitation to ${person.name}`}
+                            className="rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors duration-150 hover:bg-primary-subtle disabled:opacity-50"
+                          >
+                            {resendingId === person.id ? "Sending…" : "Resend"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void removeCollaborator(board.id, person.id)
+                            }
+                            aria-label={`Cancel invitation for ${person.name}`}
+                            className="shrink-0 rounded-md p-1.5 text-text-secondary transition-colors duration-150 hover:bg-danger-subtle hover:text-danger-text"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {past.length > 0 && (
+              <>
+                <p className="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-[0.05em] text-text-secondary">
+                  Past invitations ({past.length})
+                </p>
+                <div className="space-y-1">
+                  {past.map((person) => (
+                    <div
+                      key={person.id}
+                      className="flex items-center gap-3 rounded-lg px-2 py-2 opacity-70"
+                    >
+                      <span className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-surface-alt text-xs font-semibold text-text-secondary ring-1 ring-border">
+                        {person.name.charAt(0).toUpperCase() || "?"}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-text-primary">
+                          {person.name}
+                        </p>
+                        <p className="truncate text-xs text-text-secondary">
+                          {person.status === "expired" ? "Expired" : "Declined"} · Invited as{" "}
+                          {ROLE_LABELS[person.role].toLowerCase()}
+                        </p>
+                      </div>
+                      {mayManage && person.status === "expired" && (
                         <button
                           type="button"
-                          onClick={() =>
-                            void removeCollaborator(board.id, person.id)
-                          }
-                          aria-label={`Cancel invitation for ${person.name}`}
-                          className="shrink-0 rounded-md p-1.5 text-text-secondary transition-colors duration-150 hover:bg-danger-subtle hover:text-danger-text"
+                          onClick={() => void handleResend(person)}
+                          disabled={resendingId === person.id}
+                          className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-primary transition-colors duration-150 hover:bg-primary-subtle disabled:opacity-50"
                         >
-                          <Trash2 size={14} />
+                          {resendingId === person.id ? "Sending…" : "Resend"}
                         </button>
                       )}
                     </div>
