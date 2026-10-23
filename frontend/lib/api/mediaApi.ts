@@ -151,40 +151,65 @@ export async function uploadMediaDirect(
     folder: string
   }>('/media/signature', { boardId: scope.boardId, cardId: scope.cardId })
 
-  const form = new FormData()
-  form.append('file', file)
-  form.append('api_key', sig.apiKey)
-  form.append('timestamp', String(sig.timestamp))
-  form.append('signature', sig.signature)
-  form.append('folder', sig.folder)
-  form.append('use_filename', 'true')
-  form.append('unique_filename', 'true')
-
   const uploadUrl = `https://api.cloudinary.com/v1_1/${sig.cloudName}/auto/upload`
-  const uploaded: { secure_url: string; public_id: string; resource_type: string } = await new Promise(
-    (resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      xhr.open('POST', uploadUrl)
-      xhr.upload.onprogress = (e) => {
-        if (onProgress && e.lengthComputable) {
-          onProgress(Math.round((e.loaded / e.total) * 100))
-        }
-      }
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            resolve(JSON.parse(xhr.responseText))
-          } catch {
-            reject(new Error('Invalid Cloudinary response'))
-          }
-        } else {
-          reject(new Error(`Cloudinary upload failed (${xhr.status})`))
-        }
-      }
-      xhr.onerror = () => reject(new Error('Network error during upload'))
-      xhr.send(form)
+
+  // Chunked upload: Cloudinary caps a single request body (100MB on the free
+  // tier), so a 250-500MB video must be sent in pieces. Each piece carries the
+  // same signed parameters; only the final chunk's response holds the result.
+  const CHUNK_SIZE = 6 * 1024 * 1024
+  const total = file.size
+  let offset = 0
+  let uploaded: { secure_url: string; public_id: string; resource_type: string } | null = null
+
+  while (offset < total) {
+    const end = Math.min(offset + CHUNK_SIZE, total) - 1
+    const chunk = file.slice(offset, end + 1)
+
+    const form = new FormData()
+    form.append('file', chunk, file.name)
+    form.append('api_key', sig.apiKey)
+    form.append('timestamp', String(sig.timestamp))
+    form.append('signature', sig.signature)
+    form.append('folder', sig.folder)
+    form.append('use_filename', 'true')
+    form.append('unique_filename', 'true')
+
+    const res = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Range': `bytes ${offset}-${end}/${total}`,
+      },
+      body: form,
+    })
+
+    let json: any = null
+    try {
+      json = await res.json()
+    } catch {
+      json = null
     }
-  )
+
+    if (!res.ok) {
+      const msg = json?.error?.message || `Cloudinary upload failed (${res.status})`
+      throw new Error(msg)
+    }
+
+    // The final chunk's response carries the full upload result.
+    if (json && (json.secure_url || json.url)) {
+      uploaded = {
+        secure_url: json.secure_url || json.url,
+        public_id: json.public_id,
+        resource_type: json.resource_type || 'auto',
+      }
+    }
+
+    offset = end + 1
+    if (onProgress) onProgress(Math.round((offset / total) * 100))
+  }
+
+  if (!uploaded) {
+    throw new Error('Cloudinary did not return an upload result')
+  }
 
   const { data } = await httpClient.post<{ item: MediaDto }>('/media/register', {
     boardId: scope.boardId,

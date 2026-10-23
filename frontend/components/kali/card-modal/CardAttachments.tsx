@@ -14,7 +14,7 @@ import SectionLabel from '../shared/SectionLabel'
  * Mirrors the backend's `MEDIA_MAX_FILE_SIZE_MB` default. The server rejects
  * anything larger regardless, so this is only early feedback.
  */
-export const MAX_FILE_SIZE = 50 * 1024 * 1024
+export const MAX_FILE_SIZE = 500 * 1024 * 1024
 
 export default function CardAttachments({
   card,
