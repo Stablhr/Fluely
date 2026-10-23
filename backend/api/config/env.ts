@@ -22,6 +22,8 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url().optional(),
   MEDIA_MAX_FILE_SIZE_MB: z.coerce.number().positive().max(2000).optional(),
   MEDIA_QUOTA_MB: z.coerce.number().positive().max(100000).optional(),
+  CRON_SECRET: z.string().optional(),
+  DONE_CARD_RETENTION_DAYS: z.coerce.number().positive().max(365).optional(),
   MEDIA_ALLOWED_MIME_TYPES: z.string().optional(),
   /**
    * Cloudinary credentials. Optional here so the app boots (and the test suite
@@ -55,6 +57,8 @@ export const env = {
   MEDIA_QUOTA_BYTES: Math.round(
     (parsed.data.MEDIA_QUOTA_MB ?? 2048) * 1024 * 1024
   ),
+  CRON_SECRET: parsed.data.CRON_SECRET ?? '',
+  DONE_CARD_RETENTION_DAYS: parsed.data.DONE_CARD_RETENTION_DAYS ?? 2,
   MEDIA_ALLOWED_MIME_TYPES: (
     parsed.data.MEDIA_ALLOWED_MIME_TYPES ??
     'image/jpeg,image/png,image/gif,image/webp,image/avif,image/heic,image/svg+xml,video/mp4,video/webm,video/quicktime,video/x-m4v,video/3gpp,video/mpeg,video/ogg,audio/mpeg,audio/ogg,audio/wav,audio/mp4,application/pdf,text/plain'

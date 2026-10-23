@@ -373,6 +373,7 @@ export interface CreateCardInput {
   coverSize?: "small" | "medium" | "large" | "full";
   coverMediaId?: string | null;
   mediaIds?: string[];
+  done?: boolean;
   comments?: {
     id: string;
     authorId?: string | null;

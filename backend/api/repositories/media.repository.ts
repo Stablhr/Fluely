@@ -72,5 +72,11 @@ export const mediaRepository = {
     MediaAttachmentModel.deleteOne({_id: id, ownerId}).exec(),
 
   deleteForBoard: (boardId: Types.ObjectId, session?: ProductSession) =>
-    MediaAttachmentModel.deleteMany({boardId}, {session}).exec()
+    MediaAttachmentModel.deleteMany({boardId}, {session}).exec(),
+
+  listByCard: (cardId: Types.ObjectId) =>
+    MediaAttachmentModel.find({cardId}).exec(),
+
+  deleteByCard: (cardId: Types.ObjectId) =>
+    MediaAttachmentModel.deleteMany({cardId}).exec()
 };

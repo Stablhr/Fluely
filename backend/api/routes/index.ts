@@ -5,6 +5,7 @@ import boardRoutes from './board.routes';
 import invitationRoutes from './invitation.routes';
 import mediaRoutes from './media.routes';
 import notificationRoutes from './notification.routes';
+import cronRoutes from './cron.routes';
 import workspaceRoutes from './workspace.routes';
 
 const router = Router();
@@ -16,5 +17,6 @@ router.use('/invitations', invitationRoutes);
 router.use('/media', mediaRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/workspaces', workspaceRoutes);
+router.use('/cron', cronRoutes);
 
 export default router;

@@ -110,5 +110,12 @@ export const cardRepository = {
     CardModel.deleteMany({listId, boardId}).exec(),
 
   deleteForBoard: (boardId: Types.ObjectId, session?: ProductSession) =>
-    CardModel.deleteMany({boardId}, {session}).exec()
+    CardModel.deleteMany({boardId}, {session}).exec(),
+
+  /** Done cards that have been done longer than the retention window. */
+  listDoneOlderThan: (cutoff: Date, limit = 200) =>
+    CardModel.find({done: true, doneAt: {$ne: null, $lt: cutoff}})
+      .sort({doneAt: 1})
+      .limit(limit)
+      .exec()
 };

@@ -30,5 +30,8 @@ export const mentionRepository = {
 
   /** Mentioned users of a given comment (for diffing on edit). */
   listForComment: (cardId: Types.ObjectId, commentId: string) =>
-    MentionModel.find({cardId, commentId}).exec()
+    MentionModel.find({cardId, commentId}).exec(),
+
+  deleteByCard: (cardId: Types.ObjectId) =>
+    MentionModel.deleteMany({cardId}).exec()
 };

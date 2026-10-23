@@ -167,6 +167,7 @@ async function serializeCard(card: CardDocument) {
     })) as any,
     archived: card.archived,
     done: card.done,
+    doneAt: card.doneAt ?? null,
     createdAt: card.createdAt,
     updatedAt: card.updatedAt,
     // Consistent image field across REST and realtime payloads.
@@ -369,7 +370,10 @@ export const cardService = {
       if (input.labelIds !== undefined) patch.labelIds = input.labelIds;
       if (input.watching !== undefined) patch.watching = input.watching;
       if (input.archived !== undefined) patch.archived = input.archived;
-      if (input.done !== undefined) patch.done = input.done;
+      if (input.done !== undefined) {
+        patch.done = input.done;
+        patch.doneAt = input.done ? new Date() : null;
+      }
       if (input.coverMediaId !== undefined) {
         patch.coverMediaId = input.coverMediaId ? new Types.ObjectId(input.coverMediaId) : null;
       }

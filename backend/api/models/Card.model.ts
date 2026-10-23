@@ -45,6 +45,8 @@ export interface CardDocument extends mongoose.Document {
   comments: {id: string; authorId: Types.ObjectId | null; parentId: string | null; text: string; reactions: Record<string, number>; createdAt: Date}[];
   archived: boolean;
   done: boolean;
+  /** When the card was marked done; drives the automatic cleanup. */
+  doneAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -79,7 +81,8 @@ const CardSchema = new Schema<CardDocument>(
       default: []
     },
     archived: {type: Boolean, default: false},
-    done: {type: Boolean, default: false}
+    done: {type: Boolean, default: false},
+    doneAt: {type: Date, default: null}
   },
   {timestamps: true}
 );
@@ -91,5 +94,7 @@ CardSchema.index({listId: 1, createdAt: 1});
 CardSchema.index({boardId: 1, position: 1});
 // Drives the calendar and schedule views, which scan by due date.
 CardSchema.index({boardId: 1, dueDate: 1});
+// Drives the automatic cleanup of done cards.
+CardSchema.index({done: 1, doneAt: 1});
 
 export const CardModel = mongoose.model<CardDocument>('Card', CardSchema, 'cards');

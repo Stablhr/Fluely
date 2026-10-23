@@ -156,6 +156,7 @@ function toCardPatch(patch: Partial<Card>): Partial<CreateCardInput> {
   if (patch.dueDate !== undefined) out.dueDate = patch.dueDate;
   if (patch.startDate !== undefined) out.startDate = patch.startDate;
   if (patch.location !== undefined) out.location = patch.location;
+  if (patch.done !== undefined) out.done = patch.done;
   if (patch.labelIds !== undefined) out.labelIds = patch.labelIds;
   if (patch.memberIds !== undefined) out.memberIds = patch.memberIds;
   if (patch.coverSize !== undefined) out.coverSize = patch.coverSize;
@@ -2244,18 +2245,20 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       };
     });
 
-  const toggleDone = (id: string) =>
+  const toggleDone = (id: string) => {
+    const card = dataRef.current.cards[id];
+    if (!card || !canWrite(card.boardId)) return;
+    const done = !card.done;
+    // Optimistic local update with the activity entry.
     mutate((prev) => {
-      const card = prev.cards[id];
-      if (!card) return prev;
-      if (!canWrite(card.boardId)) return prev;
-      const done = !card.done;
+      const c = prev.cards[id];
+      if (!c) return prev;
       return {
         ...prev,
         cards: {
           ...prev.cards,
           [id]: {
-            ...card,
+            ...c,
             done,
             updatedAt: now(),
             activity: [
@@ -2264,12 +2267,15 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
                 text: done ? "marked this card as done" : "reopened this card",
                 createdAt: now(),
               },
-              ...card.activity,
+              ...c.activity,
             ],
           },
         },
       };
     });
+    // Sync the new done state (and the resulting doneAt) to the server.
+    updateCard(id, { done });
+  };
 
   /**
    * Changes a board's visibility, optimistically.

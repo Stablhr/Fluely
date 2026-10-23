@@ -69,7 +69,11 @@ export const notificationRepository = {
       commentId,
       type: 'mention',
       read: false
-    }).exec()
+    }).exec(),
+
+  /** Drop all mention notifications for a deleted card. */
+  deleteMentionsForCard: (cardId: Types.ObjectId) =>
+    NotificationModel.deleteMany({cardId, type: 'mention'}).exec()
 };
 
 export type NotificationRow = NotificationDocument;
