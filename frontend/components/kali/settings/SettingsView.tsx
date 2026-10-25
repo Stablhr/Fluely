@@ -610,7 +610,7 @@ export default function SettingsView() {
                 </section>
 
                 {/* Preview (mobile: right after identity; desktop: right column sticky) */}
-                <section className="order-2 rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:sticky lg:top-4">
+                <section className="order-2 rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:order-none lg:col-start-2 lg:row-start-1 lg:sticky lg:top-4">
                   <h2 className="text-[15px] font-semibold text-text-primary">Preview</h2>
                   <p className="mt-0.5 text-[13px] text-text-secondary">This is how collaborators see your profile.</p>
                   <p className="mt-1 text-[11px] text-text-muted">Previewing as: a collaborator</p>
