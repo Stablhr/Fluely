@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { AlertTriangle, Monitor, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Trash2, Upload } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStore } from '@/lib/kali/store/useStore'
 import { meQueryKey, useMeQuery } from '@/lib/hooks/auth/useMeQuery'
@@ -24,7 +24,7 @@ const buttonClass =
   'inline-flex items-center gap-1.5 rounded-md bg-surface-alt px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition-colors duration-150 hover:bg-primary-subtle hover:text-primary-hover active:scale-[0.98] disabled:opacity-40'
 
 export default function SettingsView() {
-  const { data, socialPosts } = useStore()
+  const { data } = useStore()
   const { data: me } = useMeQuery()
   const queryClient = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -40,14 +40,6 @@ export default function SettingsView() {
     .join('')
     .slice(0, 2)
     .toUpperCase()
-
-  const stats = [
-    { label: 'Boards', value: Object.keys(data.boards).length },
-    { label: 'Lists', value: Object.keys(data.lists).length },
-    { label: 'Cards', value: Object.keys(data.cards).length },
-    { label: 'Inbox', value: data.inbox.length },
-    { label: 'Posts', value: socialPosts.length },
-  ]
 
   /** Both actions change the account, so both refetch `/auth/me` when done. */
   const refreshAccount = () => queryClient.invalidateQueries({ queryKey: meQueryKey })
@@ -159,20 +151,6 @@ export default function SettingsView() {
           )}
         </Section>
 
-        <Section title="Storage" description="Your boards, cards, and scheduled posts are kept in this browser.">
-          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {stats.map((stat) => (
-              <div key={stat.label} className="rounded-chip bg-surface-alt px-3 py-2">
-                <dt className="text-[11px] uppercase tracking-wide text-text-muted">{stat.label}</dt>
-                <dd className="font-mono text-[15px] font-semibold text-text-primary">{stat.value}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-3 flex items-center gap-1.5 text-[12px] text-text-muted">
-            <Monitor size={13} />
-            Signing out keeps this data here. Clear your browser storage to remove it.
-          </p>
-        </Section>
       </div>
     </div>
   )
