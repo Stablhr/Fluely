@@ -1,7 +1,7 @@
-'use client'
+﻿'use client'
 
 import { useRef, useState, useEffect, useMemo } from 'react'
-import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe } from 'lucide-react'
+import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield, ChevronRight } from 'lucide-react'
 import AvatarCropModal from './AvatarCropModal'
 import { useQueryClient } from '@tanstack/react-query'
 import { meQueryKey, useMeQuery } from '@/lib/hooks/auth/useMeQuery'
@@ -46,6 +46,17 @@ const AVATAR_COLORS = [
 const PRONOUNS_OPTIONS = ['', 'he/him', 'she/her', 'they/them', 'custom']
 const ACCENT_SWATCHES = ['#3971b8', '#c8d69b', '#f6e6a5', '#ff8b5e', '#8b7cf6', '#33b27a', '#ff5e6c']
 
+const SECTIONS = [
+  { id: 'profile', label: 'Profile', icon: User },
+  { id: 'account', label: 'Account & Security', icon: Lock },
+  { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'sharing', label: 'Sharing & Privacy', icon: Shield },
+  { id: 'danger', label: 'Danger Zone', icon: AlertTriangle },
+] as const
+
+type TabId = (typeof SECTIONS)[number]['id']
+
 export default function SettingsView() {
   const { data: me } = useMeQuery()
   const queryClient = useQueryClient()
@@ -53,6 +64,22 @@ export default function SettingsView() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cropFile, setCropFile] = useState<File | null>(null)
+
+  const [tab, setTabState] = useState<TabId>('profile')
+  const setTab = (t: TabId) => {
+    setTabState(t)
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', t)
+      window.history.replaceState({}, '', url.toString())
+    }
+  }
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const t = params.get('tab') as TabId | null
+    if (t && SECTIONS.some((s) => s.id === t)) setTabState(t)
+  }, [])
 
   // Profile data (loaded from /account/me/profile)
   const { data: profile, isLoading: profileLoading } = useQuery({
@@ -173,7 +200,7 @@ export default function SettingsView() {
   const handleUpload = (file: File | undefined) => {
     if (!file) return
     if (file.size > MAX_AVATAR_BYTES) {
-      setError(`"${file.name}" is ${formatSize(file.size)} — profile pictures are capped at ${formatSize(MAX_AVATAR_BYTES)}.`)
+      setError(`"${file.name}" is ${formatSize(file.size)} â€” profile pictures are capped at ${formatSize(MAX_AVATAR_BYTES)}.`)
       return
     }
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
@@ -258,12 +285,65 @@ export default function SettingsView() {
   }, [draft.timezone, profile?.timezone])
 
   return (
-    <>
-    <div className="scroll-slim mx-auto h-full max-w-2xl overflow-y-auto p-4 sm:p-6 md:p-8">
-      <h1 className="text-xl font-semibold text-text-primary sm:text-2xl">Settings</h1>
-      <p className="mt-1 text-sm text-text-secondary">Preferences for this workspace and your account.</p>
+    <div className="flex h-full flex-col overflow-hidden bg-background">
+      {/* Compact header */}
+      <header className="shrink-0 border-b border-border bg-surface px-6 py-3 lg:px-8">
+        <h1 className="text-lg font-semibold text-text-primary">Settings</h1>
+        <p className="text-xs text-text-secondary">Preferences for this workspace and your account.</p>
+      </header>
 
-      <div className="mt-4 space-y-4 sm:mt-6">
+      {/* Mobile tab strip */}
+      <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border bg-surface px-2 py-2 lg:hidden">
+        {SECTIONS.map((s) => {
+          const Icon = s.icon
+          const active = tab === s.id
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setTab(s.id)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors duration-150 ${
+                active ? 'bg-primary-subtle text-primary-hover' : 'bg-surface-alt text-text-secondary'
+              }`}
+            >
+              <Icon size={13} />
+              {s.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Two-pane layout */}
+      <div className="flex min-h-0 flex-1">
+        {/* Left nav (desktop) */}
+        <nav className="hidden w-[240px] shrink-0 overflow-y-auto border-r border-border bg-surface p-3 lg:flex lg:flex-col gap-1">
+          {SECTIONS.map((s) => {
+            const Icon = s.icon
+            const active = tab === s.id
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => setTab(s.id)}
+                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+                  active
+                    ? 'bg-primary-subtle text-primary-hover'
+                    : 'text-text-secondary hover:bg-surface-alt hover:text-text-primary'
+                }`}
+              >
+                <Icon size={16} className="shrink-0" />
+                <span className="truncate">{s.label}</span>
+                {active && <ChevronRight size={14} className="ml-auto shrink-0" />}
+              </button>
+            )
+          })}
+        </nav>
+
+        {/* Right pane */}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+            {tab === 'profile' && (
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3 max-w-[1600px]">
         {/* Picture */}
         <Section title="Profile picture" description="This is how you appear to people you collaborate with.">
           <div className="flex flex-col gap-4 sm:flex-row">
@@ -282,7 +362,7 @@ export default function SettingsView() {
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className={buttonClass} disabled={busy} onClick={() => fileRef.current?.click()}>
                     <Upload size={13} />
-                    {busy ? 'Uploading…' : avatarUrl ? 'Replace picture' : 'Upload picture'}
+                    {busy ? 'Uploadingâ€¦' : avatarUrl ? 'Replace picture' : 'Upload picture'}
                   </button>
                   {avatarUrl && (
                     <button type="button" className={buttonClass} disabled={busy} onClick={() => void handleRemoveAvatar()}>
@@ -345,7 +425,7 @@ export default function SettingsView() {
                 placeholder="Your name"
               />
               <p className="mt-1 text-[11px] text-text-muted">
-                2–50 characters. Updates live across the app.
+                2â€“50 characters. Updates live across the app.
               </p>
             </div>
             <div>
@@ -367,9 +447,9 @@ export default function SettingsView() {
                 />
               </div>
               <p className="mt-1 text-[11px] text-text-muted">
-                3–24 chars: lowercase letters, numbers, underscore, dot. Shown in the mention picker.
+                3â€“24 chars: lowercase letters, numbers, underscore, dot. Shown in the mention picker.
               </p>
-              {checkingUsername && <p className="mt-1 text-[11px] text-text-muted">Checking availability…</p>}
+              {checkingUsername && <p className="mt-1 text-[11px] text-text-muted">Checking availabilityâ€¦</p>}
               {!checkingUsername && usernameAvailable === true && (
                 <p className="mt-1 text-[11px] text-success-text">Username is available.</p>
               )}
@@ -425,7 +505,7 @@ export default function SettingsView() {
                     {p || 'None'}
                   </option>
                 ))}
-                <option value="custom">Custom…</option>
+                <option value="custom">Customâ€¦</option>
               </select>
               {(draft.pronouns === '' || !PRONOUNS_OPTIONS.includes(draft.pronouns ?? '')) && (
                 <input
@@ -485,7 +565,7 @@ export default function SettingsView() {
                 Email
               </label>
               <input type="email" value={me?.user?.email ?? ''} readOnly className={`${inputClass} opacity-70`} />
-              <p className="mt-1 text-[11px] text-text-muted">Email changes require verification — coming soon.</p>
+              <p className="mt-1 text-[11px] text-text-muted">Email changes require verification â€” coming soon.</p>
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.05em] text-text-secondary">
@@ -538,6 +618,78 @@ export default function SettingsView() {
           <ProfileCard profile={previewProfile} />
         </Section>
       </div>
+            )}
+
+      {tab === 'account' && (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 max-w-[1600px]">
+          <Section title="Password" description="Change your password via the reset flow.">
+            <p className="text-[13px] text-text-secondary">
+              Use the &quot;Forgot password&quot; link on the sign-in page to reset your password.
+            </p>
+          </Section>
+          <Section title="Active sessions" description="Devices currently signed in.">
+            <p className="text-[13px] text-text-muted">Session management is not available yet.</p>
+          </Section>
+        </div>
+      )}
+
+      {tab === 'appearance' && (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 max-w-[1600px]">
+          <Section title="Theme" description="Follows your system preference.">
+            <p className="text-[13px] text-text-muted">Light / dark theme switching is not available yet.</p>
+          </Section>
+          <Section title="Density" description="Compact or comfortable spacing.">
+            <p className="text-[13px] text-text-muted">Density options are not available yet.</p>
+          </Section>
+          <Section title="Motion" description="Reduce animations.">
+            <p className="text-[13px] text-text-muted">Motion options are not available yet.</p>
+          </Section>
+        </div>
+      )}
+
+      {tab === 'notifications' && (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 max-w-[1600px]">
+          <Section title="In-app" description="Notifications shown in the app.">
+            <ul className="divide-y divide-border">
+              {['Mentions', 'Invitations', 'Card moves'].map((label) => (
+                <li key={label} className="flex items-center justify-between py-2.5">
+                  <span className="text-[13px] text-text-primary">{label}</span>
+                  <span className="text-[11px] text-text-muted">On</span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+          <Section title="Email" description="Email digests and alerts.">
+            <ul className="divide-y divide-border">
+              {['Weekly digest', 'Mentions', 'Invitations'].map((label) => (
+                <li key={label} className="flex items-center justify-between py-2.5">
+                  <span className="text-[13px] text-text-primary">{label}</span>
+                  <span className="text-[11px] text-text-muted">On</span>
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </div>
+      )}
+
+      {tab === 'sharing' && (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 max-w-[1600px]">
+          <Section title="Default visibility" description="Who can see your new boards by default.">
+            <p className="text-[13px] text-text-muted">Default visibility options are not available yet.</p>
+          </Section>
+          <Section title="Privacy" description="Control what is shared with collaborators.">
+            <p className="text-[13px] text-text-muted">Additional privacy controls are not available yet.</p>
+          </Section>
+        </div>
+      )}
+
+      {tab === 'danger' && (
+        <div className="grid grid-cols-1 gap-4 max-w-[1600px]">
+          <Section title="Delete account" description="Permanently remove your account and all data.">
+            <p className="text-[13px] text-text-muted">Account deletion is not available yet. Contact support.</p>
+          </Section>
+        </div>
+      )}
 
       {/* Save bar */}
       {dirty && (
@@ -553,7 +705,7 @@ export default function SettingsView() {
               onClick={() => void handleSave()}
               disabled={saving || (usernameAvailable === false)}
             >
-              {saving ? 'Saving…' : 'Save changes'}
+              {saving ? 'Savingâ€¦' : 'Save changes'}
             </button>
           </div>
         </div>
@@ -561,6 +713,7 @@ export default function SettingsView() {
       {saveMessage && !dirty && (
         <p className="mt-2 text-center text-[12px] text-success-text">{saveMessage}</p>
       )}
+    </div>
     </div>
 
     {cropFile && (
@@ -570,6 +723,7 @@ export default function SettingsView() {
         onConfirm={(blob) => void handleCroppedUpload(blob)}
       />
     )}
-    </>
+    </div>
+    </div>
   )
 }
