@@ -20,6 +20,8 @@ import Modal from '@/components/kali/shared/Modal'
 import { useQuery } from '@tanstack/react-query'
 import { useToast } from '@/components/kali/shared/useToastState'
 import { avatarDisplayUrl, colorFromId } from '@/components/kali/shared/Avatar'
+import { useStore } from '@/lib/kali/store/useStore'
+import { YOU_ID } from '@/lib/kali/store/schema'
 
 function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
@@ -63,6 +65,7 @@ type TabId = (typeof SECTIONS)[number]['id']
 export default function SettingsView() {
   const { data: me } = useMeQuery()
   const queryClient = useQueryClient()
+  const store = useStore()
   const { toast } = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -254,6 +257,7 @@ export default function SettingsView() {
       }
       queryClient.invalidateQueries({ queryKey: ['myProfile'] })
       queryClient.invalidateQueries({ queryKey: meQueryKey })
+      store.setCurrentUser({ avatarUrl: res.avatarUrl ?? null })
       setImgFailed(false)
       setUploadStatus('done')
       toast('Profile photo updated.', 'success')
@@ -284,6 +288,7 @@ export default function SettingsView() {
       await removeAvatar()
       queryClient.invalidateQueries({ queryKey: ['myProfile'] })
       queryClient.invalidateQueries({ queryKey: meQueryKey })
+      store.setCurrentUser({ avatarUrl: null })
       setImgFailed(true)
       setUploadStatus('done')
       toast('Profile photo removed.', 'success')

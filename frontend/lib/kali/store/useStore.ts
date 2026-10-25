@@ -30,6 +30,8 @@ export interface StoreUser {
   id: string;
   name: string;
   workspaceId: string | null;
+  avatarUrl?: string | null;
+  avatarColor?: string | null;
 }
 
 /** A board invitation addressed to the signed-in person. */
@@ -142,6 +144,17 @@ export interface Store {
   pendingBoardId: string | null;
   /** The signed-in account id, for spotting "you" in a people list. */
   currentUserId: string | null;
+
+  /**
+   * Updates the signed-in person's own store record (name, avatar) so the
+   * header chip, sidebar, comment composer and every comment/member avatar
+   * reflect the change without a reload.
+   */
+  setCurrentUser: (patch: {
+    name?: string;
+    avatarUrl?: string | null;
+    avatarColor?: string | null;
+  }) => void;
 
   /** Can the signed-in person change this board's content? */
   canWrite: (boardId: string) => boolean;

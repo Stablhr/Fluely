@@ -4,6 +4,10 @@ export interface Member {
   id: string;
   name: string;
   color: string;
+  /** Cloudinary URL of the profile picture, when one is uploaded. */
+  avatarUrl?: string | null;
+  /** Initials background color shown when there is no picture. */
+  avatarColor?: string | null;
 }
 
 export interface Label {

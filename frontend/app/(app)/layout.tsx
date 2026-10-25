@@ -89,6 +89,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           currentUser={{
             id: user.id,
             name: getDisplayName(user),
+            avatarUrl: user.avatarUrl ?? null,
+            avatarColor: user.avatarColor ?? null,
             workspaceId: user.workspaceId ?? null,
           }}
         >

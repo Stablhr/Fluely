@@ -26,7 +26,7 @@ import {
   canWriteBoard,
   canManageBoard,
 } from "./schema";
-import { clearData, loadData, saveData } from "./storage";
+import { clearData, loadData, saveData, storageKey } from "./storage";
 import { StoreContext } from "./useStore";
 import type {
   KickSignal,
@@ -356,14 +356,28 @@ function isRevisionConflict(error: unknown): boolean {
  * An empty name is ignored, so a response that somehow lacks one falls back to
  * the seeded "You" rather than blanking the chip.
  */
-function withUserName(data: AppData, name: string | undefined): AppData {
-  const trimmed = name?.trim();
+function withCurrentUser(
+  data: AppData,
+  currentUser: StoreUser | undefined,
+): AppData {
   const member = data.members[YOU_ID];
-  if (!trimmed || !member || member.name === trimmed) return data;
-
+  if (!member) return data;
+  const name = currentUser?.name ?? member.name;
+  const avatarUrl = currentUser?.avatarUrl ?? member.avatarUrl ?? null;
+  const avatarColor = currentUser?.avatarColor ?? member.avatarColor ?? null;
+  if (
+    member.name === name &&
+    member.avatarUrl === avatarUrl &&
+    member.avatarColor === avatarColor
+  ) {
+    return data;
+  }
   return {
     ...data,
-    members: { ...data.members, [YOU_ID]: { ...member, name: trimmed } },
+    members: {
+      ...data.members,
+      [YOU_ID]: { ...member, name, avatarUrl, avatarColor },
+    },
   };
 }
 
@@ -444,7 +458,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
      name first. Every account change unmounts this — sign-out and sign-in both
      swap the whole route tree — so a remount always re-reads the name. */
   const [data, setData] = useState<AppData>(() =>
-    withUserName(loadData(currentUser?.id), currentUser?.name),
+    withCurrentUser(loadData(currentUser?.id), currentUser),
   );
   const [error, setError] = useState<string | null>(null);
   const [pendingBoardId, setPendingBoardId] = useState<string | null>(null);
@@ -3306,8 +3320,64 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     clearData(currentUser?.id);
     // Through `mutate`, not `setData`, so `dataRef` swaps with it -- a later
     // mutation against the stale ref would resurrect the cleared store.
-    mutate(() => withUserName(emptyData(), currentUser?.name));
+    mutate(() => withCurrentUser(emptyData(), currentUser));
   };
+
+  const setCurrentUser = useCallback(
+    (patch: {
+      name?: string;
+      avatarUrl?: string | null;
+      avatarColor?: string | null;
+    }) => {
+      mutate((prev) => {
+        const member = prev.members[YOU_ID];
+        if (!member) return prev;
+        const next = { ...member, ...patch };
+        return {
+          ...prev,
+          members: { ...prev.members, [YOU_ID]: next },
+        };
+      });
+    },
+    [mutate],
+  );
+
+  /* ── Cross-tab sync: the signed-in person's own record ──────────────
+     One tab's Settings avatar/name change writes through `mutate` →
+     `saveData` → localStorage, which fires a `storage` event in every other
+     tab. Mirror the current user's avatar/name into this tab's store so the
+     header chip, composer and comments update without a reload. */
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const key = storageKey(currentUser.id);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== key || !e.newValue) return;
+      let next: AppData;
+      try {
+        next = JSON.parse(e.newValue) as AppData;
+      } catch {
+        return;
+      }
+      const you = next?.members?.[YOU_ID];
+      const local = dataRef.current.members[YOU_ID];
+      if (!you || !local) return;
+      const changed =
+        you.avatarUrl !== local.avatarUrl ||
+        you.avatarColor !== local.avatarColor ||
+        you.name !== local.name;
+      if (!changed) return;
+      setData((prev) => ({
+        ...prev,
+        members: {
+          ...prev.members,
+          [YOU_ID]: { ...local, avatarUrl: you.avatarUrl, avatarColor: you.avatarColor, name: you.name },
+        },
+      }));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [currentUser?.id]);
 
   /* ── Social Posts (delegated to useSocialPosts hook) ──────────── */
 
@@ -3482,6 +3552,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     loadBoardActivity,
 
     resetAll,
+    setCurrentUser,
     socialPosts: social.posts,
     socialJobs: social.jobs,
     addSocialPost,

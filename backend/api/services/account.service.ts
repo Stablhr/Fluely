@@ -85,6 +85,82 @@ async function sharesBoard(viewerId: Types.ObjectId, targetId: Types.ObjectId, b
  * and the account keeps the Cloudinary `public_id` precisely so replacing a
  * picture can destroy the asset it replaces rather than leaking it.
  */
+/**
+ * Central serializer for every user object that leaves the server to a client
+ * that is not the account owner.
+ *
+ * Visibility is enforced here, never in the UI: a field whose visibility is not
+ * `boards` is simply `null` in the payload. Missing visibility is treated as
+ * `me` (fail closed). Only the account themself ever sees their own email and
+ * phone, and `jobTitle`/`bio`/`pronouns`/`timezone` are only returned to people
+ * who share a board with the account.
+ */
+export function serializePublicProfile(
+  target: {
+    _id?: unknown;
+    id?: string;
+    email?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    displayName?: string | null;
+    username?: string | null;
+    avatarUrl?: string | null;
+    avatarColor?: string | null;
+    accentColor?: string | null;
+    jobTitle?: string | null;
+    bio?: string | null;
+    pronouns?: string | null;
+    timezone?: string | null;
+    phone?: string | null;
+    profileVisibility?: Record<string, 'me' | 'boards'> | null;
+    createdAt?: unknown;
+  },
+  viewerId: string | null,
+): {
+  id: string;
+  displayName: string | null;
+  username: string | null;
+  avatarUrl: string | null;
+  avatarColor: string | null;
+  accentColor: string | null;
+  jobTitle: string | null;
+  bio: string | null;
+  pronouns: string | null;
+  timezone: string | null;
+  email: string | null;
+  phone: string | null;
+  createdAt: unknown;
+} {
+  const id = String(target._id ?? target.id ?? '');
+  const isSelf = viewerId != null && id === String(viewerId);
+  const visibility: Record<string, 'me' | 'boards'> = target.profileVisibility ?? {};
+  const emailVis = visibility.email ?? 'me';
+  const phoneVis = visibility.phone ?? 'me';
+  const othersVis = visibility.others ?? 'me';
+  const showEmail = isSelf || emailVis === 'boards';
+  const showPhone = isSelf || phoneVis === 'boards';
+  const showOthers = isSelf || othersVis !== 'me';
+  const displayName =
+    (target.displayName ??
+      `${target.firstName ?? ''} ${target.lastName ?? ''}`.trim())
+    || null;
+  return {
+    id,
+    displayName,
+    username: target.username ?? null,
+    avatarUrl: target.avatarUrl ?? null,
+    avatarColor: target.avatarColor ?? null,
+    accentColor: target.accentColor ?? null,
+    jobTitle: showOthers ? (target.jobTitle ?? null) : null,
+    bio: showOthers ? (target.bio ?? null) : null,
+    pronouns: showOthers ? (target.pronouns ?? null) : null,
+    timezone: showOthers ? (target.timezone ?? null) : null,
+    email: showEmail ? (target.email ?? null) : null,
+    phone: showPhone ? (target.phone ?? null) : null,
+    createdAt: target.createdAt,
+  };
+}
+
 export const accountService = {
   async uploadAvatar(userId: Types.ObjectId, file: Express.Multer.File) {
     const existing = await userRepository.findById(userId.toString());
@@ -219,25 +295,8 @@ export const accountService = {
       if (!shared) throw new ApiError(404, ErrorCodes.USER_NOT_FOUND, 'Profile not found');
     }
 
-    const visibility = target.profileVisibility ?? {};
-    const showEmail = isSelf || visibility.email === 'boards';
-    const showPhone = isSelf || visibility.phone === 'boards';
-    const showOthers = isSelf || visibility.others !== 'me';
-
-    return {
-      id: target._id.toString(),
-      displayName: target.displayName || `${target.firstName} ${target.lastName}`.trim(),
-      username: target.username ?? null,
-      avatarUrl: target.avatarUrl ?? null,
-      avatarColor: target.avatarColor ?? null,
-      accentColor: target.accentColor ?? null,
-      jobTitle: showOthers ? (target.jobTitle ?? null) : null,
-      bio: showOthers ? (target.bio ?? null) : null,
-      pronouns: showOthers ? (target.pronouns ?? null) : null,
-      timezone: showOthers ? (target.timezone ?? null) : null,
-      email: showEmail ? target.email : null,
-      phone: showPhone ? (target.phone ?? null) : null,
-      createdAt: target.createdAt,
-    };
+    // Visibility is enforced by the serializer: fields the viewer is not
+    // allowed to see come back as `null` and never reach the client.
+    return serializePublicProfile(target, viewerId.toString());
   }
 };

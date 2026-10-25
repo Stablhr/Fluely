@@ -1,5 +1,7 @@
 // Quick check for mojibake patterns in source files.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path')
 
 const ROOT = path.resolve(__dirname, '..')

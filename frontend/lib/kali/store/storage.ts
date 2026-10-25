@@ -4,6 +4,8 @@ import { emptyData } from "./schema";
 function storageKey(userId?: string | null): string {
   return userId ? `kali_data:${userId}` : "kali_data";
 }
+
+export { storageKey };
 const SCHEMA_VERSION = 1;
 
 /**
