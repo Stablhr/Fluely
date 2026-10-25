@@ -409,7 +409,7 @@ export default function SettingsView() {
             {tab === 'profile' && (
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
                 {/* Identity */}
-                <section className="order-1 rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:col-start-1">
+                <section className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:col-start-1 lg:row-start-1">
                   <h2 className="text-[15px] font-semibold text-text-primary">Identity</h2>
                   <p className="mt-0.5 text-[13px] text-text-secondary">How you appear to collaborators.</p>
                   <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
@@ -612,7 +612,7 @@ export default function SettingsView() {
                 </section>
 
                 {/* Preview (mobile: right after identity; desktop: right column sticky) */}
-                <section className="order-2 rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:order-none lg:col-start-2 lg:row-start-1 lg:sticky lg:top-4">
+                <section className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:col-start-2 lg:row-start-1 lg:sticky lg:top-4">
                   <h2 className="text-[15px] font-semibold text-text-primary">Preview</h2>
                   <p className="mt-0.5 text-[13px] text-text-secondary">This is how collaborators see your profile.</p>
                   <p className="mt-1 text-[11px] text-text-muted">Previewing as: a collaborator</p>
@@ -622,7 +622,7 @@ export default function SettingsView() {
                 </section>
 
                 {/* About you */}
-                <section className="order-3 rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:order-none lg:col-start-1">
+                <section className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:col-start-1 lg:row-start-2">
                   <h2 className="text-[15px] font-semibold text-text-primary">About you</h2>
                   <p className="mt-0.5 text-[13px] text-text-secondary">Optional details collaborators can see.</p>
                   <div className="mt-4 space-y-3">
@@ -714,7 +714,7 @@ export default function SettingsView() {
                 </section>
 
                 {/* Contact & visibility */}
-                <section className="order-4 rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:order-none lg:col-start-1">
+                <section className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5 lg:col-start-1 lg:row-start-3">
                   <h2 className="text-[15px] font-semibold text-text-primary">Contact & visibility</h2>
                   <p className="mt-0.5 text-[13px] text-text-secondary">Only the fields you share appear on your profile card.</p>
                   <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
