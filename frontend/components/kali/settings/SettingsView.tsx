@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useRef, useState, useEffect, useMemo } from 'react'
-import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield, ChevronRight } from 'lucide-react'
+import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield } from 'lucide-react'
 import AvatarCropModal from './AvatarCropModal'
 import { useQueryClient } from '@tanstack/react-query'
 import { meQueryKey, useMeQuery } from '@/lib/hooks/auth/useMeQuery'
@@ -47,12 +47,12 @@ const PRONOUNS_OPTIONS = ['', 'he/him', 'she/her', 'they/them', 'custom']
 const ACCENT_SWATCHES = ['#3971b8', '#c8d69b', '#f6e6a5', '#ff8b5e', '#8b7cf6', '#33b27a', '#ff5e6c']
 
 const SECTIONS = [
-  { id: 'profile', label: 'Profile', icon: User },
-  { id: 'account', label: 'Account & Security', icon: Lock },
-  { id: 'appearance', label: 'Appearance', icon: Palette },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'sharing', label: 'Sharing & Privacy', icon: Shield },
-  { id: 'danger', label: 'Danger Zone', icon: AlertTriangle },
+  { id: 'profile', label: 'Profile', icon: User, description: 'How you appear to collaborators.' },
+  { id: 'account', label: 'Account & Security', icon: Lock, description: 'Password, sessions, and account access.' },
+  { id: 'appearance', label: 'Appearance', icon: Palette, description: 'Theme, density, and motion.' },
+  { id: 'notifications', label: 'Notifications', icon: Bell, description: 'In-app and email alerts.' },
+  { id: 'sharing', label: 'Sharing & Privacy', icon: Shield, description: 'Default visibility and privacy.' },
+  { id: 'danger', label: 'Danger Zone', icon: AlertTriangle, description: 'Destructive actions.' },
 ] as const
 
 type TabId = (typeof SECTIONS)[number]['id']
@@ -274,6 +274,8 @@ export default function SettingsView() {
     createdAt: profile?.createdAt ?? new Date().toISOString(),
   }
 
+  const activeSection = SECTIONS.find((s) => s.id === tab)!
+
   const localTime = useMemo(() => {
     const tz = draft.timezone ?? profile?.timezone
     if (!tz) return null
@@ -325,15 +327,17 @@ export default function SettingsView() {
                 key={s.id}
                 type="button"
                 onClick={() => setTab(s.id)}
-                className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+                className={`group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ${
                   active
                     ? 'bg-primary-subtle text-primary-hover'
                     : 'text-text-secondary hover:bg-surface-alt hover:text-text-primary'
                 }`}
               >
+                {active && (
+                  <span className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-primary" />
+                )}
                 <Icon size={16} className="shrink-0" />
                 <span className="truncate">{s.label}</span>
-                {active && <ChevronRight size={14} className="ml-auto shrink-0" />}
               </button>
             )
           })}
@@ -341,7 +345,13 @@ export default function SettingsView() {
 
         {/* Right pane */}
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="scroll-slim flex-1 overflow-y-auto p-4 sm:p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-text-primary">{activeSection.label}</h2>
+                <p className="text-[12px] text-text-muted">{activeSection.description}</p>
+              </div>
+            </div>
             {tab === 'profile' && (
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3 max-w-[1600px]">
         {/* Picture */}
@@ -693,7 +703,7 @@ export default function SettingsView() {
 
       {/* Save bar */}
       {dirty && (
-        <div className="sticky bottom-0 mt-4 flex items-center justify-between gap-2 rounded-card border border-border-strong bg-surface-elevated px-4 py-3 shadow-medium">
+        <div className="sticky bottom-0 mt-4 flex items-center justify-between gap-2 rounded-card border border-border-strong bg-surface-elevated/95 px-4 py-3 shadow-medium backdrop-blur">
           <span className="text-[12px] text-text-secondary">You have unsaved changes.</span>
           <div className="flex gap-2">
             <button type="button" className={buttonClass} onClick={handleDiscard}>
