@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { User, Briefcase, Mail, Phone, Clock } from 'lucide-react'
 import { getPublicProfile, type PublicProfile } from '@/lib/api/profileApi'
+import { avatarDisplayUrl, colorFromId } from '@/components/kali/shared/Avatar'
 
 export type { PublicProfile }
 
@@ -15,12 +16,6 @@ type Props = {
   className?: string
 }
 
-export function colorFromId(id: string): string {
-  const palette = ['#3971b8', '#c8d69b', '#f6e6a5', '#ff8b5e', '#8b7cf6', '#33b27a', '#ff5e6c', '#4aa8ff']
-  let hash = 0
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0
-  return palette[hash % palette.length]
-}
 
 function initials(name: string) {
   return name
@@ -55,17 +50,19 @@ export function ProfileCard({
   const color = profile.avatarColor || colorFromId(profile.id)
   const accent = profile.accentColor || '#3971b8'
   const time = localTime(profile.timezone)
+  const [imgFailed, setImgFailed] = useState(false)
 
   return (
     <div className={`overflow-hidden rounded-2xl border border-border bg-surface shadow-medium ${className}`}>
       <div className="h-16 w-full" style={{ background: accent }} />
       <div className="px-5 pb-5">
         <div className="-mt-8 flex items-end gap-3">
-          {profile.avatarUrl ? (
+          {profile.avatarUrl && !imgFailed ? (
             <img
-              src={profile.avatarUrl}
+              src={avatarDisplayUrl(profile.avatarUrl, 128) ?? profile.avatarUrl!}
               alt={name}
               className="h-16 w-16 shrink-0 rounded-full border-4 border-surface object-cover shadow-subtle"
+              onError={() => setImgFailed(true)}
             />
           ) : (
             <span

@@ -19,6 +19,7 @@ export type AvatarResponse = {
 export async function uploadAvatar(
   file: File,
   onProgress?: (percent: number) => void,
+  signal?: AbortSignal,
 ): Promise<AvatarResponse> {
   const form = new FormData();
   form.append("file", file);
@@ -32,6 +33,7 @@ export async function uploadAvatar(
         onProgress(Math.round((event.loaded / event.total) * 100));
       }
     },
+    signal,
   });
 
   return data;

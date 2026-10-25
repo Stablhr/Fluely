@@ -15,8 +15,10 @@ import {
 } from '@/lib/api/profileApi'
 import { getFriendlyErrorMessage } from '@/lib/api/getFriendlyErrorMessage'
 import { formatSize } from '@/lib/kali/utils/format'
-import { ProfileCard, colorFromId } from '@/components/kali/shared/ProfileCard'
+import { ProfileCard } from '@/components/kali/shared/ProfileCard'
 import { useQuery } from '@tanstack/react-query'
+import { useToast } from '@/components/kali/shared/useToastState'
+import { avatarDisplayUrl, colorFromId } from '@/components/kali/shared/Avatar'
 
 function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
@@ -60,10 +62,17 @@ type TabId = (typeof SECTIONS)[number]['id']
 export default function SettingsView() {
   const { data: me } = useMeQuery()
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cropFile, setCropFile] = useState<File | null>(null)
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'preparing' | 'uploading' | 'processing' | 'done' | 'error'>('idle')
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [imgFailed, setImgFailed] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const uploadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [tab, setTabState] = useState<TabId>('profile')
   const setTab = (t: TabId) => {
@@ -209,31 +218,79 @@ export default function SettingsView() {
 
   const handleCroppedUpload = async (blob: Blob) => {
     setCropFile(null)
-    setBusy(true)
+    setUploadStatus('preparing')
+    setUploadProgress(0)
+    setUploadError(null)
     setError(null)
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    // Timeout guard: never leave the avatar stuck loading.
+    if (uploadTimerRef.current) clearTimeout(uploadTimerRef.current)
+    uploadTimerRef.current = setTimeout(() => {
+      controller.abort()
+      setUploadStatus('error')
+      setUploadError('Upload timed out. Please try again.')
+      toast('Upload timed out. Please try again.', 'error')
+    }, 60_000)
+
     try {
       const file = new File([blob], 'avatar.png', { type: 'image/png' })
-      await uploadAvatar(file)
+      setUploadStatus('uploading')
+      const res = await uploadAvatar(file, (pct) => {
+        setUploadProgress(pct)
+        if (pct >= 100) setUploadStatus('processing')
+      }, controller.signal)
+      // Preload the new image before swapping to avoid a blank flash.
+      if (res.avatarUrl) {
+        await new Promise<void>((resolve) => {
+          const img = new Image()
+          img.onload = () => resolve()
+          img.onerror = () => resolve()
+          img.src = res.avatarUrl as string
+        })
+      }
       queryClient.invalidateQueries({ queryKey: ['myProfile'] })
       queryClient.invalidateQueries({ queryKey: meQueryKey })
+      setImgFailed(false)
+      setUploadStatus('done')
+      toast('Profile photo updated.', 'success')
+      setTimeout(() => setUploadStatus('idle'), 1500)
     } catch (err) {
-      setError(getFriendlyErrorMessage(err, 'Could not upload that picture. Please try again.'))
+      if (controller.signal.aborted) {
+        // handled by timeout or manual cancel
+      } else {
+        const msg = getFriendlyErrorMessage(err, 'Could not upload that picture. Please try again.')
+        setUploadError(msg)
+        setUploadStatus('error')
+        toast(msg, 'error')
+      }
     } finally {
-      setBusy(false)
+      if (uploadTimerRef.current) {
+        clearTimeout(uploadTimerRef.current)
+        uploadTimerRef.current = null
+      }
+      abortRef.current = null
     }
   }
 
   const handleRemoveAvatar = async () => {
-    setBusy(true)
+    setUploadStatus('processing')
+    setUploadError(null)
     setError(null)
     try {
       await removeAvatar()
       queryClient.invalidateQueries({ queryKey: ['myProfile'] })
       queryClient.invalidateQueries({ queryKey: meQueryKey })
+      setImgFailed(true)
+      setUploadStatus('done')
+      toast('Profile photo removed.', 'success')
+      setTimeout(() => setUploadStatus('idle'), 1500)
     } catch (err) {
-      setError(getFriendlyErrorMessage(err, 'Could not remove your profile picture.'))
-    } finally {
-      setBusy(false)
+      const msg = getFriendlyErrorMessage(err, 'Could not remove your profile picture.')
+      setUploadError(msg)
+      setUploadStatus('error')
+      toast(msg, 'error')
     }
   }
 
@@ -355,29 +412,100 @@ export default function SettingsView() {
                   <p className="mt-0.5 text-[13px] text-text-secondary">How you appear to collaborators.</p>
                   <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start">
                     <div className="flex flex-col items-center gap-2 sm:w-[110px]">
-                      {avatarUrl ? (
-                        <img src={avatarUrl} alt="Avatar" className="h-24 w-24 rounded-full border border-border object-cover shadow-subtle" />
-                      ) : (
-                        <span
-                          className="flex h-24 w-24 items-center justify-center rounded-full text-[22px] font-semibold text-white shadow-subtle"
-                          style={{ background: avatarColor }}
-                        >
-                          {displayName.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase() || '?'}
-                        </span>
+                      <div className="group relative h-24 w-24 cursor-pointer" onClick={() => { if (uploadStatus === "idle" || uploadStatus === "done" || uploadStatus === "error") fileRef.current?.click() }} onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("ring-2","ring-primary") }} onDragLeave={(e) => { e.currentTarget.classList.remove("ring-2","ring-primary") }} onDrop={(e) => { e.preventDefault(); e.currentTarget.classList.remove("ring-2","ring-primary"); const f = e.dataTransfer.files?.[0]; if (f) void handleUpload(f) }}>
+                        {avatarUrl && !imgFailed ? (
+                          <img
+                            key={avatarUrl}
+                            src={avatarDisplayUrl(avatarUrl, 192) ?? avatarUrl}
+                            alt="Avatar"
+                            className="h-24 w-24 rounded-full border border-border object-cover object-center shadow-subtle"
+                            onError={() => setImgFailed(true)}
+                          />
+                        ) : (
+                          <span
+                            className="flex h-24 w-24 items-center justify-center rounded-full text-[22px] font-semibold text-white shadow-subtle"
+                            style={{ background: avatarColor }}
+                          >
+                            {displayName.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase() || '?'}
+                          </span>
+                        )}
+                        {(uploadStatus === 'uploading' || uploadStatus === 'processing' || uploadStatus === 'preparing') && (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                            <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64" aria-hidden="true">
+                              <circle cx="32" cy="32" r="28" stroke="rgba(255,255,255,0.25)" strokeWidth="4" fill="none" />
+                              <circle
+                                cx="32" cy="32" r="28"
+                                stroke="#ffffff" strokeWidth="4" fill="none"
+                                strokeDasharray={2 * Math.PI * 28}
+                                strokeDashoffset={uploadStatus === 'uploading' ? (2 * Math.PI * 28) * (1 - uploadProgress / 100) : 2 * Math.PI * 28 * 0.25}
+                                className={uploadStatus !== 'uploading' ? 'animate-spin' : ''}
+                                style={{ transformOrigin: 'center' }}
+                              />
+                            </svg>
+                            <span className="absolute text-[10px] font-semibold text-white">
+                              {uploadStatus === 'preparing' ? '...' : uploadStatus === 'processing' ? '...' : `${uploadProgress}%`}
+                            </span>
+                          </div>
+                        )}
+                        {uploadStatus === 'done' && (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-success/40">
+                            <span className="text-white text-xl">✓</span>
+                          </div>
+                        )}
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/0 opacity-0 transition-opacity group-hover:bg-black/40 group-hover:opacity-100">
+                        <Upload size={20} className="text-white" />
+                      </div>
+                      </div>
+                      {uploadStatus === 'error' && uploadError && (
+                        <p className="mt-1 text-center text-[11px] text-danger-text">{uploadError}</p>
                       )}
                       <div className="flex flex-wrap justify-center gap-1.5">
-                        <button type="button" className={buttonClass} disabled={busy} onClick={() => fileRef.current?.click()}>
+                        <button
+                          type="button"
+                          className={buttonClass}
+                          disabled={uploadStatus !== 'idle' && uploadStatus !== 'done' && uploadStatus !== 'error'}
+                          onClick={() => fileRef.current?.click()}
+                        >
                           <Upload size={13} />
-                          {busy ? 'Uploading...' : avatarUrl ? 'Replace' : 'Upload'}
+                          {uploadStatus === 'uploading' ? 'Uploading...' : uploadStatus === 'processing' ? 'Processing...' : avatarUrl ? 'Replace' : 'Upload'}
                         </button>
                         {avatarUrl && (
-                          <button type="button" className={buttonClass} disabled={busy} onClick={() => void handleRemoveAvatar()}>
+                          <button
+                            type="button"
+                            className={buttonClass}
+                            disabled={uploadStatus !== 'idle' && uploadStatus !== 'done' && uploadStatus !== 'error'}
+                            onClick={() => void handleRemoveAvatar()}
+                          >
                             <Trash2 size={13} />
                             Remove
                           </button>
                         )}
+                        {(uploadStatus === 'uploading' || uploadStatus === 'processing') && (
+                          <button
+                            type="button"
+                            className={buttonClass}
+                            onClick={() => { abortRef.current?.abort(); setUploadStatus('idle'); setUploadError(null) }}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        {uploadStatus === 'error' && (
+                          <button
+                            type="button"
+                            className={buttonClass}
+                            onClick={() => { setUploadStatus('idle'); setUploadError(null); fileRef.current?.click() }}
+                          >
+                            Try again
+                          </button>
+                        )}
                       </div>
                       <p className="text-center text-[11px] text-text-muted">JPG, PNG, or WebP up to 5 MB.</p>
+                      <div aria-live="polite" className="sr-only">
+                        {uploadStatus === 'uploading' && `Uploading your photo ${uploadProgress} percent`}
+                        {uploadStatus === 'processing' && 'Processing your photo'}
+                        {uploadStatus === 'done' && 'Profile photo updated'}
+                        {uploadStatus === 'error' && (uploadError ?? 'Upload failed')}
+                      </div>
                       {!avatarUrl && (
                         <div className="mt-1 w-full">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-text-secondary">Initials color</p>
