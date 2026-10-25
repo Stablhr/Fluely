@@ -28,14 +28,16 @@ export type AuthUser = {
   firstName: string;
   lastName: string;
   username?: string;
-  /**
-   * Cloudinary URL of the profile picture, or `null` when none is set.
-   *
-   * Optional because an admin account never gets one, and because a response
-   * predating the field simply omits it — callers must treat `null` and
-   * `undefined` the same way rather than assuming a picture exists.
-   */
   avatarUrl?: string | null;
+  avatarColor?: string | null;
+  displayName?: string | null;
+  jobTitle?: string | null;
+  bio?: string | null;
+  pronouns?: string | null;
+  timezone?: string | null;
+  accentColor?: string | null;
+  phone?: string | null;
+  profileVisibility?: Record<string, 'me' | 'boards'> | null;
   /**
    * The person's primary workspace, as the backend reports it.
    *
@@ -64,6 +66,8 @@ type MeResponse = {
  */
 export function getDisplayName(user: AuthUser | undefined): string {
   if (!user) return "";
+
+  if (user.displayName?.trim()) return user.displayName.trim();
 
   const full = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
   if (full) return full;

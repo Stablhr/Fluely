@@ -289,6 +289,19 @@ export const mediaListQuerySchema = paginationQuerySchema.extend({
   search: text(200).optional()
 });
 
+export const profilePatchSchema = z.object({
+  displayName: z.string().trim().min(2).max(50).optional().nullable(),
+  username: z.string().trim().toLowerCase().regex(/^[a-z0-9_.]{3,24}$/).optional().nullable(),
+  jobTitle: z.string().trim().max(60).optional().nullable(),
+  bio: z.string().trim().max(160).optional().nullable(),
+  pronouns: z.string().trim().max(30).optional().nullable(),
+  timezone: z.string().trim().max(60).optional().nullable(),
+  accentColor: z.string().trim().max(30).optional().nullable(),
+  avatarColor: z.string().trim().max(30).optional().nullable(),
+  phone: z.string().trim().max(40).optional().nullable(),
+  profileVisibility: z.record(z.enum(['me', 'boards'])).optional().nullable()
+});
+
 /** Scope for a direct-to-Cloudinary upload (video / large files). */
 export const mediaSignatureSchema = z.object({
   boardId: objectId.optional(),

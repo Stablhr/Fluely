@@ -44,6 +44,15 @@ export type PublicAccount = {
    * it should not leave the server.
    */
   avatarUrl: string | null;
+  avatarColor?: string | null;
+  displayName?: string | null;
+  jobTitle?: string | null;
+  bio?: string | null;
+  pronouns?: string | null;
+  timezone?: string | null;
+  accentColor?: string | null;
+  phone?: string | null;
+  profileVisibility?: Record<string, 'me' | 'boards'> | null;
   workspaceId: string | null;
 };
 
@@ -63,6 +72,15 @@ export function toPublicAccount(
     lastName: string;
     username?: string;
     avatarUrl?: string | null;
+    avatarColor?: string | null;
+    displayName?: string | null;
+    jobTitle?: string | null;
+    bio?: string | null;
+    pronouns?: string | null;
+    timezone?: string | null;
+    accentColor?: string | null;
+    phone?: string | null;
+    profileVisibility?: Record<string, 'me' | 'boards'> | null;
     workspaceId?: unknown;
   },
   type: 'user' | 'admin'
@@ -75,6 +93,15 @@ export function toPublicAccount(
     lastName: account.lastName,
     username: account.username,
     avatarUrl: account.avatarUrl ?? null,
+    avatarColor: account.avatarColor ?? null,
+    displayName: account.displayName ?? null,
+    jobTitle: account.jobTitle ?? null,
+    bio: account.bio ?? null,
+    pronouns: account.pronouns ?? null,
+    timezone: account.timezone ?? null,
+    accentColor: account.accentColor ?? null,
+    phone: account.phone ?? null,
+    profileVisibility: account.profileVisibility ?? null,
     workspaceId: account.workspaceId ? String(account.workspaceId) : null
   };
 }

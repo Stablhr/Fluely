@@ -11,6 +11,7 @@ import { formatDateTime } from '@/lib/kali/utils/dates'
 import { hasUserCommentReaction, toggleUserCommentReaction } from '@/lib/kali/utils/reactions'
 import SectionLabel from '../shared/SectionLabel'
 import Avatar from '../shared/Avatar'
+import ProfilePopover from '../shared/ProfilePopover'
 
 function parseMentions(text: string): { type: 'text' | 'mention'; value: string; userId?: string; name?: string }[] {
   const parts: { type: 'text' | 'mention'; value: string; userId?: string; name?: string }[] = []
@@ -333,7 +334,16 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
 
     return (
       <div key={comment.id} ref={(el) => { commentRefs.current[comment.id] = el }} className="flex items-start gap-2 rounded-lg transition-all">
-        <Avatar member={author} size={36} />
+        <ProfilePopover
+          userId={
+            comment.authorId === YOU_ID || comment.authorId === store.currentUserId
+              ? (store.currentUserId ?? comment.authorId)
+              : comment.authorId
+          }
+          boardId={card.boardId}
+        >
+          <Avatar member={author} size={36} />
+        </ProfilePopover>
         <div className="min-w-0 flex-1">
           <div className="rounded-2xl bg-brand-vanilla/15 px-4 py-3 dark:bg-brand-vanilla/10">
             <div className="flex items-baseline gap-2">

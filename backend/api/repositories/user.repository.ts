@@ -16,7 +16,21 @@ export const userRepository = {
     data: Partial<
       Pick<
         UserDocument,
-        'firstName' | 'lastName' | 'username' | 'email'
+        | 'firstName'
+        | 'lastName'
+        | 'username'
+        | 'email'
+        | 'displayName'
+        | 'jobTitle'
+        | 'bio'
+        | 'pronouns'
+        | 'timezone'
+        | 'avatarColor'
+        | 'accentColor'
+        | 'phone'
+        | 'profileVisibility'
+        | 'lastUsernameChangeAt'
+        | 'lastDisplayNameChangeAt'
       >
     >
   ) => UserModel.updateOne({_id: userId}, data).exec(),
