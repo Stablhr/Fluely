@@ -293,6 +293,7 @@ export default function ShareModal({
                           id: person.id,
                           name: person.name,
                           color: colorFor(person.userId),
+                          avatarUrl: person.avatarUrl ?? null,
                         }}
                         size={34}
                       />

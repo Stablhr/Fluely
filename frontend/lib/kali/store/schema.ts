@@ -66,6 +66,8 @@ export interface Collaborator {
   invitedByName: string;
   invitedAt: string;
   respondedAt: string | null;
+  /** Cloudinary URL of the profile picture, or `null` when none is set. */
+  avatarUrl?: string | null;
 }
 
 export interface FileAttachment {

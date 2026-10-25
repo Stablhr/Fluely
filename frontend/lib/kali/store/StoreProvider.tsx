@@ -289,6 +289,7 @@ function boardMembersFor(
         board.ownerName?.trim() ||
         "Board owner",
       color: local?.color ?? memberColorFor(board.ownerId),
+      avatarUrl: local?.avatarUrl ?? null,
     });
   }
 
@@ -304,6 +305,7 @@ function boardMembersFor(
         collaborator.email ||
         "Collaborator",
       color: local?.color ?? memberColorFor(collaborator.userId),
+      avatarUrl: local?.avatarUrl ?? collaborator.avatarUrl ?? null,
     });
   }
 

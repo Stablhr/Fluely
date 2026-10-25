@@ -22,6 +22,7 @@ type Person = {
   lastName: string;
   email: string;
   username?: string;
+  avatarUrl?: string | null;
 };
 
 function serializeCollaborator(
@@ -47,7 +48,8 @@ function serializeCollaborator(
     firstName: person?.firstName ?? '',
     lastName: person?.lastName ?? '',
     email: person?.email ?? '',
-    username: person?.username
+    username: person?.username,
+    avatarUrl: person?.avatarUrl ?? null,
   };
 }
 

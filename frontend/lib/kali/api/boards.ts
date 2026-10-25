@@ -68,6 +68,8 @@ export interface CollaboratorDto {
   lastName: string;
   email: string;
   username: string | null;
+  /** Cloudinary URL of the profile picture, or `null` when none is set. */
+  avatarUrl: string | null;
 }
 
 /** Mirrors `BoardMember` in `boardMember.service.ts`: owner + accepted collaborators. */
@@ -119,6 +121,7 @@ export function toCollaborator(dto: CollaboratorDto): Collaborator {
     invitedByName: "",
     invitedAt: dto.invitedAt,
     respondedAt: dto.respondedAt,
+    avatarUrl: dto.avatarUrl ?? null,
   };
 }
 
