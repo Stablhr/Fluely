@@ -16,6 +16,7 @@ import {
 import { getFriendlyErrorMessage } from '@/lib/api/getFriendlyErrorMessage'
 import { formatSize } from '@/lib/kali/utils/format'
 import { ProfileCard } from '@/components/kali/shared/ProfileCard'
+import Modal from '@/components/kali/shared/Modal'
 import { useQuery } from '@tanstack/react-query'
 import { useToast } from '@/components/kali/shared/useToastState'
 import { avatarDisplayUrl, colorFromId } from '@/components/kali/shared/Avatar'
@@ -100,6 +101,7 @@ export default function SettingsView() {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [confirmSaveOpen, setConfirmSaveOpen] = useState(false)
 
   const [usernameQuery, setUsernameQuery] = useState('')
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
@@ -869,6 +871,35 @@ export default function SettingsView() {
           )}
         </div>
       </div>
+
+      <Modal open={confirmSaveOpen} onClose={() => setConfirmSaveOpen(false)}>
+        <div className="p-5">
+          <h3 className="text-base font-semibold text-text-primary">Save profile changes?</h3>
+          <p className="mt-2 text-sm text-text-secondary">
+            Saving will update your profile and make it visible to collaborators on your boards. You can review the live preview on the right before confirming.
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <button type="button" className={buttonClass} onClick={() => setConfirmSaveOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={buttonClass}
+              onClick={() => { handleDiscard(); setConfirmSaveOpen(false) }}
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary-hover active:scale-[0.98] disabled:opacity-40"
+              disabled={saving || usernameAvailable === false}
+              onClick={() => { setConfirmSaveOpen(false); void handleSave() }}
+            >
+              {saving ? 'Saving...' : 'Save changes'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {cropFile && (
         <AvatarCropModal
