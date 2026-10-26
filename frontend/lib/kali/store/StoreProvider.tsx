@@ -279,13 +279,19 @@ function boardMembersFor(
     members.push(member);
   };
 
+  // The seeded record is literally named "You"; treat it as "no local name" so
+  // the server roster's real name wins instead of sticking the placeholder on
+  // the person's comments and avatars.
+  const localName = (member: Member | undefined) =>
+    member?.name && member.name !== "You" ? member.name : undefined;
+
   if (board.ownerId) {
     const isYou = Boolean(youId && board.ownerId === youId);
     const local = isYou ? data.members[YOU_ID] : undefined;
     add({
       id: isYou ? YOU_ID : board.ownerId,
       name:
-        local?.name ||
+        localName(local) ||
         board.ownerName?.trim() ||
         "Board owner",
       color: local?.color ?? memberColorFor(board.ownerId),
@@ -300,7 +306,7 @@ function boardMembersFor(
     add({
       id: isYou ? YOU_ID : collaborator.userId,
       name:
-        local?.name ||
+        localName(local) ||
         collaborator.name ||
         collaborator.email ||
         "Collaborator",
