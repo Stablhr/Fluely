@@ -54,6 +54,8 @@ export type AvatarMember = {
   name: string
   color?: string | null
   avatarUrl?: string | null
+  /** The person's chosen initials background, when they set one. */
+  avatarColor?: string | null
 }
 
 type Props = {
@@ -78,7 +80,7 @@ export default function Avatar({
 }: Props) {
   const [failed, setFailed] = useState(false)
   const resolvedName = name ?? member?.name ?? null
-  const resolvedColor = color ?? member?.color ?? (member?.id ? colorFromId(member.id) : '#3971b8')
+  const resolvedColor = color ?? member?.avatarColor ?? member?.color ?? (member?.id ? colorFromId(member.id) : '#3971b8')
   const resolvedSrc = src ?? member?.avatarUrl ?? null
   useEffect(() => { setFailed(false) }, [resolvedSrc])
   const showImage = !!resolvedSrc && !failed
