@@ -309,7 +309,13 @@ export default function SettingsView() {
 
   const user = me?.user
   const displayName = getDisplayName(user)
-  const avatarUrl = profile?.avatarUrl ?? user?.avatarUrl ?? null
+  // Prefer the store's avatar URL (updated synchronously on upload/remove) so
+  // every surface updates instantly; fall back to the server record while the
+  // store is still loading.
+  const storeAvatarUrl = store.data.members[YOU_ID]?.avatarUrl
+  const avatarUrl = storeAvatarUrl !== undefined
+    ? storeAvatarUrl
+    : (profile?.avatarUrl ?? user?.avatarUrl ?? null)
   const avatarColor = draft.avatarColor ?? profile?.avatarColor ?? colorFromId(profile?.id ?? user?.id ?? 'you')
   const accentColor = draft.accentColor ?? profile?.accentColor ?? '#3971b8'
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 /**
  * Brand palette for initials swatches. Matches `ProfileCard` and the settings
@@ -80,6 +80,7 @@ export default function Avatar({
   const resolvedName = name ?? member?.name ?? null
   const resolvedColor = color ?? member?.color ?? (member?.id ? colorFromId(member.id) : '#3971b8')
   const resolvedSrc = src ?? member?.avatarUrl ?? null
+  useEffect(() => { setFailed(false) }, [resolvedSrc])
   const showImage = !!resolvedSrc && !failed
   const displaySrc = showImage ? avatarDisplayUrl(resolvedSrc, Math.max(40, size * 2)) : null
   const px = size
