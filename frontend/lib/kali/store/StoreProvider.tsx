@@ -362,12 +362,26 @@ function withCurrentUser(
   data: AppData,
   currentUser: StoreUser | undefined,
 ): AppData {
-  const member = data.members[YOU_ID];
-  if (!member) return data;
-  const name = currentUser?.name ?? member.name;
-  const avatarUrl = currentUser?.avatarUrl ?? member.avatarUrl ?? null;
-  const avatarColor = currentUser?.avatarColor ?? member.avatarColor ?? null;
+  // Create the "you" record when it is missing. Older stores (and stores that
+  // were wiped down to an empty `members` map) had no YOU_ID entry, which made
+  // every avatar/name lookup for the signed-in person fall back to the seeded
+  // "You"/"Y" placeholder — comments included. Recreate it on mount.
+  const member: Member = data.members[YOU_ID] ?? {
+    id: YOU_ID,
+    name: "You",
+    color: MEMBER_COLORS[0],
+  };
+  const name = currentUser?.name?.trim() || member.name || "You";
+  // `currentUser` carries an explicit avatarUrl (string or null), so once it
+  // arrives it wins outright. A photo the person removed must not resurface
+  // from the local cache on the next mount.
+  const avatarUrl = currentUser
+    ? (currentUser.avatarUrl ?? null)
+    : (member.avatarUrl ?? null);
+  const avatarColor =
+    currentUser?.avatarColor ?? member.avatarColor ?? null;
   if (
+    data.members[YOU_ID] &&
     member.name === name &&
     member.avatarUrl === avatarUrl &&
     member.avatarColor === avatarColor
