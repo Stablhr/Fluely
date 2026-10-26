@@ -23,4 +23,11 @@ router.post(
   notificationController.markRead
 );
 
+router.delete(
+  '/:notificationId',
+  authActionLimiter,
+  validateRequest({params: notificationIdParamsSchema}),
+  notificationController.delete
+);
+
 export default router;

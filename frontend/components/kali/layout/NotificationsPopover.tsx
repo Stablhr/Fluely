@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AtSign, Bell, Check, Clock, Handshake, X } from 'lucide-react'
+import { AtSign, Bell, Check, Clock, Handshake, Trash2, X } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import { useToast } from '@/components/kali/shared/useToastState'
 import type { AppNotification, AppNotificationType } from '@/lib/kali/store/useStore'
@@ -83,6 +83,7 @@ export default function NotificationsPopover() {
     pendingInvitations,
     markNotificationRead,
     markAllNotificationsRead,
+    deleteNotification,
     respondToInvitation,
   } = useStore()
   const { toast } = useToast()
@@ -278,6 +279,16 @@ export default function NotificationsPopover() {
                       <Check size={13} />
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => void deleteNotification(notification.id)}
+                    aria-label="Delete notification"
+                    title="Delete"
+                    className="mt-1 rounded p-1 text-ink-500 transition-colors hover:bg-base-surface-alt hover:text-danger-text"
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               )
             })}

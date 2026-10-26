@@ -74,6 +74,7 @@ import {
   fetchNotifications,
   markAllNotificationsRead as markAllNotificationsReadOnServer,
   markNotificationRead as markNotificationReadOnServer,
+  deleteNotification as deleteNotificationOnServer,
 } from "@/lib/kali/api/notifications";
 import type { AppNotificationDto } from "@/lib/kali/api/notifications";
 import { getFriendlyErrorMessage } from "@/lib/api/getFriendlyErrorMessage";
@@ -3279,7 +3280,24 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }
   };
 
-  const markAllNotificationsRead = async () => {
+  const deleteNotification = async (notificationId: string) => {
+    const target = notifications.find((n) => n.id === notificationId);
+    if (!target) return;
+    const wasUnread = !target.read;
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+    if (wasUnread) setUnreadNotificationCount((prev) => Math.max(0, prev - 1));
+    try {
+      await deleteNotificationOnServer(notificationId);
+    } catch (err) {
+      // Roll back so the row reappears and the badge stays consistent.
+      setNotifications((prev) => [...prev, target]);
+      if (wasUnread) setUnreadNotificationCount((prev) => prev + 1);
+      setError(
+        getFriendlyErrorMessage(err, "Could not delete that notification."),
+      );
+    }
+  };
+    const markAllNotificationsRead = async () => {
     const previous = notifications;
     if (!notifications.some((n) => !n.read)) return;
     setNotifications((prev) =>
@@ -3564,6 +3582,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     unreadNotificationCount,
     syncNotifications,
     markNotificationRead,
+    deleteNotification,
     markAllNotificationsRead,
 
     /* Realtime */

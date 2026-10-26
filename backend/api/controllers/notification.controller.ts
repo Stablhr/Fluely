@@ -23,6 +23,18 @@ export const notificationController = {
     }
   },
 
+  async delete(req: Request, res: Response, next: NextFunction) {
+    try {
+      res
+        .status(200)
+        .json(
+          await notificationService.delete(actorFromRequest(req), req.params.notificationId)
+        );
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async markAllRead(req: Request, res: Response, next: NextFunction) {
     try {
       res.status(200).json(await notificationService.markAllRead(actorFromRequest(req)));

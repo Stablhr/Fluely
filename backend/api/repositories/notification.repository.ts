@@ -62,7 +62,9 @@ export const notificationRepository = {
       type: 'board_invitation'
     }).exec(),
 
-  /** Drop the unread mention notifications tied to a deleted comment. */
+  /** Scoped to the owner, so a notification can never be deleted for someone else. */
+  deleteOne: (id: string, userId: Types.ObjectId) =>
+    NotificationModel.deleteOne({_id: id, userId}).exec(),
   deleteMentionsForComment: (cardId: Types.ObjectId, commentId: string) =>
     NotificationModel.deleteMany({
       cardId,

@@ -215,6 +215,7 @@ export interface Store {
   /** Re-pulls notifications and pending invitations; called on a timer. */
   syncNotifications: () => Promise<void>;
   markNotificationRead: (notificationId: string) => Promise<void>;
+  deleteNotification: (notificationId: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
 
   // Social Posts

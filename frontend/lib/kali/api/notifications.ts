@@ -51,3 +51,7 @@ export async function markNotificationRead(id: string): Promise<void> {
 export async function markAllNotificationsRead(): Promise<void> {
   await httpClient.post("/notifications/read-all");
 }
+
+export async function deleteNotification(id: string): Promise<void> {
+  await httpClient.delete(`/notifications/${id}`);
+}

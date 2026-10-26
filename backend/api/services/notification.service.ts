@@ -122,6 +122,15 @@ export const notificationService = {
     return {message: 'Notification marked as read'};
   },
 
+  async delete(actor: Actor, notificationId: string) {
+    const result = await notificationRepository.deleteOne(notificationId, actor.actorId);
+    if (result.deletedCount === 0) {
+      // Either the id is bad or it belongs to somebody else; the caller learns
+      // nothing about which.
+      throw new ApiError(404, ErrorCodes.NOT_FOUND, 'Notification not found');
+    }
+    return {message: 'Notification deleted'};
+  },
   async markAllRead(actor: Actor) {
     await notificationRepository.markAllRead(actor.actorId);
     return {message: 'All notifications marked as read'};
