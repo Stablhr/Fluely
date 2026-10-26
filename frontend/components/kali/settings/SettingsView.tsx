@@ -178,6 +178,12 @@ export default function SettingsView() {
       await updateMyProfile(patch)
       queryClient.invalidateQueries({ queryKey: ['myProfile'] })
       queryClient.invalidateQueries({ queryKey: meQueryKey })
+      // Keep the local store's "you" record in sync so the header chip, sidebar,
+      // comment composer and comment authors reflect the new name/color instantly.
+      store.setCurrentUser({
+        name: (draft.displayName ?? '').trim() || displayName,
+        ...(draft.avatarColor ? { avatarColor: draft.avatarColor } : {}),
+      })
       setDirty(false)
       setSaveMessage('Saved.')
     } catch (err) {

@@ -89,6 +89,15 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
 
   const boardMembers = store.getBoardMembers(card.boardId)
 
+  // Make sure the board roster (with avatar URLs) is loaded so comment authors
+  // resolve to their real name + photo instead of the generic fallback.
+  useEffect(() => {
+    const board = store.data.boards[card.boardId]
+    if (board?.ownerId && board.revision !== null) {
+      void store.loadCollaborators(card.boardId)
+    }
+  }, [card.boardId, store])
+
   // Convert composer text (which uses `@Name` for mentions) into the structured
   // `@[id|Name]` form the store/backend expect, so ids never appear in the UI.
   const toStructured = (input: string): string => {
@@ -322,9 +331,20 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
     )
 
   const renderComment = (comment: typeof card.comments[number]) => {
+    // Normalize the author id: comments created locally use YOU_ID while the
+    // server stores the real account id. Both must resolve to the same member
+    // record (which carries the real name + avatar) so a refresh doesn't fall
+    // back to the generic "You"/"Y" avatar.
+    const authorId =
+      comment.authorId === store.currentUserId ? YOU_ID : comment.authorId
     const author =
+      store.data.members[authorId] ??
       store.data.members[comment.authorId] ??
-      boardMembers.find((m) => m.id === comment.authorId) ?? {
+      boardMembers.find((m) => m.id === authorId) ??
+      boardMembers.find((m) => m.id === comment.authorId) ??
+      (authorId === YOU_ID || comment.authorId === store.currentUserId
+        ? store.data.members[YOU_ID]
+        : undefined) ?? {
         id: comment.authorId,
         name: comment.authorId === store.currentUserId || comment.authorId === YOU_ID ? 'You' : 'Unknown',
         color: '#3971B8',
