@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from 'react'
 import { tokenizeText } from '@/lib/kali/utils/linkify'
-import { parseEmbed, type EmbedDescriptor } from '@/lib/kali/utils/embed'
+import { parseEmbedLine } from '@/lib/kali/utils/embed'
 import LinkEmbed from './LinkEmbed'
 
 /**
@@ -19,16 +19,6 @@ const LINK_CLASS =
 
 /** Stops a single long description from mounting a wall of third-party frames. */
 const MAX_EMBEDS_PER_TEXT = 3
-
-function embedForLine(line: string): EmbedDescriptor | null {
-  const trimmed = line.trim()
-  if (!trimmed) return null
-
-  const tokens = tokenizeText(trimmed)
-  const [token] = tokens
-  if (tokens.length !== 1 || token?.type !== 'link') return null
-  return parseEmbed(token.value)
-}
 
 function renderTokens(text: string, interactive: boolean): ReactNode[] {
   return tokenizeText(text).map((token, index) => {
@@ -67,7 +57,7 @@ function renderBody(text: string, interactive: boolean, embeds: boolean): ReactN
   let previousWasEmbed = false
 
   lines.forEach((line, index) => {
-    const descriptor = embeds && embedCount < MAX_EMBEDS_PER_TEXT ? embedForLine(line) : null
+    const descriptor = embeds && embedCount < MAX_EMBEDS_PER_TEXT ? parseEmbedLine(line) : null
 
     if (descriptor) {
       embedCount += 1

@@ -1,4 +1,4 @@
-import { toHref } from './linkify'
+import { toHref, tokenizeText } from './linkify'
 
 /**
  * Recognizes links that can be shown as an inline player or document preview.
@@ -149,5 +149,30 @@ export function parseEmbed(raw: string): EmbedDescriptor | null {
     }
   }
 
+  return null
+}
+
+/**
+ * Returns a descriptor only when the whole trimmed line is exactly one URL.
+ *
+ * This is the rule the renderer and the composer both use: a link becomes a
+ * preview only on its own line, never mid-sentence.
+ */
+export function parseEmbedLine(line: string): EmbedDescriptor | null {
+  const trimmed = line.trim()
+  if (!trimmed) return null
+
+  const tokens = tokenizeText(trimmed)
+  const [token] = tokens
+  if (tokens.length !== 1 || token?.type !== 'link') return null
+  return parseEmbed(token.value)
+}
+
+/** The first previewable URL in a multi-line block of text, if any. */
+export function findFirstEmbed(text: string): EmbedDescriptor | null {
+  for (const line of text.split('\n')) {
+    const descriptor = parseEmbedLine(line)
+    if (descriptor) return descriptor
+  }
   return null
 }

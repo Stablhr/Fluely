@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { X, Plus, Calendar, Tag, Sparkles, AlertTriangle, CheckCircle2, Clock, Loader2, Library } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { X, Plus, Calendar, Tag, Sparkles, AlertTriangle, CheckCircle2, Clock, Loader2, Library, Link2 } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import type { SocialPost, SocialPostPlatform, SocialMediaAttachment, Platform } from '@/lib/kali/store/schema'
 import { PLATFORM_COLORS, PLATFORM_DEFAULTS, PLATFORM_LIMITS } from '@/lib/kali/store/schema'
@@ -15,6 +15,8 @@ import { COMMON_TIMEZONES, getBrowserTimezone } from '@/lib/kali/utils/timezones
 import { useMediaLibrary } from '@/lib/kali/feature-hooks/useMediaLibrary'
 import MediaLibraryPanel from './MediaLibraryPanel'
 import PlatformIcon from './PlatformIcon'
+import LinkEmbed from '../shared/LinkEmbed'
+import { findFirstEmbed, parseEmbed } from '@/lib/kali/utils/embed'
 
 const ALL_PLATFORMS: Platform[] = ['youtube', 'facebook', 'tiktok', 'instagram']
 
@@ -132,11 +134,25 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
   const [scheduling, setScheduling] = useState<'idle' | 'scheduling' | 'done'>('idle')
   const [scheduleResult, setScheduleResult] = useState<{ ok: boolean; errors?: string[] } | null>(null)
   const [showPreview, setShowPreview] = useState(false)
+  const [showLinkPreview, setShowLinkPreview] = useState(false)
   const [libOpen, setLibOpen] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const { addToLibrary } = useMediaLibrary()
 
   const isEditing = !!post
+
+  /**
+   * A URL on its own line is offered as a link preview. It stays part of the
+   * caption text and is never added to `media`, so it is visual only and is
+   * not sent to the publishing APIs.
+   */
+  const linkPreview = useMemo(() => findFirstEmbed(caption), [caption])
+
+  const handleCaptionPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = e.clipboardData.getData('text/plain').trim()
+    // A new supported link was pasted; let the person opt in to its preview.
+    if (pasted && parseEmbed(pasted)) setShowLinkPreview(false)
+  }
 
   useEffect(() => {
     document.body.style.overflow = 'hidden'
@@ -375,6 +391,7 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
             <Textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
+              onPaste={handleCaptionPaste}
               placeholder="Write your caption here..."
               rows={5}
               className="mt-2"
@@ -438,6 +455,34 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
                 <AlertTriangle size={13} className="shrink-0" />
                 {uploadError}
               </p>
+            )}
+
+            {linkPreview && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <SectionLabel icon={<Link2 size={12} />}>Link preview</SectionLabel>
+                  <button
+                    type="button"
+                    onClick={() => setShowLinkPreview((value) => !value)}
+                    aria-pressed={showLinkPreview}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  >
+                    {showLinkPreview ? 'Hide preview' : 'Show preview'}
+                  </button>
+                </div>
+                {showLinkPreview ? (
+                  <>
+                    <LinkEmbed descriptor={linkPreview} interactive={false} />
+                    <p className="mt-1 text-[10px] text-text-muted">
+                      Link previews are visual only and aren&apos;t published to the platform. Final appearance may vary.
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-1 truncate text-xs text-text-muted" title={linkPreview.sourceUrl}>
+                    {linkPreview.sourceUrl}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
