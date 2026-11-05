@@ -5,6 +5,7 @@ import boardRoutes from './board.routes';
 import invitationRoutes from './invitation.routes';
 import mediaRoutes from './media.routes';
 import notificationRoutes from './notification.routes';
+import embedRoutes from './embeds.routes';
 import cronRoutes from './cron.routes';
 import workspaceRoutes from './workspace.routes';
 
@@ -16,6 +17,7 @@ router.use('/boards', boardRoutes);
 router.use('/invitations', invitationRoutes);
 router.use('/media', mediaRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/embeds', embedRoutes);
 router.use('/workspaces', workspaceRoutes);
 router.use('/cron', cronRoutes);
 

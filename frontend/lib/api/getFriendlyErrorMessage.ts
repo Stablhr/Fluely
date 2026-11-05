@@ -99,6 +99,8 @@ export function getFriendlyErrorMessage(
         return "That file type is not supported.";
       case "FILE_TOO_LARGE":
         return "That file is too large to upload.";
+      case "LINK_PREVIEW_UNAVAILABLE":
+        return "This link can't be previewed right now. Try another link.";
       case "VALIDATION_ERROR":
         return "Please check the details you entered and try again.";
       default:

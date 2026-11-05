@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {MAX_PREVIEW_URL_LENGTH} from '../constants/linkPreview';
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid ObjectId');
 const text = (max: number) => z.string().trim().max(max);
@@ -405,6 +406,12 @@ export const pollQuerySchema = z.object({
 export const exportQuerySchema = z.object({
   includeArchived: z.coerce.boolean().default(true)
 });
+
+export const linkPreviewQuerySchema = z.object({
+  url: z.string().trim().min(1).max(MAX_PREVIEW_URL_LENGTH)
+});
+
+export type LinkPreviewQuery = z.infer<typeof linkPreviewQuerySchema>;
 
 export type BoardCreateInput = z.infer<typeof boardCreateSchema>;
 export type BoardPatchInput = z.infer<typeof boardPatchSchema>;

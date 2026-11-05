@@ -75,6 +75,20 @@ export const authReadLimiter = makeLimiter({
 });
 
 /**
+ * Outbound link unfurls. A cache miss performs up to four requests to
+ * third-party hosts, so this gets its own small budget instead of the
+ * human-paced read allowance.
+ */
+export const linkPreviewLimiter = makeLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  keyGenerator: accountOrIp,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler
+});
+
+/**
  * Background polling reads -- the notification bell and pending invitations.
  * They fire every few seconds on their own, so they get a per-minute allowance
  * instead of spending the human-paced budget above. Sized for several visible
