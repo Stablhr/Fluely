@@ -152,23 +152,66 @@ export function parseEmbed(raw: string): EmbedDescriptor | null {
   return null
 }
 
+/** A line that is exactly one link, as it appeared in the text. */
+export interface LinkDescriptor {
+  /** The address as the person typed it, kept for display. */
+  value: string
+  /** Normalized `http(s)` address, used for the request and the anchor. */
+  href: string
+}
+
 /**
- * Returns a descriptor only when the whole trimmed line is exactly one URL.
+ * What a line can become when it sits alone: a provider embed, or a generic
+ * link card resolved by the backend.
+ */
+export type LinePreview =
+  | { kind: 'embed'; descriptor: EmbedDescriptor }
+  | { kind: 'link'; link: LinkDescriptor }
+
+/**
+ * Returns a descriptor only when the whole trimmed line is exactly one link.
  *
  * This is the rule the renderer and the composer both use: a link becomes a
  * preview only on its own line, never mid-sentence.
  */
-export function parseEmbedLine(line: string): EmbedDescriptor | null {
+export function parseLinkLine(line: string): LinkDescriptor | null {
   const trimmed = line.trim()
   if (!trimmed) return null
 
   const tokens = tokenizeText(trimmed)
   const [token] = tokens
   if (tokens.length !== 1 || token?.type !== 'link') return null
-  return parseEmbed(token.value)
+  return { value: token.value, href: token.href }
+}
+
+/**
+ * Classifies a standalone link line. Providers we can build locally stay an
+ * `embed` (no network call); everything else becomes a `link` for the card.
+ */
+export function parsePreviewLine(line: string): LinePreview | null {
+  const link = parseLinkLine(line)
+  if (!link) return null
+
+  const descriptor = parseEmbed(link.href)
+  return descriptor ? { kind: 'embed', descriptor } : { kind: 'link', link }
+}
+
+/** A provider embed only, for callers that cannot show generic cards. */
+export function parseEmbedLine(line: string): EmbedDescriptor | null {
+  const preview = parsePreviewLine(line)
+  return preview?.kind === 'embed' ? preview.descriptor : null
 }
 
 /** The first previewable URL in a multi-line block of text, if any. */
+export function findFirstPreview(text: string): LinePreview | null {
+  for (const line of text.split('\n')) {
+    const preview = parsePreviewLine(line)
+    if (preview) return preview
+  }
+  return null
+}
+
+/** The first provider embed in a multi-line block of text, if any. */
 export function findFirstEmbed(text: string): EmbedDescriptor | null {
   for (const line of text.split('\n')) {
     const descriptor = parseEmbedLine(line)

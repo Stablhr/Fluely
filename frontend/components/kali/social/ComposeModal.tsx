@@ -16,7 +16,8 @@ import { useMediaLibrary } from '@/lib/kali/feature-hooks/useMediaLibrary'
 import MediaLibraryPanel from './MediaLibraryPanel'
 import PlatformIcon from './PlatformIcon'
 import LinkEmbed from '../shared/LinkEmbed'
-import { findFirstEmbed, parseEmbed } from '@/lib/kali/utils/embed'
+import LinkCard from '../shared/LinkCard'
+import { findFirstPreview, parseLinkLine } from '@/lib/kali/utils/embed'
 
 const ALL_PLATFORMS: Platform[] = ['youtube', 'facebook', 'tiktok', 'instagram']
 
@@ -134,7 +135,12 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
   const [scheduling, setScheduling] = useState<'idle' | 'scheduling' | 'done'>('idle')
   const [scheduleResult, setScheduleResult] = useState<{ ok: boolean; errors?: string[] } | null>(null)
   const [showPreview, setShowPreview] = useState(false)
-  const [showLinkPreview, setShowLinkPreview] = useState(false)
+  // The opt-in remembers which address it belongs to, so a different link
+  // starts closed without an effect resetting state after the render.
+  const [linkPreviewChoice, setLinkPreviewChoice] = useState<{
+    href: string | null
+    shown: boolean
+  }>({ href: null, shown: false })
   const [libOpen, setLibOpen] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const { addToLibrary } = useMediaLibrary()
@@ -146,12 +152,23 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
    * caption text and is never added to `media`, so it is visual only and is
    * not sent to the publishing APIs.
    */
-  const linkPreview = useMemo(() => findFirstEmbed(caption), [caption])
+  const linkPreview = useMemo(() => findFirstPreview(caption), [caption])
+
+  const previewHref =
+    linkPreview?.kind === 'embed' ? linkPreview.descriptor.sourceUrl : linkPreview?.link.href ?? null
+
+  const showLinkPreview = linkPreviewChoice.href === previewHref && linkPreviewChoice.shown
+
+  const toggleLinkPreview = () => {
+    setLinkPreviewChoice({ href: previewHref, shown: !showLinkPreview })
+  }
 
   const handleCaptionPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const pasted = e.clipboardData.getData('text/plain').trim()
-    // A new supported link was pasted; let the person opt in to its preview.
-    if (pasted && parseEmbed(pasted)) setShowLinkPreview(false)
+    // A new previewable link was pasted; let the person opt in to its preview.
+    if (pasted && parseLinkLine(pasted)) {
+      setLinkPreviewChoice({ href: null, shown: false })
+    }
   }
 
   useEffect(() => {
@@ -463,7 +480,7 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
                   <SectionLabel icon={<Link2 size={12} />}>Link preview</SectionLabel>
                   <button
                     type="button"
-                    onClick={() => setShowLinkPreview((value) => !value)}
+                    onClick={toggleLinkPreview}
                     aria-pressed={showLinkPreview}
                     className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                   >
@@ -472,14 +489,23 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
                 </div>
                 {showLinkPreview ? (
                   <>
-                    <LinkEmbed descriptor={linkPreview} interactive={false} />
+                    {linkPreview.kind === 'embed' ? (
+                      <LinkEmbed descriptor={linkPreview.descriptor} interactive={false} />
+                    ) : (
+                      <LinkCard
+                        href={linkPreview.link.href}
+                        label={linkPreview.link.value}
+                        interactive={false}
+                        variant="composer"
+                      />
+                    )}
                     <p className="mt-1 text-[10px] text-text-muted">
                       Link previews are visual only and aren&apos;t published to the platform. Final appearance may vary.
                     </p>
                   </>
                 ) : (
-                  <p className="mt-1 truncate text-xs text-text-muted" title={linkPreview.sourceUrl}>
-                    {linkPreview.sourceUrl}
+                  <p className="mt-1 truncate text-xs text-text-muted" title={previewHref ?? undefined}>
+                    {previewHref}
                   </p>
                 )}
               </div>

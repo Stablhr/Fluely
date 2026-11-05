@@ -1,7 +1,10 @@
+'use client'
+
 import { Fragment, type ReactNode } from 'react'
 import { tokenizeText } from '@/lib/kali/utils/linkify'
-import { parseEmbedLine } from '@/lib/kali/utils/embed'
+import { parsePreviewLine } from '@/lib/kali/utils/embed'
 import LinkEmbed from './LinkEmbed'
+import LinkCard from './LinkCard'
 
 /**
  * Renders plain text with its URLs turned into links.
@@ -10,15 +13,16 @@ import LinkEmbed from './LinkEmbed'
  * original text is never modified — only the rendering changes. That keeps
  * server sync and existing records untouched.
  *
- * A line that is exactly one supported URL becomes an inline preview; every
- * other URL stays an ordinary link, so a frame never appears mid-sentence.
+ * A line that is exactly one supported URL becomes an inline provider preview
+ * or a compact link card; every other URL stays an ordinary link, so a preview
+ * never appears mid-sentence.
  */
 
 const LINK_CLASS =
   'rounded-sm text-primary-text underline underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40'
 
 /** Stops a single long description from mounting a wall of third-party frames. */
-const MAX_EMBEDS_PER_TEXT = 3
+const MAX_PREVIEWS_PER_TEXT = 3
 
 function renderTokens(text: string, interactive: boolean): ReactNode[] {
   return tokenizeText(text).map((token, index) => {
@@ -53,25 +57,41 @@ function renderTokens(text: string, interactive: boolean): ReactNode[] {
 function renderBody(text: string, interactive: boolean, embeds: boolean): ReactNode[] {
   const lines = text.split('\n')
   const nodes: ReactNode[] = []
-  let embedCount = 0
-  let previousWasEmbed = false
+  let previewCount = 0
+  let previousWasPreview = false
 
   lines.forEach((line, index) => {
-    const descriptor = embeds && embedCount < MAX_EMBEDS_PER_TEXT ? parseEmbedLine(line) : null
+    const preview =
+      embeds && previewCount < MAX_PREVIEWS_PER_TEXT ? parsePreviewLine(line) : null
 
-    if (descriptor) {
-      embedCount += 1
-      previousWasEmbed = true
-      nodes.push(<LinkEmbed key={`embed-${index}`} descriptor={descriptor} interactive={interactive} />)
+    if (preview) {
+      previewCount += 1
+      previousWasPreview = true
+      nodes.push(
+        preview.kind === 'embed' ? (
+          <LinkEmbed
+            key={`embed-${index}`}
+            descriptor={preview.descriptor}
+            interactive={interactive}
+          />
+        ) : (
+          <LinkCard
+            key={`card-${index}`}
+            href={preview.link.href}
+            label={preview.link.value}
+            interactive={interactive}
+          />
+        )
+      )
       return
     }
 
-    // A block-level embed already starts a new line, so keeping the source
+    // A block-level preview already starts a new line, so keeping the source
     // newline beside it would render an empty line.
-    if (index > 0 && !previousWasEmbed) nodes.push('\n')
+    if (index > 0 && !previousWasPreview) nodes.push('\n')
 
     nodes.push(<Fragment key={`line-${index}`}>{renderTokens(line, interactive)}</Fragment>)
-    previousWasEmbed = false
+    previousWasPreview = false
   })
 
   return nodes
