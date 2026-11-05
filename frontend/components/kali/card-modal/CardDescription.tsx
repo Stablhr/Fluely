@@ -5,6 +5,7 @@ import { AlignLeft } from 'lucide-react'
 import type { Card } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import SectionLabel from '../shared/SectionLabel'
+import RichText from '../shared/RichText'
 
 export default function CardDescription({ card, readOnly = false }: { card: Card; readOnly?: boolean }) {
   const { updateCard, addActivity } = useStore()
@@ -26,13 +27,13 @@ export default function CardDescription({ card, readOnly = false }: { card: Card
 
       {readOnly ? (
         card.desc ? (
-          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary">{card.desc}</p>
+          <RichText text={card.desc} className="mt-2 text-sm leading-relaxed text-text-primary" />
         ) : (
           <p className="mt-2 text-xs text-text-muted">No description.</p>
         )
       ) : card.desc && !editing ? (
         <div>
-          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary">{card.desc}</p>
+          <RichText text={card.desc} className="mt-2 text-sm leading-relaxed text-text-primary" />
           <button
             type="button"
             onClick={() => {

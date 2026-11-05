@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { Fragment, useRef, useState, useEffect, useCallback } from 'react'
 import { MessageSquare, SmilePlus, Trash2, Send } from 'lucide-react'
 import EmojiPicker, { Theme } from 'emoji-picker-react'
 import type { Card, Member } from '@/lib/kali/store/schema'
@@ -12,6 +12,7 @@ import { hasUserCommentReaction, toggleUserCommentReaction } from '@/lib/kali/ut
 import SectionLabel from '../shared/SectionLabel'
 import Avatar from '../shared/Avatar'
 import ProfilePopover from '../shared/ProfilePopover'
+import { LinkText } from '../shared/RichText'
 
 function parseMentions(text: string): { type: 'text' | 'mention'; value: string; userId?: string; name?: string }[] {
   const parts: { type: 'text' | 'mention'; value: string; userId?: string; name?: string }[] = []
@@ -326,7 +327,9 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
       part.type === 'mention' && part.userId ? (
         <MentionChip key={i} userId={part.userId} name={part.name} members={members} currentUserId={store.currentUserId} />
       ) : (
-        <span key={i}>{part.value}</span>
+        <Fragment key={i}>
+          <LinkText text={part.value} />
+        </Fragment>
       ),
     )
 

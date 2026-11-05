@@ -7,6 +7,7 @@ import type { Board, List } from '@/lib/kali/store/schema'
 import { formatDateTime } from '@/lib/kali/utils/dates'
 import { useStore } from '@/lib/kali/store/useStore'
 import Modal from '../shared/Modal'
+import RichText from '../shared/RichText'
 
 type FeedStatus = 'loading' | 'ready' | 'failed'
 
@@ -166,7 +167,7 @@ export default function BoardActivityPanel({ board, onClose }: { board: Board; o
           <ul className="space-y-2">
             {board.activity.map((item) => (
               <li key={item.id} className="flex flex-wrap items-baseline gap-x-2">
-                <span className="min-w-0 break-words text-sm text-text-primary">{item.text}</span>
+                <RichText as="span" text={item.text} className="min-w-0 text-sm text-text-primary" />
                 <span className="shrink-0 font-mono text-[10.5px] text-text-muted">
                   {formatDateTime(item.createdAt)}
                 </span>

@@ -21,6 +21,7 @@ import { useStore } from '@/lib/kali/store/useStore'
 import type { SocialPost, Platform, PlatformStatus } from '@/lib/kali/store/schema'
 import { PLATFORM_COLORS } from '@/lib/kali/store/schema'
 import Button from '../shared/Button'
+import RichText from '../shared/RichText'
 import { useToast } from '../shared/useToastState'
 
 const PLATFORM_ICONS: Record<Platform, typeof Play> = {
@@ -147,7 +148,7 @@ export default function PostDetailModal({ postId, onClose, onEdit }: {
 
           <div className="scroll-slim flex-1 overflow-y-auto p-4 space-y-5">
             {post.caption && (
-              <p className="whitespace-pre-wrap text-sm text-text-secondary">{post.caption}</p>
+              <RichText text={post.caption} className="text-sm text-text-secondary" />
             )}
 
             {/* Schedule */}
