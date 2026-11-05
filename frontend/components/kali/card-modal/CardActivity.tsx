@@ -16,7 +16,7 @@ export default function CardActivity({ card }: { card: Card }) {
         <ul className="mt-2 space-y-1">
           {card.activity.map((item) => (
             <li key={item.id} className="flex flex-wrap items-baseline gap-x-2">
-              <RichText as="span" text={item.text} className="min-w-0 text-sm text-text-primary" />
+              <RichText as="span" text={item.text} embeds={false} className="min-w-0 text-sm text-text-primary" />
               <span className="font-mono text-[10.5px] text-text-muted">
                 {formatDateTime(item.createdAt)}
               </span>

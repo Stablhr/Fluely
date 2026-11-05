@@ -1,5 +1,7 @@
 import { Fragment, type ReactNode } from 'react'
 import { tokenizeText } from '@/lib/kali/utils/linkify'
+import { parseEmbed, type EmbedDescriptor } from '@/lib/kali/utils/embed'
+import LinkEmbed from './LinkEmbed'
 
 /**
  * Renders plain text with its URLs turned into links.
@@ -7,10 +9,26 @@ import { tokenizeText } from '@/lib/kali/utils/linkify'
  * The store keeps descriptions, comments and captions as plain strings, so the
  * original text is never modified — only the rendering changes. That keeps
  * server sync and existing records untouched.
+ *
+ * A line that is exactly one supported URL becomes an inline preview; every
+ * other URL stays an ordinary link, so a frame never appears mid-sentence.
  */
 
 const LINK_CLASS =
   'rounded-sm text-primary-text underline underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40'
+
+/** Stops a single long description from mounting a wall of third-party frames. */
+const MAX_EMBEDS_PER_TEXT = 3
+
+function embedForLine(line: string): EmbedDescriptor | null {
+  const trimmed = line.trim()
+  if (!trimmed) return null
+
+  const tokens = tokenizeText(trimmed)
+  const [token] = tokens
+  if (tokens.length !== 1 || token?.type !== 'link') return null
+  return parseEmbed(token.value)
+}
 
 function renderTokens(text: string, interactive: boolean): ReactNode[] {
   return tokenizeText(text).map((token, index) => {
@@ -42,6 +60,33 @@ function renderTokens(text: string, interactive: boolean): ReactNode[] {
   })
 }
 
+function renderBody(text: string, interactive: boolean, embeds: boolean): ReactNode[] {
+  const lines = text.split('\n')
+  const nodes: ReactNode[] = []
+  let embedCount = 0
+  let previousWasEmbed = false
+
+  lines.forEach((line, index) => {
+    const descriptor = embeds && embedCount < MAX_EMBEDS_PER_TEXT ? embedForLine(line) : null
+
+    if (descriptor) {
+      embedCount += 1
+      previousWasEmbed = true
+      nodes.push(<LinkEmbed key={`embed-${index}`} descriptor={descriptor} interactive={interactive} />)
+      return
+    }
+
+    // A block-level embed already starts a new line, so keeping the source
+    // newline beside it would render an empty line.
+    if (index > 0 && !previousWasEmbed) nodes.push('\n')
+
+    nodes.push(<Fragment key={`line-${index}`}>{renderTokens(line, interactive)}</Fragment>)
+    previousWasEmbed = false
+  })
+
+  return nodes
+}
+
 /**
  * Just the token run, without a wrapper element. Use this inside a container
  * that already exists and whose markup must not change — comment bodies, for
@@ -60,6 +105,8 @@ interface RichTextProps {
   className?: string
   /** Set false inside preview mocks so a link cannot navigate away from the app. */
   interactive?: boolean
+  /** Set false on surfaces that should only linkify (activity feeds). */
+  embeds?: boolean
 }
 
 export default function RichText({
@@ -67,12 +114,13 @@ export default function RichText({
   as: Tag = 'p',
   className = '',
   interactive = true,
+  embeds = true,
 }: RichTextProps) {
   if (!text) return null
 
   return (
     <Tag className={`whitespace-pre-wrap break-words ${className}`.trim()}>
-      <LinkText text={text} interactive={interactive} />
+      {renderBody(text, interactive, embeds)}
     </Tag>
   )
 }

@@ -167,7 +167,7 @@ export default function BoardActivityPanel({ board, onClose }: { board: Board; o
           <ul className="space-y-2">
             {board.activity.map((item) => (
               <li key={item.id} className="flex flex-wrap items-baseline gap-x-2">
-                <RichText as="span" text={item.text} className="min-w-0 text-sm text-text-primary" />
+                <RichText as="span" text={item.text} embeds={false} className="min-w-0 text-sm text-text-primary" />
                 <span className="shrink-0 font-mono text-[10.5px] text-text-muted">
                   {formatDateTime(item.createdAt)}
                 </span>
