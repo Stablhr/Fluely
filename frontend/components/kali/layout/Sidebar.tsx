@@ -19,7 +19,6 @@ import {
   adaptiveVars,
 } from "@/lib/kali/hooks/useAdaptiveTheme";
 import { useSignOut } from "@/lib/hooks/auth/useSignOut";
-import CaptureBox from "../shared/CaptureBox";
 import Avatar from "../shared/Avatar";
 
 interface NavLinkProps {
@@ -293,7 +292,7 @@ export default function Sidebar({
             ))}
         </nav>
 
-        {/* Footer: CaptureBox → User → Sign out */}
+        {/* Footer: User → Sign out */}
         {collapsed ? (
           <div
             className="flex flex-col items-center gap-2 border-t px-2 py-3"
@@ -306,7 +305,6 @@ export default function Sidebar({
             className="border-t p-3 space-y-2.5"
             style={{ borderColor: theme.border }}
           >
-            <CaptureBox />
             {you && (
               <div
                 className="flex items-center gap-2 rounded-md px-2.5 py-2"
@@ -356,3 +354,5 @@ export default function Sidebar({
     </>
   );
 }
+
+
