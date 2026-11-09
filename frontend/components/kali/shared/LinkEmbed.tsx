@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ExternalLink, FileText, Play, Video } from 'lucide-react'
+import { ExternalLink, Play, Video } from 'lucide-react'
 import type { EmbedDescriptor, EmbedProvider } from '@/lib/kali/utils/embed'
 
 /**
@@ -34,7 +34,7 @@ const ASPECT_CLASS: Record<EmbedDescriptor['aspectRatio'], string> = {
 }
 
 function ProviderIcon({ provider, size }: { provider: EmbedProvider; size: number }) {
-  if (provider === 'google-drive') return <FileText size={size} aria-hidden="true" />
+  if (provider === 'google-drive') return <Play size={size} className="translate-x-[1px]" aria-hidden="true" />
   if (provider === 'video') return <Video size={size} aria-hidden="true" />
   return <Play size={size} className="translate-x-[1px]" aria-hidden="true" />
 }
@@ -115,7 +115,9 @@ export default function LinkEmbed({
         )}
       </span>
 
-      {descriptor.provider !== 'youtube' && (
+      {descriptor.provider !== 'youtube' &&
+        descriptor.provider !== 'google-drive' &&
+        descriptor.provider !== 'video' && (
         <span className="flex items-center justify-between gap-2 border-t border-border bg-surface px-3 py-2">
           <span className="min-w-0 truncate text-xs text-text-muted">{label}</span>
           {interactive ? (
