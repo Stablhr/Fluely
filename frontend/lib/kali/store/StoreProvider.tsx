@@ -1182,7 +1182,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
     mutate((prev) => ({
       ...prev,
-      boards: { ...prev.boards, [boardId]: board },
+      boards: { ...prev.boards, [boardId]: board as any },
       lists: { ...prev.lists, ...lists },
       ui: { ...prev.ui, lastVisitedBoardId: boardId },
     }));
@@ -2515,7 +2515,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       id: newBoardId,
       name: `${srcBoard.name} (template)`,
       description: srcBoard.description,
-      visibility: "private",
+      visibility: "private" as any,
       starred: false,
       background: srcBoard.background,
       createdAt: now(),
@@ -2523,7 +2523,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       listOrder,
       labels,
       collaborators: [],
-      access: "owner",
+      access: "owner" as any,
       ownerId: null,
       workspaceId: null,
       publicSlug: null,
@@ -2782,6 +2782,96 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }
     void load();
   }, [syncBoards]);
+  // One-time migration of the removed Inbox into a board. Runs per user and is
+  // guarded by a localStorage flag so it never duplicates.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const userId = currentUser?.id ?? "anon";
+    const flag = `fluely:inboxMigrated:${userId}`;
+    if (window.localStorage.getItem(flag)) return;
+    const items = data?.inbox ?? [];
+    if (items.length === 0) {
+      window.localStorage.setItem(flag, "1");
+      return;
+    }
+    const already = Object.values(data?.boards ?? {}).some(
+      (b) => b.name === "Inbox (migrated)",
+    );
+    if (already) {
+      window.localStorage.setItem(flag, "1");
+      return;
+    }
+    const boardId = uid();
+    const listId = uid();
+    const cardIds: string[] = [];
+    const cards: Record<string, any> = {};
+    items.forEach((item) => {
+      const cardId = uid();
+      cardIds.push(cardId);
+      cards[cardId] = {
+        id: cardId,
+        boardId,
+        listId,
+        title: item.text,
+        desc: "",
+        cover: null,
+        coverSize: "large",
+        labelIds: [],
+        memberIds: [],
+        dueDate: null,
+        startDate: null,
+        location: "",
+        watching: false,
+        archived: false,
+        done: false,
+        files: [],
+        comments: [],
+        activity: [],
+        createdAt: item.createdAt,
+        updatedAt: item.createdAt,
+      };
+    });
+    const list = {
+      id: listId,
+      boardId,
+      name: "Captured",
+      assignee: "",
+      collapsed: false,
+      order: 0,
+      cardOrder: cardIds,
+      backgroundColor: "",
+    };
+    const board = {
+      id: boardId,
+      name: "Inbox (migrated)",
+      description: "",
+      visibility: "private" as any,
+      starred: false,
+      background: "",
+      createdAt: now(),
+      updatedAt: now(),
+      listOrder: [listId],
+      labels: {},
+      collaborators: [],
+      access: "owner" as any,
+      ownerId: currentUser?.id ?? null,
+      ownerName: currentUser?.name ?? null,
+      workspaceId: null,
+      publicSlug: null,
+      revision: null,
+      childrenSyncedAt: null,
+      settings: { commentPermission: "members", selfJoin: false },
+      activity: [],
+      archivedLists: [],
+    };
+    mutate((prev) => ({
+      ...prev,
+      boards: { ...prev.boards, [boardId]: board as any },
+      lists: { ...prev.lists, [listId]: list },
+      cards: { ...prev.cards, ...cards },
+    }));
+    window.localStorage.setItem(flag, "1");
+  }, [data?.inbox?.length, currentUser?.id]);
 
   /**
    * Pulls the notification bell and the pending-invitation list together —
@@ -3566,5 +3656,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
   );
 }
+
+
+
 
 
