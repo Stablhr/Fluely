@@ -53,8 +53,8 @@ export default function LinkEmbed({
 
   return (
     <span
-      className={`my-2 block w-full overflow-hidden rounded-2xl border border-border bg-surface ${
-        portrait ? 'mx-auto max-w-[320px]' : ''
+      className={`my-2 mx-auto block w-full overflow-hidden rounded-2xl border border-border bg-surface ${
+        portrait ? 'max-w-[320px]' : 'max-w-[560px]'
       }`.trim()}
     >
       <span className={`relative block w-full bg-surface-alt ${ASPECT_CLASS[descriptor.aspectRatio]}`}>
