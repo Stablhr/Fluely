@@ -4,7 +4,7 @@
 
 Fluely is a social media content planning and scheduling app. It provides a weekly time-grid content
 planner where you can drag posts into time slots, manage boards with multiple views, keep track of
-your inbox, and get an at-a-glance dashboard of what's coming up.
+and get an at-a-glance dashboard of what's coming up.
 
 The app UI is ported from [Stablhr/Kali](https://github.com/Stablhr/Kali) and runs as a Next.js 16
 app behind a JWT auth boundary, with an Express.js API alongside it. App data currently lives in a
@@ -14,7 +14,6 @@ local store in the browser; the remote API client in `frontend/lib/kali/api/` st
 ### Key Features
 
 - **Dashboard** — At-a-glance overview of boards, due-soon items, and planner previews.
-- **Inbox** — Incoming items with quick actions.
 - **Boards** — Kanban boards with board views: Board, Calendar, Table, Timeline, and Map.
 - **Schedule** — Day-column planner with drag-and-drop between days and an unscheduled pool.
 - **Content Planner** — Weekly time grid (6 AM – 11 PM) to schedule social posts by hour; drag posts
@@ -64,7 +63,6 @@ fluely/
 │   │   │   ├── boards/           # /boards, /boards/[boardId]
 │   │   │   ├── content-planner/  # /content-planner, /planner
 │   │   │   ├── dev/              # Contrast test page
-│   │   │   ├── inbox/            # /inbox
 │   │   │   ├── schedule/         # /schedule
 │   │   │   └── layout.tsx        # Auth guard, .kali-app wrapper, providers
 │   │   ├── (admin)/              # /admin/dashboard (parallel routes)
@@ -79,7 +77,6 @@ fluely/
 │   │   │   ├── content-planner/  # Weekly time grid planner
 │   │   │   ├── dashboard/        # Home dashboard
 │   │   │   ├── dev/              # Contrast test page
-│   │   │   ├── inbox/            # Inbox view
 │   │   │   ├── layout/           # Sidebar, app shell, top bar
 │   │   │   ├── planner/          # Day-column schedule planner
 │   │   │   ├── shared/           # Buttons, inputs, modals, skeletons
@@ -282,3 +279,4 @@ Request into `main` and request a code review before merging.
 
 More detail for agents and contributors lives in [AGENTS.md](./AGENTS.md) and
 [frontend/AGENTS.md](./frontend/AGENTS.md).
+

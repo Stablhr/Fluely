@@ -4,7 +4,7 @@
 
 Social content planner built on an auth boilerplate — a Next.js 16 frontend plus an Express.js
 backend with JWT authentication, role-based access (User/Admin), email verification, and password
-reset. The planner UI (boards, calendar, inbox, scheduled posts) is ported from
+reset. The planner UI (boards, calendar, scheduled posts) is ported from
 [Stablhr/Kali](https://github.com/Stablhr/Kali) and lives in `frontend/components/kali/`; the
 backend currently exposes auth only, so app data is kept in browser storage.
 

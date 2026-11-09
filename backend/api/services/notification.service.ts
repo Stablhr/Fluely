@@ -43,7 +43,7 @@ async function sendBestEffortEmail(params: {
 }
 
 export const notificationService = {
-  /** The signed-in person's inbox: recent items plus the badge count. */
+  /** The signed-in person's notifications: recent items plus the badge count. */
   async list(actor: Actor) {
     const [rows, unreadCount] = await Promise.all([
       notificationRepository.listForUser(actor.actorId),
@@ -263,3 +263,4 @@ export const notificationService = {
     return {actorName};
   }
 };
+

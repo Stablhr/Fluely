@@ -6,7 +6,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Inbox,
   Columns3,
   CalendarDays,
   Settings,
@@ -55,7 +54,6 @@ function NavLink({ to, end, title, className, style, children }: NavLinkProps) {
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/inbox", label: "Inbox", icon: Inbox },
   { to: "/boards", label: "Boards", icon: Columns3 },
   { to: "/schedule", label: "Schedule", icon: CalendarDays },
   { to: "/content-planner", label: "Social Posting", icon: CalendarRange },
@@ -140,7 +138,6 @@ export default function Sidebar({
   onMouseLeave,
 }: SidebarProps) {
   const { data } = useStore();
-  const inboxCount = data.inbox.length;
   const you = data.members[YOU_ID];
 
   const theme = useAdaptiveTheme("#3971b8");
@@ -236,17 +233,6 @@ export default function Sidebar({
                     )}
                     <Icon size={16} className="shrink-0" />
                     {!collapsed && <span className="flex-1">{item.label}</span>}
-                    {item.to === "/inbox" &&
-                      inboxCount > 0 &&
-                      (collapsed ? (
-                        <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border border-sidebar-bg bg-brand-vanilla px-1 font-mono text-[9px] font-semibold leading-none text-brand-ink">
-                          {inboxCount}
-                        </span>
-                      ) : (
-                        <span className="ml-2 rounded-pill bg-brand-vanilla px-1.5 py-0.5 font-mono text-[10px] font-medium text-brand-ink">
-                          {inboxCount}
-                        </span>
-                      ))}
                   </>
                 )}
               </NavLink>
@@ -363,11 +349,6 @@ export default function Sidebar({
             >
               <Icon size={20} />
               <span className="text-[10px] font-medium">{item.label}</span>
-              {item.to === "/inbox" && inboxCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 rounded-pill bg-brand-vanilla px-1 py-0.5 font-mono text-[8px] font-medium text-brand-ink">
-                  {inboxCount}
-                </span>
-              )}
             </NavLink>
           );
         })}

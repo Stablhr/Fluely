@@ -109,10 +109,6 @@ export interface Store {
     patch: Partial<Board["settings"]>,
   ) => void;
   makeTemplate: (boardId: string) => string;
-  addInboxItem: (text: string) => void;
-  dismissInboxItem: (id: string) => void;
-  moveInboxToBoard: (itemId: string, boardId: string, listId: string) => void;
-  scheduleInboxItem: (itemId: string, boardId: string, date: string) => void;
   archiveCard: (id: string) => void;
   restoreCard: (id: string) => void;
   toggleDone: (id: string) => void;
@@ -273,3 +269,4 @@ export function useStore(): Store {
   if (!ctx) throw new Error("useStore must be used within StoreProvider");
   return ctx;
 }
+

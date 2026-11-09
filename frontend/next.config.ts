@@ -23,7 +23,13 @@ const nextConfig: NextConfig = {
         destination: `${API_PROXY_ORIGIN}/api/:path*`
       }
     ];
-  }
+  },
+  async redirects() {
+    return [
+      { source: '/inbox', destination: '/dashboard', permanent: false },
+      { source: '/inbox/:path*', destination: '/dashboard', permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

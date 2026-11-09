@@ -36,7 +36,7 @@ const NotificationSchema = new Schema<NotificationDocument>(
   {timestamps: true}
 );
 
-// The inbox query: one person's notifications, newest first, unread filterable.
+// Notifications: one person's notifications, newest first, unread filterable.
 NotificationSchema.index({userId: 1, createdAt: -1});
 
 export const NotificationModel = mongoose.model<NotificationDocument>(
@@ -44,3 +44,4 @@ export const NotificationModel = mongoose.model<NotificationDocument>(
   NotificationSchema,
   'notifications'
 );
+

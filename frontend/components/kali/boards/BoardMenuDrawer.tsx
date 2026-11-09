@@ -116,7 +116,7 @@ export default function BoardMenuDrawer({
   const handleReset = () => {
     if (
       window.confirm(
-        "Reset ALL app data? This clears every board, card, and inbox item on this device. This cannot be undone.",
+        "Reset ALL app data? This clears every board and card on this device. This cannot be undone.",
       )
     ) {
       resetAll();

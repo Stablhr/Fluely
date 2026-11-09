@@ -11,13 +11,12 @@ import PromoCard from './PromoCard'
 import StatCard from './StatCard'
 
 export default function DashboardView() {
-  const { data } = useStore()
+  const { data, unreadNotificationCount } = useStore()
 
   const boardCount = Object.keys(data.boards).length
   const dueThisWeek = Object.values(data.cards).filter(
     (c) => !c.done && c.dueDate && isDueThisWeek(c.dueDate),
   ).length
-  const inboxCount = data.inbox.length
   const starredCount = Object.values(data.boards).filter((b) => b.starred).length
 
   return (
@@ -30,7 +29,7 @@ export default function DashboardView() {
         <div className="grid grid-cols-2 gap-4">
           <StatCard tone="green" label="Boards" value={boardCount} />
           <StatCard tone="vanilla" label="Due this week" value={dueThisWeek} />
-          <StatCard tone="blue" label="Inbox unread" value={inboxCount} />
+          <StatCard tone="blue" label="Notifications" value={unreadNotificationCount} />
           <StatCard tone="white" label="Starred boards" value={starredCount} />
         </div>
       </div>

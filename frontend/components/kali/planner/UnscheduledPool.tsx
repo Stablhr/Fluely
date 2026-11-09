@@ -1,7 +1,7 @@
 'use client'
 
 import { Droppable } from '@hello-pangea/dnd'
-import { Inbox } from 'lucide-react'
+import { ListTodo } from 'lucide-react'
 import type { Card } from '@/lib/kali/store/schema'
 import PlannerCard from './PlannerCard'
 
@@ -19,7 +19,7 @@ export default function UnscheduledPool({ cards }: { cards: Card[] }) {
           }`}
         >
           <div className="flex items-center gap-1.5 px-1 pb-2">
-            <Inbox size={14} className="text-text-muted" />
+            <ListTodo size={14} className="text-text-muted" />
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.05em] text-text-secondary">
               Unscheduled
             </h2>

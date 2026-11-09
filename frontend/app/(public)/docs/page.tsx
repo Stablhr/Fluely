@@ -33,8 +33,7 @@ const SECTIONS = [
       '/verify-email — enter verification code',
       '/reset-password — set new password',
       '/ — Kali app dashboard (requires login)',
-      '/inbox — capture inbox',
-      '/boards, /boards/[boardId] — boards with board, calendar, table, timeline and map views',
+      '/boards, /boards/[boardId] - boards with board, calendar, table, timeline and map views',
       '/schedule — day-column planner',
       '/content-planner — weekly social content planner',
       '/admin/dashboard — admin dashboard (requires admin role)'
@@ -44,7 +43,7 @@ const SECTIONS = [
     title: 'Project Structure',
     items: [
       'frontend/app/(auth)/ — public auth pages',
-      'frontend/app/(app)/ — Kali app (dashboard, inbox, boards, schedule, content planner)',
+      'frontend/app/(app)/ - Kali app (dashboard, boards, schedule, content planner)',
       'frontend/app/(admin)/ — admin dashboard with parallel routes',
       'frontend/components/kali/ — Kali feature components',
       'frontend/lib/kali/ — Kali store, hooks, utils and API client',

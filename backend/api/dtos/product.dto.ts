@@ -32,7 +32,6 @@ export const invitationIdParamsSchema = z.object({invitationId: objectId});
 export const notificationIdParamsSchema = z.object({notificationId: objectId});
 export const shareIdParamsSchema = z.object({shareId: objectId});
 export const tokenParamsSchema = z.object({token: requiredText(32)});export const mediaIdParamsSchema = z.object({mediaId: objectId});
-export const inboxIdParamsSchema = z.object({inboxId: objectId});
 export const accountIdParamsSchema = z.object({accountId: objectId});
 export const postIdParamsSchema = z.object({postId: objectId});
 export const jobIdParamsSchema = z.object({jobId: objectId});
@@ -44,30 +43,6 @@ export const preferencesSchema = z.object({
 }).refine(value => value.theme !== undefined || value.timezone !== undefined, 'At least one preference is required');
 
 export const preferencesPatchSchema = preferencesSchema;
-
-export const inboxCreateSchema = z.object({
-  title: requiredText(200),
-  content: text(10000).default(''),
-  source: text(200).optional(),
-  boardId: objectId.optional(),
-  cardId: objectId.optional(),
-  scheduledAt: optionalDate
-});
-
-export const inboxPatchSchema = z.object({
-  title: requiredText(200).optional(),
-  content: text(10000).optional(),
-  source: text(200).optional(),
-  boardId: objectId.nullable().optional(),
-  cardId: objectId.nullable().optional(),
-  scheduledAt: z.string().datetime({offset: true}).nullable().optional(),
-  dismissedAt: z.string().datetime({offset: true}).nullable().optional()
-}).refine(value => Object.keys(value).length > 0, 'At least one field is required');
-
-export const inboxListQuerySchema = paginationQuerySchema.extend({
-  search: text(200).optional(),
-  status: z.enum(['active', 'scheduled', 'dismissed', 'all']).default('active')
-});
 
 export const boardCreateSchema = z.object({
   name: requiredText(120),
@@ -424,8 +399,6 @@ export type MemberCreateInput = z.infer<typeof memberCreateSchema>;
 export type MemberPatchInput = z.infer<typeof memberPatchSchema>;
 export type InvitationCreateInput = z.infer<typeof invitationCreateSchema>;
 export type ShareCreateInput = z.infer<typeof shareCreateSchema>;
-export type InboxCreateInput = z.infer<typeof inboxCreateSchema>;
-export type InboxPatchInput = z.infer<typeof inboxPatchSchema>;
 export type PreferencesInput = z.infer<typeof preferencesSchema>;
 export type SocialPostCreateInput = z.infer<typeof socialPostCreateSchema>;
 export type SocialPostPatchInput = z.infer<typeof socialPostPatchSchema>;
@@ -433,3 +406,4 @@ export type SocialAccountCreateInput = z.infer<typeof socialAccountCreateSchema>
 export type SocialAccountPatchInput = z.infer<typeof socialAccountPatchSchema>;
 export type RunDueInput = z.infer<typeof runDueSchema>;
 export type CaptionInput = z.infer<typeof captionSchema>;
+

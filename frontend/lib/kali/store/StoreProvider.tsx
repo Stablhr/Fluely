@@ -2179,18 +2179,6 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     });
   };
 
-  const addInboxItem = (text: string) =>
-    mutate((prev) => ({
-      ...prev,
-      inbox: [{ id: uid(), text, createdAt: now() }, ...prev.inbox],
-    }));
-
-  const dismissInboxItem = (id: string) =>
-    mutate((prev) => ({
-      ...prev,
-      inbox: prev.inbox.filter((i) => i.id !== id),
-    }));
-
   const archiveCard = (id: string) =>
     mutate((prev) => {
       const card = prev.cards[id];
@@ -3315,47 +3303,6 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }
   };
 
-  const moveInboxToBoard = (itemId: string, boardId: string, listId: string) =>
-    mutate((prev) => {
-      const item = prev.inbox.find((i) => i.id === itemId);
-      const list = prev.lists[listId];
-      if (!item || !list || list.boardId !== boardId) return prev;
-      if (!canWrite(boardId)) return prev;
-      const card = makeCard(list, item.text, {
-        activity: [{ id: uid(), text: "created from inbox", createdAt: now() }],
-      });
-      return {
-        ...withCardAdded(prev, card),
-        inbox: prev.inbox.filter((i) => i.id !== itemId),
-      };
-    });
-
-  const scheduleInboxItem = (itemId: string, boardId: string, date: string) =>
-    mutate((prev) => {
-      const item = prev.inbox.find((i) => i.id === itemId);
-      const board = prev.boards[boardId];
-      if (!item || !board || board.listOrder.length === 0) return prev;
-      if (!canWrite(boardId)) return prev;
-      const listId = board.listOrder[0];
-      const list = prev.lists[listId];
-      if (!list) return prev;
-      const card = makeCard(list, item.text, {
-        dueDate: date,
-        activity: [
-          {
-            id: uid(),
-            text: `scheduled for ${formatDate(date)}`,
-            createdAt: now(),
-          },
-          { id: uid(), text: "created from inbox", createdAt: now() },
-        ],
-      });
-      return {
-        ...withCardAdded(prev, card),
-        inbox: prev.inbox.filter((i) => i.id !== itemId),
-      };
-    });
-
   const resetAll = () => {
     clearData(currentUser?.id);
     // Through `mutate`, not `setData`, so `dataRef` swaps with it -- a later
@@ -3548,10 +3495,6 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     addBoardActivity,
     setBoardSettings,
     makeTemplate,
-    addInboxItem,
-    dismissInboxItem,
-    moveInboxToBoard,
-    scheduleInboxItem,
     archiveCard,
     restoreCard,
     toggleDone,
@@ -3623,3 +3566,5 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
   );
 }
+
+

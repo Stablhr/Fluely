@@ -206,6 +206,7 @@ export interface Card {
   updatedAt: string;
 }
 
+/** @deprecated Removed with the Inbox page; kept for one-time migration only. */
 export interface InboxItem {
   id: string;
   text: string;
@@ -423,7 +424,7 @@ export interface AppData {
   boards: Record<string, Board>;
   lists: Record<string, List>;
   cards: Record<string, Card>;
-  inbox: InboxItem[];
+  inbox: InboxItem[]; // @deprecated kept for migration; no UI reads it
   members: Record<string, Member>;
   ui: {
     lastVisitedBoardId: string | null;
@@ -530,3 +531,5 @@ export function emptyData(): AppData {
     },
   };
 }
+
+
