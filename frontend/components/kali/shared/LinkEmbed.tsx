@@ -115,26 +115,28 @@ export default function LinkEmbed({
         )}
       </span>
 
-      <span className="flex items-center justify-between gap-2 border-t border-border bg-surface px-3 py-2">
-        <span className="min-w-0 truncate text-xs text-text-muted">{label}</span>
-        {interactive ? (
-          <a
-            href={descriptor.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer nofollow ugc"
-            title={descriptor.sourceUrl}
-            className="inline-flex shrink-0 items-center gap-1 rounded-sm text-xs font-semibold text-primary-text underline underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-          >
-            {openLabel}
-            <ExternalLink size={12} aria-hidden="true" />
-          </a>
-        ) : (
-          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-text">
-            {openLabel}
-            <ExternalLink size={12} aria-hidden="true" />
-          </span>
-        )}
-      </span>
+      {descriptor.provider !== 'youtube' && (
+        <span className="flex items-center justify-between gap-2 border-t border-border bg-surface px-3 py-2">
+          <span className="min-w-0 truncate text-xs text-text-muted">{label}</span>
+          {interactive ? (
+            <a
+              href={descriptor.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer nofollow ugc"
+              title={descriptor.sourceUrl}
+              className="inline-flex shrink-0 items-center gap-1 rounded-sm text-xs font-semibold text-primary-text underline underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              {openLabel}
+              <ExternalLink size={12} aria-hidden="true" />
+            </a>
+          ) : (
+            <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-text">
+              {openLabel}
+              <ExternalLink size={12} aria-hidden="true" />
+            </span>
+          )}
+        </span>
+      )}
     </span>
   )
 }
