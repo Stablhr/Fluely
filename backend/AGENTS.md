@@ -65,7 +65,13 @@ All API errors must follow this shape (enforced in `api/middleware/errorHandler.
 - Never commit `.env` files — only `.env.example` is tracked
 - Never log secrets, tokens, or passwords
 - Cookies use HTTP-only, Secure, SameSite — configured via env vars
-- Refresh tokens are revoked on use (in-memory blocklist — resets on server restart)
+- Refresh tokens are revoked on use and on logout. Revocations live in MongoDB (`revokedtokens`,
+  SHA-256 of the token, TTL-expired with the token) so every serverless instance sees them. Each
+  refresh token carries a random `jti` so two tokens are never identical
+- Security rate limits (`authLimiter`, `authActionLimiter`, `uploadLimiter`, `linkPreviewLimiter`)
+  count in MongoDB (`ratelimitcounters`) via `MongoRateLimitStore`, so the budget holds across
+  instances; high-frequency read/poll limiters stay in memory. On Vercel the app trusts one proxy
+  hop so `req.ip` is the real client
 - Passwords must be bcrypt-hashed before storage
 - All input passes through Zod validation before reaching services
 - Sanitize middleware strips `$`-prefixed keys to prevent NoSQL injection
@@ -103,5 +109,8 @@ in production: the endpoint then requires Vercel's `Authorization: Bearer <CRON_
 ## Testing
 
 - Jest suites live in `backend/tests/`: board access, board children (lists/cards), board polling,
-  and media access
+  media access, and shared security state (blocklist + rate-limit store)
+- Tests that need a database use `mongodb-memory-server-core` (downloads a MongoDB binary on first
+  run); never point tests at the real `MONGO_URI`
+- CI runs `npm test` for the backend on every push and pull request
 - Add new tests there and assert against the error shape above

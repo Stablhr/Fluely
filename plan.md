@@ -19,7 +19,7 @@ JWT auth, roles, email verification, and password reset. The planner UI is porte
 
 | Area | Status |
 |---|---|
-| Auth | Sign in/up, email verification, password reset, JWT + refresh cookies, CSRF, User/Admin roles. |
+| Auth | Sign in/up, email verification, password reset, JWT + refresh cookies, CSRF, User/Admin roles. Token revocation and security rate limits are stored in MongoDB, so they hold across serverless instances. |
 | Admin | `/admin/dashboard` with `@profile` and `@settings` parallel routes, `?tab=` switching. |
 | Landing / docs | `/landing`, `/docs`. |
 | Boards | Board/Calendar/Table/Timeline/Map views, persisted server-side: boards, lists, cards, comments, covers, labels, archive, activity log. Workspaces, collaborators, email invitations, public boards by slug, and 3.5 s polling for collaborators' changes. |
@@ -31,7 +31,7 @@ JWT auth, roles, email verification, and password reset. The planner UI is porte
 | Social Posting | `/content-planner`: platform overview + calendar / board / table views over one shared post state, with a right-side slide-over editor. |
 | Schedule | `/schedule` (and the `/planner` alias): day columns of board cards by due date, plus an unscheduled pool. |
 | Branding | So Matcha design system, light only, Fluely logo + mascot assets, branded auth pages and loading screen. |
-| Tests | Backend Jest suites for board access, board children, board polling, and media access (64 tests). |
+| Tests | Backend Jest suites for board access, board children, board polling, media access, and shared security state (76 tests), run in CI. |
 
 Removed: the Inbox page. Capture now goes into boards, and legacy inbox items are migrated into a
 board on load (`AppData.inbox` is kept only for that migration).
@@ -72,8 +72,6 @@ Ordered by dependency, not by size.
 
 ## Known gaps
 
-- **Refresh-token blocklist is in memory** and resets on server restart (and per serverless
-  instance on Vercel).
 - **`SidebarTab` still includes `'goals'`** but no UI reaches it; the tips/goals sidebar is opened
   only on the `tips` tab.
 - **No dark mode** — deliberately dropped so every route stays on the ivory canvas.
