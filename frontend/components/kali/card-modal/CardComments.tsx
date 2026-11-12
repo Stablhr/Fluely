@@ -350,7 +350,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
         : undefined) ?? {
         id: comment.authorId,
         name: comment.authorId === store.currentUserId || comment.authorId === YOU_ID ? 'You' : 'Unknown',
-        color: '#3971B8',
+        color: '#2554C7',
       }
     const reactionEntries = Object.entries(comment.reactions).filter(([, c]) => c > 0)
     const pickerOpen = activePicker === comment.id
@@ -368,7 +368,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
           <Avatar member={author} size={36} />
         </ProfilePopover>
         <div className="min-w-0 flex-1">
-          <div className="rounded-2xl bg-brand-vanilla/15 px-4 py-3 dark:bg-brand-vanilla/10">
+          <div className="rounded-card border border-border bg-surface-alt px-4 py-3">
             <div className="flex items-baseline gap-2">
               <span className="font-heading text-sm font-semibold text-text-primary">{author.name}</span>
               <span className="font-mono text-[11px] text-text-muted">{formatDateTime(comment.createdAt)}</span>

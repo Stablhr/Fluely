@@ -5,8 +5,7 @@ import type { Platform, SocialPost } from '@/lib/kali/store/schema'
 import PlatformIcon from '../social/PlatformIcon'
 import {
   ALL_PLATFORMS,
-  OVERVIEW_BLOCKS,
-  OVERVIEW_BLOCK_INK,
+  OVERVIEW_HEADER,
   columnForStatus,
   enabledPlatforms,
   platformLabel,
@@ -20,7 +19,6 @@ export interface PlatformOverviewProps {
   onSelect: (platform: Platform | 'all') => void
 }
 
-const TOTAL_BLOCK = 'bg-brand-ink'
 
 interface Counts {
   total: number
@@ -73,10 +71,6 @@ export default function PlatformOverview({ posts, active, onSelect }: PlatformOv
       {(['all', ...ALL_PLATFORMS] as const).map((key) => {
         const countsForKey = key === 'all' ? counts.all : counts.byPlatform[key]
         const isActive = active === key
-        // The "all" card is ink, not one of the rotating brand blocks, so its
-        // ink colour is decided alongside the block rather than looked up.
-        const block = key === 'all' ? null : OVERVIEW_BLOCKS[ALL_PLATFORMS.indexOf(key)]
-        const ink = block ? OVERVIEW_BLOCK_INK[block] : 'text-brand-ivory'
 
         return (
           <button
@@ -84,13 +78,13 @@ export default function PlatformOverview({ posts, active, onSelect }: PlatformOv
             type="button"
             onClick={() => onSelect(key)}
             aria-pressed={isActive}
-            className={`group flex flex-col overflow-hidden rounded-2xl border bg-surface text-left transition-all duration-150 ${
+            className={`group flex flex-col overflow-hidden rounded-card border bg-surface text-left transition-all duration-150 ${
               isActive
                 ? 'border-primary ring-2 ring-primary/25'
                 : 'border-border hover:border-border-strong'
             }`}
           >
-            <span className={`flex items-center gap-2 px-3 py-2 ${block ?? TOTAL_BLOCK} ${ink}`}>
+            <span className={`flex items-center gap-2 px-3 py-2 ${OVERVIEW_HEADER} border-b border-border`}>
               {key === 'all' ? (
                 <span className="text-[13px] font-semibold">All channels</span>
               ) : (
@@ -102,7 +96,7 @@ export default function PlatformOverview({ posts, active, onSelect }: PlatformOv
             </span>
 
             <span className="flex items-baseline gap-1.5 px-3 pt-2">
-              <span className="font-heading text-2xl font-bold leading-none text-text-primary">
+              <span className="text-2xl font-semibold leading-none tabular-nums text-text-primary">
                 {countsForKey.total}
               </span>
               <span className="text-[11px] text-text-muted">

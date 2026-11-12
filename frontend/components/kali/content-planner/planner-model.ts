@@ -90,24 +90,11 @@ export function statusLabel(status: SocialPostStatus): string {
 export const ALL_PLATFORMS: Platform[] = ['instagram', 'facebook', 'tiktok', 'youtube']
 
 /**
- * Flat colour blocks for the overview cards, rotating through the brand palette
- * rather than each platform's own brand colour — the platform's real colour is
- * reserved for the icons and accents, so the cards read as one set.
+ * Header strip for the overview cards. One neutral treatment for every card —
+ * the platform's own colour is reserved for its icon, so the cards read as one
+ * set in both themes.
  */
-export const OVERVIEW_BLOCKS = [
-  'bg-brand-blue',
-  'bg-brand-green',
-  'bg-brand-vanilla',
-  'bg-blue-deep',
-] as const
-
-/** Text that stays legible on each block above. */
-export const OVERVIEW_BLOCK_INK: Record<(typeof OVERVIEW_BLOCKS)[number], string> = {
-  'bg-brand-blue': 'text-brand-ivory',
-  'bg-brand-green': 'text-brand-ink',
-  'bg-brand-vanilla': 'text-brand-ink',
-  'bg-blue-deep': 'text-brand-ivory',
-}
+export const OVERVIEW_HEADER = 'bg-surface-alt text-text-primary'
 
 export function platformLabel(platform: Platform): string {
   return platform.charAt(0).toUpperCase() + platform.slice(1)

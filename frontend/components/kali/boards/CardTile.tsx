@@ -197,7 +197,7 @@ function CardTile({ card, index, onOpenCard }: CardTileProps) {
                   </span>
                 )}
                 {card.watching && (
-                  <Eye size={12} style={{ color: '#10c4bb' }} aria-label="Watching" />
+                  <Eye size={12} className="text-primary-text" aria-label="Watching" />
                 )}
 
                 {members.length > 0 && (

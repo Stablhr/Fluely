@@ -1,16 +1,14 @@
 import type {Metadata} from 'next';
-import {Geist, Geist_Mono, JetBrains_Mono, Poppins, Comfortaa} from 'next/font/google';
+import {Geist, Geist_Mono} from 'next/font/google';
 import './globals.css';
 import {cn} from '@/lib/utils';
 import ReactQueryProvider from '@/lib/provider/ReactQueryProvider';
 import LoadingScreenProvider from '@/lib/provider/LoadingScreenProvider';
-import {LOADING_FRAMES} from '@/lib/loadingFrames';
+import {THEME_INIT_SCRIPT} from '@/lib/theme/theme';
+import {ThemeSync} from '@/lib/theme/useTheme';
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono'
-});
-
+/* One UI typeface for the whole product, plus its mono companion for code and
+   tabular figures. */
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin']
@@ -21,44 +19,18 @@ const geistMono = Geist_Mono({
   subsets: ['latin']
 });
 
-/* So Matcha brand faces — Poppins for headings and numerals, Comfortaa for
-   body copy. Exposed as --font-poppins / --font-comfortaa so the theme layer
-   can publish them as the font-heading and font-body utilities. */
-const poppins = Poppins({
-  subsets: ['latin'],
-  weight: ['500', '600', '700'],
-  variable: '--font-poppins'
-});
-
-const comfortaa = Comfortaa({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-comfortaa'
-});
-
 export const metadata: Metadata = {
-  metadataBase: new URL('https://yourdomain.vercel.app'), // Replace with your actual URL
+  metadataBase: new URL('https://fluely.vercel.app'),
   title: 'Fluely',
   description: 'Project-Management System with Social Media Content Planner',
   icons: {
-    // The supplied favicon asset is 413x604 rather than a square icon, so the
-    // real intrinsic size is declared instead of invented 32x32/192x192 hints.
-    icon: [{url: '/assets/fluely_favicon.png', type: 'image/png', sizes: '413x604'}],
-    apple: '/assets/fluely_favicon.png'
+    icon: [{url: '/assets/fluely_mark.svg', type: 'image/svg+xml'}]
   },
   openGraph: {
     title: 'Fluely',
     description: 'Project-Management and Social Media Planner',
-    url: 'https://yourdomain.vercel.app/',
-    type: 'website',
-    images: [
-      {
-        url: '/assets/fluely_logo.png',
-        width: 1480,
-        height: 1063,
-        alt: 'Fluely'
-      }
-    ]
+    url: 'https://fluely.vercel.app/',
+    type: 'website'
   }
 };
 
@@ -70,26 +42,17 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn(
-        'h-full',
-        'antialiased',
-        geistSans.variable,
-        geistMono.variable,
-        'font-mono',
-        jetbrainsMono.variable,
-        poppins.variable,
-        comfortaa.variable
-      )}
+      // The theme script below adds `dark` and a color-scheme before hydration,
+      // so the server and client attributes on <html> legitimately differ.
+      suppressHydrationWarning
+      className={cn('h-full', 'antialiased', geistSans.variable, geistMono.variable, 'font-sans')}
     >
       <head>
-        {/* The boot curtain is part of the server HTML, so its mascot frames are
-            requested in parallel with the bundle rather than after hydration.
-            These are the same URLs the <img> uses, so the preloads are hits. */}
-        {LOADING_FRAMES.map((src) => (
-          <link key={src} rel="preload" as="image" href={src} />
-        ))}
+        {/* Applies the saved light/dark choice before first paint. */}
+        <script dangerouslySetInnerHTML={{__html: THEME_INIT_SCRIPT}} />
       </head>
       <body className="min-h-full flex flex-col">
+        <ThemeSync />
         <ReactQueryProvider>
           <LoadingScreenProvider>{children}</LoadingScreenProvider>
         </ReactQueryProvider>

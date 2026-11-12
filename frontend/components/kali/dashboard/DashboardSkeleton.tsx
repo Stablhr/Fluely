@@ -79,11 +79,11 @@ export default function DashboardSkeleton() {
           </div>
 
           {/* PromoCard skeleton */}
-          <div className="rounded-card bg-sidebar-bg p-6 shadow-card">
+          <div className="rounded-card border border-border bg-surface p-6 shadow-card">
             <Skeleton className="h-9 w-9 rounded-chip" />
-            <Skeleton className="mt-4 h-4 w-32 bg-white/20" />
-            <Skeleton className="mt-2 h-3 w-44 bg-white/20" />
-            <Skeleton className="mt-4 h-8 w-28 rounded-pill bg-white/20" />
+            <Skeleton className="mt-4 h-4 w-32" />
+            <Skeleton className="mt-2 h-3 w-44" />
+            <Skeleton className="mt-4 h-8 w-28 rounded-pill" />
           </div>
         </div>
       </div>

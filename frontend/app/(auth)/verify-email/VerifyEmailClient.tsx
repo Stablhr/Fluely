@@ -172,7 +172,7 @@ export default function VerifyEmailClient() {
         )}
 
         {successMessage && (
-          <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+          <div className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground">
             {successMessage}
           </div>
         )}

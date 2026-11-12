@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield } from 'lucide-react'
 import AvatarCropModal from './AvatarCropModal'
+import ThemePicker from './ThemePicker'
 import { useQueryClient } from '@tanstack/react-query'
 import { meQueryKey, useMeQuery } from '@/lib/hooks/auth/useMeQuery'
 import { getDisplayName } from '@/lib/api/authApi'
@@ -41,16 +42,16 @@ const inputClass =
   'w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-primary/20'
 
 const AVATAR_COLORS = [
-  { label: 'Celtic Blue', value: '#3971b8' },
-  { label: 'Tea Green', value: '#c8d69b' },
-  { label: 'Vanilla', value: '#f6e6a5' },
-  { label: 'Warm rose', value: '#ff8b5e' },
-  { label: 'Lavender', value: '#8b7cf6' },
-  { label: 'Mint', value: '#33b27a' },
+  { label: 'Cobalt', value: '#2554c7' },
+  { label: 'Teal', value: '#0f766e' },
+  { label: 'Violet', value: '#6d4fc4' },
+  { label: 'Amber', value: '#b45309' },
+  { label: 'Rose', value: '#be3a5e' },
+  { label: 'Slate', value: '#475569' },
 ]
 
 const PRONOUNS_OPTIONS = ['', 'he/him', 'she/her', 'they/them', 'custom']
-const ACCENT_SWATCHES = ['#3971b8', '#c8d69b', '#f6e6a5', '#ff8b5e', '#8b7cf6', '#33b27a', '#ff5e6c']
+const ACCENT_SWATCHES = ['#2554c7', '#0369a1', '#0f766e', '#15803d', '#6d4fc4', '#b45309', '#be3a5e', '#475569']
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User, description: 'How you appear to collaborators.' },
@@ -132,7 +133,7 @@ export default function SettingsView() {
         bio: profile.bio ?? '',
         pronouns: profile.pronouns ?? '',
         timezone: profile.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-        accentColor: profile.accentColor ?? '#3971b8',
+        accentColor: profile.accentColor ?? '#2554c7',
         avatarColor: profile.avatarColor ?? colorFromId(profile.id ?? me?.user?.id ?? 'you'),
         phone: profile.phone ?? '',
         profileVisibility: profile.profileVisibility ?? { email: 'me', phone: 'me', others: 'boards' },
@@ -215,7 +216,7 @@ export default function SettingsView() {
         bio: profile.bio ?? '',
         pronouns: profile.pronouns ?? '',
         timezone: profile.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-        accentColor: profile.accentColor ?? '#3971b8',
+        accentColor: profile.accentColor ?? '#2554c7',
         avatarColor: profile.avatarColor ?? colorFromId(profile.id ?? me?.user?.id ?? 'you'),
         phone: profile.phone ?? '',
         profileVisibility: profile.profileVisibility ?? { email: 'me', phone: 'me', others: 'boards' },
@@ -330,7 +331,7 @@ export default function SettingsView() {
     ? storeAvatarUrl
     : (profile?.avatarUrl ?? user?.avatarUrl ?? null)
   const avatarColor = draft.avatarColor ?? profile?.avatarColor ?? colorFromId(profile?.id ?? user?.id ?? 'you')
-  const accentColor = draft.accentColor ?? profile?.accentColor ?? '#3971b8'
+  const accentColor = draft.accentColor ?? profile?.accentColor ?? '#2554c7'
 
   useEffect(() => {
     if (!dirty) return
@@ -817,16 +818,20 @@ export default function SettingsView() {
             )}
 
             {tab === 'appearance' && (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 max-w-[1600px]">
-                <Section title="Theme" description="Follows your system preference.">
-                  <p className="text-[13px] text-text-muted">Light / dark theme switching is not available yet.</p>
+              <div className="grid max-w-[960px] grid-cols-1 gap-4">
+                <Section title="Theme" description="Choose how Fluely looks on this device.">
+                  <ThemePicker />
                 </Section>
-                <Section title="Density" description="Compact or comfortable spacing.">
-                  <p className="text-[13px] text-text-muted">Density options are not available yet.</p>
-                </Section>
-                <Section title="Motion" description="Reduce animations.">
-                  <p className="text-[13px] text-text-muted">Motion options are not available yet.</p>
-                </Section>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <Section title="Density" description="Compact or comfortable spacing.">
+                    <p className="text-[13px] text-text-muted">Density options are not available yet.</p>
+                  </Section>
+                  <Section title="Motion" description="Reduce animations.">
+                    <p className="text-[13px] text-text-muted">
+                      Fluely follows your device&apos;s reduce-motion setting.
+                    </p>
+                  </Section>
+                </div>
               </div>
             )}
 

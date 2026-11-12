@@ -168,7 +168,7 @@ export default function SignUpPage() {
               { label: 'At least one number', ok: /[0-9]/.test(password) },
               { label: 'At least one special character', ok: /[^A-Za-z0-9]/.test(password) },
             ].map((req) => (
-              <li key={req.label} className={req.ok ? 'text-green-600' : 'text-text-muted'}>
+              <li key={req.label} className={req.ok ? 'text-success-text' : 'text-text-muted'}>
                 {req.ok ? '✓' : '○'} {req.label}
               </li>
             ))}

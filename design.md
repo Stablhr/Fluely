@@ -6,18 +6,16 @@ and priorities live in [`plan.md`](./plan.md).
 
 ## Brand
 
-**So Matcha** — a warm, low-contrast palette that reads as a workspace rather than a dashboard tool.
-Celtic Blue carries interaction and emphasis; Tea Green, Vanilla, and Ivory are the supporting
-surfaces; Drab Dark Brown is the ink. Dark mode was removed so every route sits on the same ivory
-canvas and the palette never has to be re-derived for a second theme.
+**Slate** — a calm, neutral workspace for professionals. A slate ramp carries surfaces, text, and
+borders; one cobalt accent carries primary actions, links, focus, and selection; semantic colors
+appear only where they mean something. Light and dark themes are both first-class, chosen per
+browser in Settings → Appearance.
 
-Two typefaces carry the whole product: **Poppins** for headings, numerals, and the wordmark;
-**Comfortaa** for everything else. Both are declared once on `.kali-app` in `frontend/app/kali.css` —
-components should apply `font-heading` / `font-body` and never name a family directly.
+One typeface, **Geist**, carries the whole product; hierarchy comes from weight and size, not from
+mixing families. The mark is a simple cobalt "F" tile (`components/brand/FluelyMark.tsx`).
 
-Cards are `rounded-2xl` / `rounded-3xl` on white, separated by hairline borders and very soft
-shadows. Depth comes from layered translucency, not from heavy drop shadows. Use the `shadow-subtle`
-/ `shadow-medium` / `shadow-modal` scale rather than ad-hoc shadows.
+Cards are 10–12px radius on `surface`, separated by hairline borders; shadows only lift things that
+float. Motion is short and straight — no bounce, no idle animation.
 
 ## The Content Planner
 
@@ -28,8 +26,8 @@ because they answer different questions about the same set of posts.
 
 A row of cards — one per platform plus an "All channels" aggregate — each showing total posts,
 scheduled / posted / in-progress counts, and how many distinct days carry work for that platform.
-The card body is a flat color block rotating through the brand palette, so the row reads as one set
-instead of a brand-color clash.
+Every card uses the same neutral header strip, so the row reads as one set instead of a
+brand-color clash.
 
 Platform *brand* color (Instagram pink, YouTube red) is reserved for icons and accents. The
 overview blocks deliberately do not use it. Clicking a card sets the active platform filter, which
@@ -45,7 +43,7 @@ while on desktop it reveals on hover.
 **Board** — five columns: Idea, Draft, In Review, Scheduled, Posted. Cards drag between columns and
 dropping sets the post's stage. A card shows a platform-accent bar, title, optional thumbnail, tags,
 platform icons, and its date. Single-platform posts take that platform's color; multi-platform posts
-use ink brown, so the accent never implies the wrong destination.
+use neutral slate, so the accent never implies the wrong destination.
 
 **Table** — the scanning view. Title, Platform, Status, Scheduled, Tags, Linked board, with
 search across title/caption/notes/tags, a date range, and sortable columns. A date range
@@ -100,8 +98,8 @@ status needs renaming, it is a one-file change.
 
 ## Open design questions
 
-- The auth page's small inline logo and the large overlapping wordmark currently render the same
-  asset at two sizes. Decide whether there should be two distinct marks.
+- The "F" tile is a placeholder-quality mark drawn in code. A designed logo can replace
+  `FluelyMark` without touching its call sites.
 - `social/ComposeModal.tsx` and `content-planner/PostDetailPanel.tsx` are two post editors with
   different field sets. The long-term shape should be one editor, or one composing the other.
 - The engagement/tips sidebar survived the planner rebuild as a toggle. It is not part of the

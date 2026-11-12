@@ -1,187 +1,152 @@
 import Link from 'next/link';
+import {
+  ArrowRight,
+  Bell,
+  CalendarRange,
+  Columns3,
+  Images,
+  Send,
+  Users
+} from 'lucide-react';
 
 const FEATURES = [
   {
-    title: 'Auth System',
-    description: 'Sign up, sign in, email verification, forgot & reset password — all built in.'
+    icon: Columns3,
+    title: 'Boards',
+    description: 'Lists, cards, labels, due dates, and attachments for every project your team runs.'
   },
   {
-    title: 'JWT + Cookies',
-    description: 'HTTP-only cookies with token rotation and refresh token revocation.'
+    icon: CalendarRange,
+    title: 'Schedule',
+    description: 'See deadlines across every board on one weekly calendar and plan around them.'
   },
   {
-    title: 'Role-based Access',
-    description: 'Separate User and Admin dashboards with protected routes and auth guards.'
+    icon: Send,
+    title: 'Social planner',
+    description: 'Draft, review, and schedule posts for Instagram, Facebook, TikTok, and YouTube.'
   },
   {
-    title: 'Email Service',
-    description: 'Nodemailer-powered transactional emails with customizable HTML templates.'
+    icon: Users,
+    title: 'Collaboration',
+    description: 'Invite teammates as editors or viewers, comment on cards, and mention people.'
   },
   {
-    title: 'Input Validation',
-    description: 'Zod schemas on every endpoint. No bad data reaches your database.'
+    icon: Bell,
+    title: 'Notifications',
+    description: 'Stay on top of invitations, mentions, and changes without chasing updates.'
   },
   {
-    title: 'Security Basics',
-    description: 'Helmet, CORS, rate limiting, body size limits, and NoSQL injection prevention.'
+    icon: Images,
+    title: 'Media library',
+    description: 'Keep images and video with the cards and posts they belong to.'
   }
 ];
 
-const STACK = [
-  { name: 'Next.js 16', role: 'Frontend' },
-  { name: 'React 19', role: 'UI' },
-  { name: 'TypeScript', role: 'Language' },
-  { name: 'TailwindCSS v4', role: 'Styling' },
-  { name: 'shadcn/ui', role: 'Components' },
-  { name: 'TanStack Query', role: 'State' },
-  { name: 'Express.js', role: 'Backend' },
-  { name: 'Mongoose', role: 'Database' },
-  { name: 'Zod', role: 'Validation' },
-  { name: 'JWT', role: 'Auth' },
-  { name: 'bcrypt', role: 'Passwords' },
-  { name: 'Nodemailer', role: 'Email' }
+const PREVIEW_LISTS = [
+  {name: 'To do', cards: [{t: 'Q3 campaign brief', l: 'bg-violet-600'}, {t: 'Product photos', l: 'bg-orange-700'}]},
+  {name: 'In progress', cards: [{t: 'Launch post copy', l: 'bg-primary'}, {t: 'Landing page review', l: 'bg-sky-700'}]},
+  {name: 'Scheduled', cards: [{t: 'Instagram carousel', l: 'bg-rose-700'}]}
 ];
 
-const STRUCTURE = [
-  { path: 'frontend/app/(auth)/', desc: 'Sign in, sign up, forgot password, verify email' },
-  { path: 'frontend/app/(user)/', desc: 'User dashboard with profile and settings' },
-  { path: 'frontend/app/(admin)/', desc: 'Admin dashboard with overview and settings' },
-  { path: 'frontend/lib/api/', desc: 'Centralized API client with interceptors' },
-  { path: 'backend/api/services/', desc: 'Business logic layer' },
-  { path: 'backend/api/repositories/', desc: 'Data access layer (Mongoose)' },
-  { path: 'backend/api/middleware/', desc: 'Auth, validation, rate limiting, error handling' },
-  { path: 'backend/api/dtos/', desc: 'Zod validation schemas' }
-];
+function ProductPreview() {
+  return (
+    <div
+      aria-hidden
+      className="mx-auto mt-16 max-w-5xl overflow-hidden rounded-xl text-left border border-border bg-card shadow-xl shadow-black/5"
+    >
+      <div className="flex items-center gap-1.5 border-b border-border px-4 py-2.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-border" />
+        <span className="h-2.5 w-2.5 rounded-full bg-border" />
+        <span className="h-2.5 w-2.5 rounded-full bg-border" />
+        <span className="ml-3 text-xs text-muted-foreground">Marketing · Board</span>
+      </div>
+      <div className="flex">
+        <div className="hidden w-44 shrink-0 space-y-1 border-r border-border p-3 sm:block">
+          {['Dashboard', 'Boards', 'Schedule', 'Social posting', 'Settings'].map((item, i) => (
+            <div
+              key={item}
+              className={`rounded-md px-2.5 py-1.5 text-xs ${
+                i === 1 ? 'bg-primary-subtle font-medium text-primary-text' : 'text-muted-foreground'
+              }`}
+            >
+              {item}
+            </div>
+          ))}
+        </div>
+        <div className="grid flex-1 grid-cols-1 gap-3 bg-background p-4 sm:grid-cols-3">
+          {PREVIEW_LISTS.map((list) => (
+            <div key={list.name} className="rounded-lg bg-muted p-2.5">
+              <p className="px-1 text-xs font-semibold text-foreground">{list.name}</p>
+              <div className="mt-2 space-y-2">
+                {list.cards.map((card) => (
+                  <div key={card.t} className="rounded-md border border-border bg-card p-2.5 shadow-sm">
+                    <span className={`block h-1 w-8 rounded-full ${card.l}`} />
+                    <p className="mt-2 text-xs font-medium text-foreground">{card.t}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Hero */}
-      <section className="flex flex-col items-center justify-center px-6 pt-32 pb-20 text-center">
-        <div className="mb-6 inline-flex items-center rounded-full border border-border bg-muted px-4 py-1.5 text-xs text-foreground">
-          Open source boilerplate
+      <section className="px-6 pt-24 pb-20 text-center sm:pt-28">
+        <div className="mx-auto max-w-3xl">
+          <p className="text-sm font-medium text-primary-text">Projects and content in one workspace</p>
+          <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">
+            Plan the work.
+            <br />
+            Schedule the content.
+          </h1>
+          <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground">
+            Fluely brings your team&apos;s boards, deadlines, and social calendar together, so
+            nothing ships late and nothing posts by surprise.
+          </p>
+          <div className="mt-10 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/sign-up"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+            >
+              Create free account
+              <ArrowRight size={16} />
+            </Link>
+            <Link
+              href="/sign-in"
+              className="rounded-md border border-border bg-card px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              Sign in
+            </Link>
+          </div>
         </div>
-        <h1 className="max-w-3xl text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl">
-          Next.js + Express
-          <br />
-          <span className="text-muted-foreground">Auth Kit</span>
-        </h1>
-        <p className="mt-6 max-w-xl text-lg text-muted-foreground">
-          A full-stack authentication boilerplate with JWT, role-based access, email
-          verification, and a clean project structure. Skip the setup, start building.
-        </p>
-        <div className="mt-10 flex gap-4">
-          <Link
-            href="/sign-up"
-            className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Get Started
-          </Link>
-          <a
-            href="https://github.com/Tobikun11-Arch/express-next-auth-kit"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
-          >
-            GitHub
-          </a>
-        </div>
+        <ProductPreview />
       </section>
 
       {/* Features */}
-      <section className="border-t border-border px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="text-center text-3xl font-bold tracking-tight">
-            Everything you need
-          </h2>
-          <p className="mt-3 text-center text-muted-foreground">
-            A complete auth system so you can focus on your product.
-          </p>
-          <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map(f => (
-              <div key={f.title} className="rounded-xl border border-border p-6">
-                <h3 className="text-base font-semibold">{f.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{f.description}</p>
+      <section className="border-t border-border bg-card px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl font-semibold tracking-tight">Everything your team plans, in one place</h2>
+            <p className="mt-3 text-muted-foreground">
+              Replace the spreadsheet, the task app, and the content calendar with one tool.
+            </p>
+          </div>
+          <div className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map(({icon: Icon, title, description}) => (
+              <div key={title}>
+                <span className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-primary-text">
+                  <Icon size={18} />
+                </span>
+                <h3 className="mt-4 text-base font-semibold">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{description}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Tech Stack */}
-      <section className="border-t border-border bg-muted px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="text-center text-3xl font-bold tracking-tight">Tech Stack</h2>
-          <p className="mt-3 text-center text-muted-foreground">
-            Modern tools, battle-tested libraries.
-          </p>
-          <div className="mt-16 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-            {STACK.map(s => (
-              <div
-                key={s.name}
-                className="rounded-lg border border-border bg-card px-4 py-3"
-              >
-                <span className="text-sm font-medium">{s.name}</span>
-                <span className="ml-2 text-xs text-muted-foreground">{s.role}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Structure */}
-      <section className="border-t border-border px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="text-center text-3xl font-bold tracking-tight">
-            Clean Structure
-          </h2>
-          <p className="mt-3 text-center text-muted-foreground">
-            Organized by concern. Easy to scale.
-          </p>
-          <div className="mt-16 space-y-3">
-            {STRUCTURE.map(s => (
-              <div
-                key={s.path}
-                className="flex flex-col gap-1 rounded-lg border border-border px-5 py-4 sm:flex-row sm:items-center sm:gap-4"
-              >
-                <code className="shrink-0 font-mono text-sm text-foreground">{s.path}</code>
-                <span className="text-sm text-muted-foreground">{s.desc}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CI/CD */}
-      <section className="border-t border-border bg-muted px-6 py-24">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="text-center text-3xl font-bold tracking-tight">
-            CI/CD Ready
-          </h2>
-          <p className="mt-3 text-center text-muted-foreground">
-            GitHub Actions workflows included. Push and deploy.
-          </p>
-          <div className="mt-16 grid gap-6 sm:grid-cols-2">
-            <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="text-base font-semibold">Frontend</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Lint, type-check, and build on every push. Auto-deploy to Vercel on
-                merge to production.
-              </p>
-              <code className="mt-4 inline-block rounded-md bg-accent px-3 py-1.5 font-mono text-xs text-foreground">
-                .github/workflows/frontend.yml
-              </code>
-            </div>
-            <div className="rounded-xl border border-border bg-card p-6">
-              <h3 className="text-base font-semibold">Backend</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Lint, type-check, build, and run tests on every push. Auto-deploy to
-                Vercel on merge to production.
-              </p>
-              <code className="mt-4 inline-block rounded-md bg-accent px-3 py-1.5 font-mono text-xs text-foreground">
-                .github/workflows/backend.yml
-              </code>
-            </div>
           </div>
         </div>
       </section>
@@ -189,23 +154,16 @@ export default function HomePage() {
       {/* CTA */}
       <section className="border-t border-border px-6 py-24">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight">Ready to start?</h2>
+          <h2 className="text-3xl font-semibold tracking-tight">Get your team on one plan</h2>
           <p className="mt-4 text-muted-foreground">
-            Clone the repo, fill in your env variables, seed an admin, and you&apos;re
-            running in under 5 minutes.
+            Create a workspace in a minute and invite your teammates when you&apos;re ready.
           </p>
-          <div className="mt-8 flex justify-center gap-4">
-            <Link
-              href="/sign-in"
-              className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-              Sign In
-            </Link>
+          <div className="mt-8 flex justify-center gap-3">
             <Link
               href="/sign-up"
-              className="rounded-full border border-border px-6 py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
             >
-              Create Account
+              Create free account
             </Link>
           </div>
         </div>
@@ -213,21 +171,14 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="border-t border-border px-6 py-8">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <p className="text-sm text-muted-foreground">
-            Express Next Auth Kit — MIT License
-          </p>
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
+          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Fluely</p>
           <div className="flex gap-6">
-            <a
-              href="https://github.com/Tobikun11-Arch/express-next-auth-kit"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              GitHub
-            </a>
+            <Link href="/docs" className="text-sm text-muted-foreground hover:text-foreground">
+              Developer docs
+            </Link>
             <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground">
-              Sign In
+              Sign in
             </Link>
           </div>
         </div>

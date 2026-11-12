@@ -30,7 +30,7 @@ JWT auth, roles, email verification, and password reset. The planner UI is porte
 | Cleanup | Daily Vercel cron deletes cards done for longer than `DONE_CARD_RETENTION_DAYS` (default 2). |
 | Social Posting | `/content-planner`: platform overview + calendar / board / table views over one shared post state, with a right-side slide-over editor. |
 | Schedule | `/schedule` (and the `/planner` alias): day columns of board cards by due date, plus an unscheduled pool. |
-| Branding | So Matcha design system, light only, Fluely logo + mascot assets, branded auth pages and loading screen. |
+| Branding | Slate design system (neutral slate + one cobalt accent, Geist type), light and dark themes in Settings → Appearance, Fluely "F" mark, professional auth, landing, and loading screens. |
 | Tests | Backend Jest suites for board access, board children, board polling, media access, and shared security state (76 tests), run in CI. |
 
 Removed: the Inbox page. Capture now goes into boards, and legacy inbox items are migrated into a
@@ -74,9 +74,6 @@ Ordered by dependency, not by size.
 
 - **`SidebarTab` still includes `'goals'`** but no UI reaches it; the tips/goals sidebar is opened
   only on the `tips` tab.
-- **No dark mode** — deliberately dropped so every route stays on the ivory canvas.
-- **`frontend/Design.md` references `ContentPostCard.tsx`**, deleted in the planner rebuild. Left
-  as-is because that section records a past color migration.
 
 ## Working on this repo
 

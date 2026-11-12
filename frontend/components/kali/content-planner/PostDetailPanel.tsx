@@ -223,7 +223,7 @@ export default function PostDetailPanel({
         type="button"
         aria-label="Close panel"
         onClick={onClose}
-        className="absolute inset-0 bg-brand-ink/20 backdrop-blur-[1px]"
+        className="absolute inset-0 bg-black/20 backdrop-blur-[1px]"
       />
 
       <aside className="relative flex h-full w-full max-w-[440px] flex-col border-l border-border bg-surface shadow-modal">
@@ -362,7 +362,7 @@ export default function PostDetailPanel({
                         if (item.mediaId) void deleteMedia(item.mediaId).catch(() => undefined)
                       }}
                       aria-label={`Remove ${item.name}`}
-                      className="absolute right-1 top-1 rounded bg-brand-ink/70 p-0.5 text-brand-ivory opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100"
+                      className="absolute right-1 top-1 rounded bg-black/70 p-0.5 text-brand-ivory opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100"
                     >
                       <X size={11} />
                     </button>

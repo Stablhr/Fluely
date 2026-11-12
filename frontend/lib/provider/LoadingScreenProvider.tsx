@@ -11,10 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import {usePathname} from 'next/navigation';
-import LoadingScreen, {
-  preloadLoadingFrames,
-  type LoadingScreenMode,
-} from '@/components/auth/LoadingScreen';
+import LoadingScreen, {type LoadingScreenMode} from '@/components/auth/LoadingScreen';
 import {CURTAIN_FADE_OUT_MS} from '@/lib/auth/loadingCurtain';
 
 type LoadingScreenContextValue = {
@@ -68,15 +65,6 @@ export default function LoadingScreenProvider({
     window.clearTimeout(exitTimer.current);
     exitTimer.current = null;
     setExiting(false);
-  }, []);
-
-  /* Warm the mascot frames on app mount so the curtain never opens on an empty
-     box, however slow the connection is when the user hits sign in. The root
-     layout also preloads them via <link rel="preload">; this is the belt to
-     that braces. Fire-and-forget — the boot curtain that used to wait on this
-     promise is gone, and nothing else needs the result. */
-  useEffect(() => {
-    void preloadLoadingFrames();
   }, []);
 
   useEffect(() => {

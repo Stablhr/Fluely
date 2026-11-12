@@ -1,7 +1,6 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,10 +13,7 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/kali/store/useStore";
 import { YOU_ID } from "@/lib/kali/store/schema";
-import {
-  useAdaptiveTheme,
-  adaptiveVars,
-} from "@/lib/kali/hooks/useAdaptiveTheme";
+import { FluelyMark } from "@/components/brand/FluelyMark";
 import { useSignOut } from "@/lib/hooks/auth/useSignOut";
 import Avatar from "../shared/Avatar";
 
@@ -61,32 +57,27 @@ const NAV = [
 
 function Logo({ collapsed }: { collapsed: boolean }) {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-4">
-      {/* The source is 413x604, so object-contain in a square box letterboxes it
-          to roughly two-thirds of the box width — a h-8 box drew it about 22px
-          wide. h-16 gives the mark real presence next to the wordmark.
-
-          Stays h-8 when collapsed: the rail is only 52px wide and 8px of that
-          is padding either side, so a larger mark would overflow it. */}
-      <Image
-        src="/assets/fluely_favicon.png"
-        alt="Fluely logo"
-        width={64}
-        height={64}
-        className={`shrink-0 rounded-lg object-contain ${collapsed ? "h-8 w-8" : "h-16 w-16"}`}
-        aria-hidden="true"
-      />
+    <div className="flex items-center gap-2.5 px-2 py-3">
+      <FluelyMark size={collapsed ? 28 : 30} />
       {!collapsed && (
-        <span
-          className="font-heading text-[22px] font-bold tracking-tight"
-          style={{ color: "var(--color-brand-ivory)" }}
-        >
+        <span className="text-[16px] font-semibold tracking-tight text-text-primary">
           Fluely
         </span>
       )}
     </div>
   );
 }
+
+/* The sidebar is a plain surface in both themes, so its text tiers are the
+   app's own tokens rather than colors computed against a brand fill. */
+const sidebarVars = {
+  "--surface-text": "var(--color-text-primary)",
+  "--surface-text-muted": "var(--color-text-secondary)",
+  "--surface-text-faint": "var(--color-text-muted)",
+  "--surface-border": "var(--color-border)",
+  "--surface-icon": "var(--color-text-secondary)",
+  "--surface-bg-subtle": "var(--color-surface-alt)",
+} as CSSProperties;
 
 function LogoutButton({ collapsed }: { collapsed: boolean }) {
   const { signOut, isPending } = useSignOut();
@@ -105,7 +96,7 @@ function LogoutButton({ collapsed }: { collapsed: boolean }) {
         disabled={isPending}
         title={label}
         aria-label={label}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--surface-text-muted)] transition-colors duration-150 outline-none hover:bg-white/[0.08] hover:text-[var(--surface-text)] focus-visible:outline-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50"
+        className="flex h-8 w-8 items-center justify-center rounded-md text-[var(--surface-text-muted)] transition-colors duration-150 outline-none hover:bg-surface-alt hover:text-[var(--surface-text)] focus-visible:outline-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50"
       >
         <LogOut size={15} />
       </button>
@@ -117,7 +108,7 @@ function LogoutButton({ collapsed }: { collapsed: boolean }) {
       type="button"
       onClick={handleLogout}
       disabled={isPending}
-      className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium text-[var(--surface-text-muted)] transition-colors duration-150 outline-none hover:bg-white/[0.08] hover:text-[var(--surface-text)] focus-visible:outline-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50"
+      className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium text-[var(--surface-text-muted)] transition-colors duration-150 outline-none hover:bg-surface-alt hover:text-[var(--surface-text)] focus-visible:outline-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50"
     >
       <LogOut size={15} className="shrink-0" />
       <span className="flex-1 text-left">{label}</span>
@@ -138,9 +129,6 @@ export default function Sidebar({
 }: SidebarProps) {
   const { data } = useStore();
   const you = data.members[YOU_ID];
-
-  const theme = useAdaptiveTheme("#3971b8");
-  const sidebarVars = adaptiveVars(theme);
 
   /**
    * Boards are grouped by how the signed-in person reaches them, because the
@@ -179,10 +167,10 @@ export default function Sidebar({
       <aside
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={`hidden shrink-0 flex-col border-r transition-[width] duration-200 md:flex bg-sidebar-bg ${
+        className={`hidden shrink-0 flex-col border-r transition-[width] duration-200 md:flex border-border bg-sidebar-bg ${
           collapsed ? "w-[52px]" : "w-[236px]"
         }`}
-        style={{ ...sidebarVars, borderColor: theme.border }}
+        style={sidebarVars}
       >
         {/* Logo */}
         <div
@@ -207,13 +195,13 @@ export default function Sidebar({
                   collapsed
                     ? `relative mx-auto flex h-9 w-9 items-center justify-center rounded-md transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary ${
                         isActive
-                          ? "bg-sidebar-active text-brand-ivory"
-                          : "text-[var(--surface-text-muted)] hover:bg-white/[0.06] hover:text-[var(--surface-text)]"
+                          ? "bg-primary-subtle text-primary-text"
+                          : "text-[var(--surface-text-muted)] hover:bg-surface-alt hover:text-[var(--surface-text)]"
                       }`
                     : `relative flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary ${
                         isActive
-                          ? "bg-sidebar-active font-semibold text-brand-ivory"
-                          : "font-medium text-[var(--surface-text-muted)] hover:bg-white/[0.06] hover:text-[var(--surface-text)]"
+                          ? "bg-primary-subtle font-semibold text-primary-text"
+                          : "font-medium text-[var(--surface-text-muted)] hover:bg-surface-alt hover:text-[var(--surface-text)]"
                       }`
                 }
                 style={({ isActive }) => {
@@ -225,10 +213,10 @@ export default function Sidebar({
                   <>
                     {/* Left accent bar */}
                     {isActive && !collapsed && (
-                      <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-brand-green" />
+                      <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-primary" />
                     )}
                     {isActive && collapsed && (
-                      <span className="absolute left-1 top-1 bottom-1 w-[3px] rounded-full bg-brand-green" />
+                      <span className="absolute left-1 top-1 bottom-1 w-[3px] rounded-full bg-primary" />
                     )}
                     <Icon size={16} className="shrink-0" />
                     {!collapsed && <span className="flex-1">{item.label}</span>}
@@ -255,7 +243,7 @@ export default function Sidebar({
                         key={board.id}
                         to={`/boards/${board.id}`}
                         title={board.name}
-                        className="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] font-medium text-[var(--surface-text-muted)] transition-colors duration-150 hover:bg-white/[0.06] hover:text-[var(--surface-text)]"
+                        className="flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] font-medium text-[var(--surface-text-muted)] transition-colors duration-150 hover:bg-surface-alt hover:text-[var(--surface-text)]"
                       >
                         <span
                           className="h-3 w-3 shrink-0 rounded-sm ring-1 ring-black/10"
@@ -295,15 +283,13 @@ export default function Sidebar({
         {/* Footer: User → Sign out */}
         {collapsed ? (
           <div
-            className="flex flex-col items-center gap-2 border-t px-2 py-3"
-            style={{ borderColor: theme.border }}
+            className="flex flex-col items-center gap-2 border-t border-border px-2 py-3"
           >
             <LogoutButton collapsed={collapsed} />
           </div>
         ) : (
           <div
-            className="border-t p-3 space-y-2.5"
-            style={{ borderColor: theme.border }}
+            className="border-t border-border p-3 space-y-2.5"
           >
             {you && (
               <div
@@ -313,8 +299,7 @@ export default function Sidebar({
               >
                 <Avatar member={you} size={22} />
                 <span
-                  className="min-w-0 flex-1 truncate text-[13px] font-semibold"
-                  style={{ color: "var(--color-brand-ivory)" }}
+                  className="min-w-0 flex-1 truncate text-[13px] font-semibold text-text-primary"
                 >
                   {you.name}
                 </span>
@@ -327,8 +312,8 @@ export default function Sidebar({
 
       {/* Mobile bottom nav */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t px-2 py-1.5 md:hidden bg-sidebar-bg"
-        style={{ ...sidebarVars, borderColor: theme.border }}
+        className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t px-2 py-1.5 md:hidden border-border bg-sidebar-bg"
+        style={sidebarVars}
       >
         {NAV.map((item) => {
           const Icon = item.icon;
@@ -337,7 +322,7 @@ export default function Sidebar({
               key={item.to}
               to={item.to}
               end={item.end}
-              className="relative flex flex-col items-center gap-0.5 rounded-md px-3 py-1.5 transition-colors duration-150 hover:bg-white/[0.06]"
+              className="relative flex flex-col items-center gap-0.5 rounded-md px-3 py-1.5 transition-colors duration-150 hover:bg-surface-alt"
               style={({ isActive }) => ({
                 color: isActive
                   ? "var(--surface-text)"

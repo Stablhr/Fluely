@@ -1,17 +1,17 @@
 'use client'
 
-import { MoreHorizontal } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 export type StatTone = 'blue' | 'green' | 'vanilla' | 'white'
 
-/* Flat brand color blocks, not tinted washes. Blue carries ivory text; the
-   lighter blocks carry ink. See frontend/Design.md §4.2. */
-const TONES: Record<StatTone, string> = {
-  blue: 'bg-brand-blue text-brand-ivory',
-  green: 'bg-brand-green text-brand-ink',
-  vanilla: 'bg-brand-vanilla text-brand-ink',
-  white: 'bg-surface text-brand-ink border border-border',
+/* Every stat sits on the same neutral card; the tone only colors the small
+   marker beside the label, so a row of stats reads as one set rather than a
+   row of colored blocks. See frontend/Design.md §4.2. */
+const MARKERS: Record<StatTone, string> = {
+  blue: 'bg-primary',
+  green: 'bg-success',
+  vanilla: 'bg-warning',
+  white: 'bg-text-muted',
 }
 
 interface StatCardProps {
@@ -23,15 +23,18 @@ interface StatCardProps {
 }
 
 export default function StatCard({ tone, label, value, icon, className = '' }: StatCardProps) {
-  const onBlue = tone === 'blue'
-
   return (
-    <div className={`rounded-card p-5 shadow-card transition-shadow duration-150 hover:shadow-card-hover ${TONES[tone]} ${className}`}>
-      <div className="flex items-center justify-between">
-        <span className={`text-label uppercase ${onBlue ? 'text-brand-ivory/70' : 'text-brand-ink/60'}`}>{label}</span>
-        {icon ?? <MoreHorizontal size={16} className={onBlue ? 'text-brand-ivory/70' : 'text-brand-ink/50'} />}
+    <div
+      className={`rounded-card border border-border bg-surface p-5 text-text-primary shadow-card transition-shadow duration-150 hover:shadow-card-hover ${className}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-[13px] font-medium text-text-secondary">
+          <span className={`h-2 w-2 rounded-full ${MARKERS[tone]}`} aria-hidden />
+          {label}
+        </span>
+        {icon}
       </div>
-      <p className="text-stat mt-2">{value}</p>
+      <p className="text-stat mt-3">{value}</p>
     </div>
   )
 }

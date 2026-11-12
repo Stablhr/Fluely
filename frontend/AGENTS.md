@@ -38,14 +38,14 @@ The product UI is ported from [Stablhr/Kali](https://github.com/Stablhr/Kali) an
 `components/kali/` and `lib/kali/`. Three rules keep it isolated from the rest of the app:
 
 - **Token scoping.** `app/kali.css` defines the app's colors, radii, and type scale on `.kali-app`
-  (light only — dark mode was removed). `app/(app)/layout.tsx` renders `AppShell` inside that wrapper. Any new
+  (light and dark — `.dark` on `<html>`, set by `lib/theme`). `app/(app)/layout.tsx` renders `AppShell` inside that wrapper. Any new
   page that should look like the app must be rendered under it — outside the wrapper, elements
   fall back to the shadcn theme in `globals.css`.
 - **Own primitives.** The app uses `components/kali/shared/` (Button, Input, Modal, Toast) instead
   of `components/ui/` to keep upstream styling intact. Use the shadcn equivalents on the auth,
   landing, docs, and admin routes; don't mix the two inside one surface.
 - **Brand tokens, not hex.** Colors come from the `brand-*` and semantic tokens in
-  `app/kali.css` (So Matcha: Celtic Blue, Tea Green, Vanilla, Ivory, Drab Dark Brown). Never hardcode
+  `app/kali.css` (Slate: neutral slate ramp plus one cobalt accent). Never hardcode
   a hex in a component; the full system is documented in [Design.md](./Design.md).
 
 App data lives in `lib/kali/store/`, a `useSyncExternalStore` store backed by `localStorage` and

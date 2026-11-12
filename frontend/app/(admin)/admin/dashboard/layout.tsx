@@ -1,7 +1,7 @@
 'use client';
 import {useSearchParams} from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import {FluelyLogo} from '@/components/brand/FluelyMark';
 import {useSignOut} from '@/lib/hooks/auth/useSignOut';
 import {Home, Settings, LogOut, LayoutDashboard} from 'lucide-react';
 
@@ -58,17 +58,10 @@ export default function AdminDashboardLayout({
   const content = tab && slotByTab[tab] ? slotByTab[tab] : (home ?? children);
 
   return (
-    <div className="flex h-screen cursor-default bg-gray-50">
+    <div className="flex h-screen cursor-default bg-background">
       <aside className="hidden md:flex flex-col w-64 min-h-screen bg-black shadow-xl z-40">
-        <div className="flex items-center justify-center py-6 px-4 border-b border-gray-800">
-          <Image
-            src="/assets/fluely_logo.png"
-            alt="Fluely logo"
-            width={130}
-            height={130}
-            className="object-contain drop-shadow-lg"
-            priority
-          />
+        <div className="flex items-center px-5 py-5 border-b border-gray-800">
+          <FluelyLogo textClassName="text-white" />
         </div>
 
         <div className="px-4 pt-4 pb-2">
@@ -86,7 +79,7 @@ export default function AdminDashboardLayout({
                 key={item.label}
                 href={item.href}
                 className={`
-                  flex items-center gap-3 px-4 py-3 rounded-xl
+                  flex items-center gap-3 px-4 py-3 rounded-md
                   text-sm font-semibold tracking-wide
                   transition-all duration-200
                   ${
@@ -111,7 +104,7 @@ export default function AdminDashboardLayout({
             onClick={handleLogout}
             disabled={signOutMutation.isPending}
             className="
-              w-full flex items-center gap-3 px-4 py-3 rounded-xl
+              w-full flex items-center gap-3 px-4 py-3 rounded-md
               text-sm font-semibold tracking-wide
               text-gray-400 hover:bg-gray-800 hover:text-white
               transition-all duration-200
@@ -124,7 +117,7 @@ export default function AdminDashboardLayout({
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto bg-gray-50 pb-24 md:pb-0">
+      <main className="flex-1 overflow-y-auto bg-background pb-24 md:pb-0">
         <div className="p-4 md:p-6">{content}</div>
       </main>
 

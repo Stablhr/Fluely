@@ -48,7 +48,7 @@ export function ProfileCard({
 }: Props) {
   const name = profile.displayName
   const color = profile.avatarColor || colorFromId(profile.id)
-  const accent = profile.accentColor || '#3971b8'
+  const accent = profile.accentColor || '#2554c7'
   const time = localTime(profile.timezone)
   const [imgFailed, setImgFailed] = useState(false)
 

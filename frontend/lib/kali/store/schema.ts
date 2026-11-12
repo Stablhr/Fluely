@@ -433,22 +433,23 @@ export interface AppData {
 
 export const YOU_ID = "member-you";
 
+/* Muted mid-tones that all carry white text at AA contrast. */
 export const MEMBER_COLORS = [
-  "#3971B8",
-  "#4AA8FF",
-  "#FF8B5E",
-  "#8B7CF6",
-  "#33B27A",
-  "#F6C453",
-  "#FF5E6C",
+  "#2554C7",
+  "#0369A1",
+  "#0F766E",
+  "#6D4FC4",
+  "#15803D",
+  "#B45309",
+  "#BE3A5E",
 ];
 
 export const LABEL_SWATCHES = [
-  { name: "Marketing", color: "#8B7CF6" },
-  { name: "Design", color: "#FF8B5E" },
-  { name: "Engineering", color: "#4AA8FF" },
-  { name: "Urgent", color: "#FF5E6C" },
-  { name: "Low priority", color: "#33B27A" },
+  { name: "Marketing", color: "#6D4FC4" },
+  { name: "Design", color: "#C2410C" },
+  { name: "Engineering", color: "#0369A1" },
+  { name: "Urgent", color: "#C2341F" },
+  { name: "Low priority", color: "#15803D" },
 ] as const;
 
 export interface BoardTemplate {
@@ -465,7 +466,7 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
     id: "blank",
     name: "Blank Board",
     description: "A single empty list. Build whatever workflow you need.",
-    swatch: "#0DABA3",
+    swatch: "#475569",
     lists: ["To Do"],
     labels: [],
   },
@@ -473,7 +474,7 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
     id: "simple-project",
     name: "Simple Project",
     description: "Classic To Do → In Progress → Review → Done workflow.",
-    swatch: "#4AA8FF",
+    swatch: "#2554C7",
     lists: ["To Do", "In Progress", "Review", "Done"],
     labels: [...LABEL_SWATCHES],
   },
@@ -482,7 +483,7 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
     name: "Social Media Content",
     description:
       "Content approval pipeline from Pending to Done, with platform tags.",
-    swatch: "#8B7CF6",
+    swatch: "#6D4FC4",
     lists: [
       "Pending",
       "In Progress",
@@ -493,24 +494,24 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
       "Done",
     ],
     labels: [
-      { name: "Instagram", color: "#E1306C" },
-      { name: "Facebook", color: "#4AA8FF" },
-      { name: "Blog", color: "#8B7CF6" },
-      { name: "TikTok", color: "#7F7FD5" },
-      { name: "Story", color: "#33B27A" },
+      { name: "Instagram", color: "#BE3A5E" },
+      { name: "Facebook", color: "#2554C7" },
+      { name: "Blog", color: "#6D4FC4" },
+      { name: "TikTok", color: "#334155" },
+      { name: "Story", color: "#15803D" },
     ],
   },
 ];
 
 export const BOARD_BACKGROUNDS = [
-  "#0DABA3",
-  "#0A8981",
-  "#132A29",
-  "#FF8B5E",
-  "#33B27A",
-  "#4AA8FF",
-  "#8B7CF6",
-  "#FF5E6C",
+  "#2554C7",
+  "#1E3A8A",
+  "#0F766E",
+  "#334155",
+  "#0F172A",
+  "#6D4FC4",
+  "#B45309",
+  "#BE3A5E",
 ];
 
 export function emptyData(): AppData {

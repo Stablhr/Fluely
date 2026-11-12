@@ -7,14 +7,14 @@ import { useState } from 'react'
  * accent pickers so a person's initials card keeps the same tint everywhere.
  */
 export const AVATAR_INITIALS_PALETTE = [
-  '#3971b8',
-  '#c8d69b',
-  '#f6e6a5',
-  '#ff8b5e',
-  '#8b7cf6',
-  '#33b27a',
-  '#ff5e6c',
-  '#4aa8ff',
+  '#2554c7',
+  '#0f766e',
+  '#6d4fc4',
+  '#b45309',
+  '#be3a5e',
+  '#475569',
+  '#15803d',
+  '#0369a1',
 ]
 
 export function colorFromId(id: string): string {
@@ -79,7 +79,7 @@ export default function Avatar({
   stacked,
 }: Props) {
   const resolvedName = name ?? member?.name ?? null
-  const resolvedColor = color ?? member?.avatarColor ?? member?.color ?? (member?.id ? colorFromId(member.id) : '#3971b8')
+  const resolvedColor = color ?? member?.avatarColor ?? member?.color ?? (member?.id ? colorFromId(member.id) : '#2554c7')
   const resolvedSrc = src ?? member?.avatarUrl ?? null
   // Remember which address failed, so a new src is tried again without an effect.
   const [failedSrc, setFailedSrc] = useState<string | null>(null)

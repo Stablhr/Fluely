@@ -1,118 +1,123 @@
 /*
- * Kali design system — scoped to the `.kali-app` subtree.
- * Imported from app/globals.css so Tailwind processes its @theme/@utility
- * blocks as part of the main stylesheet. The four tokens shared with
- * globals.css (background, primary, primary-foreground, border) are
- * re-declared on `.kali-app` so Kali's palette wins inside the app without
- * leaking to the other route groups.
+ * Fluely design system ("Slate") — the app's tokens, scoped to `.kali-app`
+ * where it matters. Imported from app/globals.css so Tailwind processes its
+ * @theme/@utility blocks as part of the main stylesheet.
+ *
+ * One neutral slate ramp carries surfaces, text, and borders; one cobalt accent
+ * carries primary actions, links, focus, and selection. Everything else is a
+ * semantic role (success / warning / danger / info).
+ *
+ * Light values live in @theme below. Dark values override the *base* tokens in
+ * the `.dark` block further down; every alias is a var() reference to a base
+ * token, so it follows the theme without its own dark entry. `.dark` is put on
+ * <html> by lib/theme (see the Appearance tab in Settings).
+ *
+ * Several token names (`brand-green`, `brand-vanilla`, `accent-teal-*`, …) are
+ * kept from the original Kali palette so the ported components re-sync cleanly
+ * with upstream; their values are now neutral or cobalt roles. See Design.md.
  */
 
 @theme {
-  /* ── So Matcha brand palette ─────────────────────────────────────────── */
-  --color-brand-blue: #3971b8;
-  --color-brand-green: #c8d69b;
-  --color-brand-vanilla: #f6e6a5;
-  --color-brand-ivory: #fbfcee;
-  --color-brand-ink: #343b1b;
+  /* ── Brand ─────────────────────────────────────────────────────────────── */
+  --color-brand-blue: #2554c7; /* cobalt — the single accent */
+  --color-brand-green: #e8eefb; /* accent tint (was Tea Green) */
+  --color-brand-vanilla: #eef1f5; /* neutral tint (was Vanilla) */
+  --color-brand-ivory: #ffffff; /* text on cobalt / on dark overlays */
+  --color-brand-ink: #0f172a; /* primary text */
 
-  /* Derived brand tints. Text tints are darker/warmer relatives of the ink
-     brown so body copy stays legible without introducing a second hue. */
-  --color-ink-secondary: #5f6740;
-  --color-ink-faint: #8a9068;
-  --color-blue-hover: #2f5c96;
-  --color-blue-deep: #24466f;
-  --color-blue-subtle: #e6edf8;
-  --color-green-subtle: #eef3de;
-  --color-vanilla-subtle: #fbf3d4;
-
-  /* ── Surfaces ────────────────────────────────────────────────────────── */
-  --color-background: #fbfcee;
+  /* ── Surfaces ──────────────────────────────────────────────────────────── */
+  --color-background: #f7f8fa;
   --color-surface: #ffffff;
-  --color-surface-alt: #f4f3e2;
+  --color-surface-alt: #f1f3f6;
   --color-surface-elevated: #ffffff;
 
-  --color-text-primary: #343b1b;
-  --color-text-secondary: #5f6740;
-  --color-text-muted: #8a9068;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
 
-  --color-border: #e4e3cd;
-  --color-border-strong: #cfceac;
+  --color-border: #e3e6eb;
+  --color-border-strong: #cdd2da;
 
-  /* ── Brand primary (Celtic Blue) ─────────────────────────────────────── */
-  --color-primary: #3971b8;
-  --color-primary-hover: #2f5c96;
-  --color-primary-foreground: #fbfcee;
-  --color-primary-subtle: #e6edf8;
-  --color-primary-text: #2f5c96;
+  /* ── Primary (cobalt) ──────────────────────────────────────────────────── */
+  --color-primary: #2554c7;
+  --color-primary-hover: #1e46a8;
+  --color-primary-foreground: #ffffff;
+  --color-primary-subtle: #ebf0fc;
+  --color-primary-text: #1e46a8;
 
-  /* ── Semantic ────────────────────────────────────────────────────────── */
-  --color-success: #8fa85c;
-  --color-success-subtle: #eef3de;
-  --color-success-text: #4c5c22;
-  --color-warning: #d9a520;
-  --color-warning-subtle: #fbf3d4;
-  --color-warning-text: #7a5c07;
-  --color-danger: #cf4b40;
-  --color-danger-subtle: #fbe9e7;
-  --color-danger-text: #a3332a;
-  --color-info: #4a86c8;
-  --color-info-subtle: #e6edf8;
-  --color-info-text: #2f5c96;
-  --color-danger-button: #c0392f;
+  /* ── Semantic ──────────────────────────────────────────────────────────── */
+  --color-success: #15803d;
+  --color-success-subtle: #ecfdf3;
+  --color-success-text: #166534;
+  --color-warning: #b45309;
+  --color-warning-subtle: #fef6e7;
+  --color-warning-text: #92400e;
+  --color-danger: #c2341f;
+  --color-danger-subtle: #fdf0ee;
+  --color-danger-text: #a72b19;
+  --color-info: #2554c7;
+  --color-info-subtle: #ebf0fc;
+  --color-info-text: #1e46a8;
+  --color-danger-button: #c2341f;
 
-  --color-board-canvas: #fbfcee;
-  --color-list-default: #ffffff;
+  --color-list-default: #f1f3f6;
+  --color-blue-deep: #1e3a8a;
 
-  --color-base-bg: #f4f3e2;
-  --color-base-surface: #ffffff;
-  --color-base-surface-alt: #faf9ec;
+  /* ── Aliases (follow the base tokens in both themes) ───────────────────── */
+  --color-ink-secondary: var(--color-text-secondary);
+  --color-ink-faint: var(--color-text-muted);
+  --color-blue-hover: var(--color-primary-hover);
+  --color-blue-subtle: var(--color-primary-subtle);
+  --color-green-subtle: var(--color-success-subtle);
+  --color-vanilla-subtle: var(--color-warning-subtle);
 
-  --color-ink-900: #343b1b;
-  --color-ink-700: #5f6740;
-  --color-ink-500: #8a9068;
-  --color-ink-300: #cfceac;
+  --color-board-canvas: var(--color-background);
 
-  /* Flat brand color blocks for stat cards, tags, and highlights. */
-  --color-accent-purple-bg: #ffffff;
-  --color-accent-purple-text: #343b1b;
-  --color-accent-green-bg: #c8d69b;
-  --color-accent-green-text: #343b1b;
-  --color-accent-yellow-bg: #f6e6a5;
-  --color-accent-yellow-text: #343b1b;
-  --color-accent-teal-bg: #3971b8;
-  --color-accent-teal-text: #fbfcee;
+  --color-base-bg: var(--color-surface-alt);
+  --color-base-surface: var(--color-surface);
+  --color-base-surface-alt: var(--color-surface-alt);
 
-  --color-sidebar-bg: #3971b8;
-  --color-sidebar-active: #2f5c96;
-  --color-sidebar-accent: #c8d69b;
+  --color-ink-900: var(--color-text-primary);
+  --color-ink-700: var(--color-text-secondary);
+  --color-ink-500: var(--color-text-muted);
+  --color-ink-300: var(--color-border-strong);
 
-  --color-status-danger: #cf4b40;
-  --color-status-success: #8fa85c;
+  --color-accent-purple-bg: var(--color-surface);
+  --color-accent-purple-text: var(--color-text-primary);
+  --color-accent-green-bg: var(--color-primary-subtle);
+  --color-accent-green-text: var(--color-primary-text);
+  --color-accent-yellow-bg: var(--color-surface-alt);
+  --color-accent-yellow-text: var(--color-text-primary);
+  --color-accent-teal-bg: var(--color-primary-subtle);
+  --color-accent-teal-text: var(--color-primary-text);
 
-  /* ── Shape: exaggerated, blobby, pill-heavy ──────────────────────────── */
-  --radius-card: 24px;
-  --radius-hero: 32px;
-  --radius-chip: 16px;
+  --color-sidebar-bg: var(--color-surface);
+  --color-sidebar-active: var(--color-primary-subtle);
+  --color-sidebar-accent: var(--color-brand-blue);
+
+  --color-status-danger: var(--color-danger);
+  --color-status-success: var(--color-success);
+
+  /* ── Shape: restrained. Pills only for avatars and small status badges. ── */
+  --radius-card: 10px;
+  --radius-hero: 12px;
+  --radius-chip: 6px;
   --radius-pill: 999px;
 
-  /* ── Elevation: soft, layered, ink-tinted. Three stacked shadows — a
-       tight contact shadow, a mid spread, and a wide ambient lift — so
-       surfaces read as raised off the ivory page without a hard edge. ── */
+  /* ── Elevation: borders do the structural work; shadows only lift. ─────── */
   --shadow-card:
-    0 1px 2px rgba(52, 59, 27, 0.05),
-    0 3px 6px rgba(52, 59, 27, 0.05),
-    0 12px 28px rgba(52, 59, 27, 0.07);
+    0 1px 2px color-mix(in srgb, var(--shadow-ink) 5%, transparent),
+    0 1px 3px color-mix(in srgb, var(--shadow-ink) 4%, transparent);
   --shadow-card-hover:
-    0 2px 4px rgba(52, 59, 27, 0.06),
-    0 8px 16px rgba(52, 59, 27, 0.07),
-    0 20px 44px rgba(52, 59, 27, 0.1);
+    0 2px 4px color-mix(in srgb, var(--shadow-ink) 6%, transparent),
+    0 6px 16px color-mix(in srgb, var(--shadow-ink) 8%, transparent);
 
-  --text-display: 28px;
-  --text-display--line-height: 34px;
-  --text-display--font-weight: 700;
-  --text-stat: 26px;
-  --text-stat--line-height: 32px;
-  --text-stat--font-weight: 700;
+  --text-display: 24px;
+  --text-display--line-height: 32px;
+  --text-display--font-weight: 600;
+  --text-stat: 24px;
+  --text-stat--line-height: 30px;
+  --text-stat--font-weight: 600;
   --text-card-title: 14px;
   --text-card-title--line-height: 20px;
   --text-card-title--font-weight: 600;
@@ -124,56 +129,104 @@
   --text-label--letter-spacing: 0.04em;
 
   --shadow-none: 0 0 #0000;
-  --shadow-subtle: 0 1px 2px rgba(52, 59, 27, 0.05), 0 4px 10px rgba(52, 59, 27, 0.06);
-  --shadow-medium: 0 2px 4px rgba(52, 59, 27, 0.06), 0 10px 24px rgba(52, 59, 27, 0.1);
-  --shadow-modal: 0 4px 8px rgba(52, 59, 27, 0.06), 0 16px 40px rgba(52, 59, 27, 0.14), 0 40px 80px rgba(52, 59, 27, 0.16);
+  --shadow-subtle: 0 1px 2px color-mix(in srgb, var(--shadow-ink) 6%, transparent);
+  --shadow-medium:
+    0 1px 3px color-mix(in srgb, var(--shadow-ink) 6%, transparent),
+    0 8px 20px color-mix(in srgb, var(--shadow-ink) 10%, transparent);
+  --shadow-modal:
+    0 2px 6px color-mix(in srgb, var(--shadow-ink) 8%, transparent),
+    0 20px 48px color-mix(in srgb, var(--shadow-ink) 18%, transparent);
 }
 
-/* Restore the shadcn values for the tokens Kali shares, so the auth,
-   landing and admin routes are unaffected by the theme block above. */
+/* Restore the shadcn values for the tokens Kali shares, so the auth, landing
+   and admin routes read the same palette through shadcn's variable names. */
 @layer base {
   :root {
     --color-background: var(--background);
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
     --color-border: var(--border);
+    --shadow-ink: #0f172a;
+    color-scheme: light;
+  }
+
+  /* Dark theme: base tokens only — aliases above follow automatically. The
+     four shared tokens (background, primary, primary-foreground, border) flip
+     through their shadcn variables in globals.css. */
+  :root.dark {
+    --color-brand-blue: #3563e9;
+    --color-brand-green: #1a2440;
+    --color-brand-vanilla: #1f242d;
+    --color-brand-ivory: #ffffff;
+    --color-brand-ink: #e7e9ee;
+
+    --color-surface: #14171d;
+    --color-surface-alt: #1b1f27;
+    --color-surface-elevated: #1e222b;
+
+    --color-text-primary: #e7e9ee;
+    --color-text-secondary: #a4acb9;
+    --color-text-muted: #7f8898;
+
+    --color-border-strong: #3a414e;
+
+    --color-primary-hover: #4a76f0;
+    --color-primary-subtle: #172036;
+    --color-primary-text: #93b2ff;
+
+    --color-success: #22a55b;
+    --color-success-subtle: #0f2a1b;
+    --color-success-text: #6fdc9d;
+    --color-warning: #d4891a;
+    --color-warning-subtle: #2b2111;
+    --color-warning-text: #f2bd5c;
+    --color-danger: #e0533c;
+    --color-danger-subtle: #33191a;
+    --color-danger-text: #ff9b8a;
+    --color-info: #3563e9;
+    --color-info-subtle: #172036;
+    --color-info-text: #93b2ff;
+    --color-danger-button: #d13f2a;
+
+    --color-list-default: #14171d;
+    --color-blue-deep: #1e3a8a;
+
+    --shadow-ink: #000000;
+    color-scheme: dark;
   }
 }
 
 @layer base {
   .kali-app {
-    /* Board cards sit on the ivory canvas as white blocks with ink text. */
-    --color-card-surface: #ffffff;
-    --color-card-surface-alt: #f7f6ea;
-    --color-card-text: #343b1b;
-    --color-card-text-secondary: #5f6740;
-    --color-card-text-muted: #8a9068;
-    --color-card-border: #e4e3cd;
-    --color-card-border-strong: #cfceac;
-    --color-card-border-faint: rgba(138, 144, 104, 0.45);
+    /* Board cards sit on the list as raised tiles. */
+    --color-card-surface: var(--color-surface-elevated);
+    --color-card-surface-alt: var(--color-surface-alt);
+    --color-card-text: var(--color-text-primary);
+    --color-card-text-secondary: var(--color-text-secondary);
+    --color-card-text-muted: var(--color-text-muted);
+    --color-card-border: var(--color-border);
+    --color-card-border-strong: var(--color-border-strong);
+    --color-card-border-faint: color-mix(in srgb, var(--color-text-muted) 35%, transparent);
 
-    /* globals.css maps these four tokens to the shadcn variables, so the
-       brand values have to be set on the base variables to take effect. */
-    --background: #fbfcee;
-    --primary: #3971b8;
-    --primary-foreground: #fbfcee;
-    --border: #e4e3cd;
-
-    font-family: var(--font-comfortaa), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "cv11", "ss01";
   }
 
-  /* Poppins carries headings, numerals, and the wordmark; Comfortaa handles
-     everything else. Declared once here so components do not repeat it. */
+  /* One typeface throughout; headings differ by weight and tracking only. */
   .kali-app :is(h1, h2, h3, h4),
   .kali-app .font-heading,
   .kali-app .text-display,
   .kali-app .text-stat {
-    font-family: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
-    letter-spacing: -0.015em;
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.011em;
+  }
+
+  .kali-app .text-stat {
+    font-variant-numeric: tabular-nums;
   }
 
   .kali-app .font-body {
-    font-family: var(--font-comfortaa), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   }
 
   button {
@@ -185,7 +238,7 @@
   }
 
   .kali-app ::selection {
-    background: var(--color-primary-subtle);
+    background: color-mix(in srgb, var(--color-primary) 22%, transparent);
   }
 
   @supports (padding-bottom: env(safe-area-inset-bottom)) {
@@ -227,17 +280,17 @@ body.kali-dragging .kali-app * {
 
 @utility scroll-slim {
   scrollbar-width: thin;
-  scrollbar-color: rgba(57, 113, 184, 0.35) transparent;
+  scrollbar-color: color-mix(in srgb, var(--color-text-muted) 40%, transparent) transparent;
   &::-webkit-scrollbar {
     height: 8px;
     width: 8px;
   }
   &::-webkit-scrollbar-thumb {
-    background: rgba(57, 113, 184, 0.3);
+    background: color-mix(in srgb, var(--color-text-muted) 35%, transparent);
     border-radius: 9999px;
   }
   &::-webkit-scrollbar-thumb:hover {
-    background: rgba(57, 113, 184, 0.5);
+    background: color-mix(in srgb, var(--color-text-muted) 55%, transparent);
   }
   &::-webkit-scrollbar-track {
     background: transparent;
@@ -247,7 +300,7 @@ body.kali-dragging .kali-app * {
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -256,43 +309,38 @@ body.kali-dragging .kali-app * {
 }
 
 @utility animate-in {
-  animation: fade-in 0.18s ease-out;
+  animation: fade-in 0.15s ease-out;
 }
 
+/* Entrances are short, straight fades — no overshoot or bounce. */
 @keyframes drop-in {
-  0% {
+  from {
     opacity: 0;
-    transform: translateY(-12px) scale(0.94);
+    transform: translateY(-4px);
   }
-  55% {
+  to {
     opacity: 1;
-    transform: translateY(3px) scale(1.02);
-  }
-  75% {
-    transform: translateY(-1px) scale(1);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 @utility animate-drop {
-  animation: drop-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: drop-in 0.16s ease-out both;
 }
 
-@keyframes gentle-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
+/* Kept so existing class names still compile; idle motion is intentionally off. */
 @utility animate-float {
-  animation: gentle-float 3.2s ease-in-out infinite;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kali-app *,
+  .kali-app *::before,
+  .kali-app *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @keyframes shimmer {

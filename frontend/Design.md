@@ -1,244 +1,128 @@
-# Design.md — Fluely App Design System (v4, "So Matcha")
+# Design.md — Fluely App Design System (v5, "Slate")
 
 ## 1. Direction Summary
 
-Previous state (v3, inherited from Kali): cool grey-teal surfaces, near-black sidebar rail, soft
-pastel-tinted stat cards, Inter/Geist type, 20px card radius.
+Previous state (v4, "So Matcha"): warm ivory page, pastel Tea Green / Vanilla color blocks, a
+Celtic Blue rail, 24–32px "blobby" radii, Poppins + Comfortaa type, bouncy motion, and a mascot on
+the loading and sign-in screens. It read as playful; Fluely's users are professionals.
 
-Current state (v4): the **So Matcha** brand system — warm ivory page, saturated flat color blocks
-instead of tinted washes, a Celtic Blue rail, rounded blobby geometry, and a two-family type
-system (Poppins for headings and numerals, Comfortaa for body).
+Current state (v5): a neutral **slate** ramp for surfaces, text, and borders, **one cobalt accent**
+for primary actions, links, focus, and selection, semantic colors only where they carry meaning,
+Geist as the single UI typeface, 6–12px radii, short straight motion, and a simple geometric mark.
+Light and dark themes, chosen in **Settings → Appearance** (Light / Dark / System).
 
-**Scope:** this is a visual re-skin only. Layout, component structure, and behavior are unchanged.
-Every change lands in tokens (`frontend/app/globals.css`, `frontend/app/kali.css`) plus a small
-number of className swaps in the components listed in §7.
-
-**Token architecture note:** this is **Tailwind v4 with CSS-based config** — there is no
-`tailwind.config.js`. Tokens are declared in `@theme` blocks in the stylesheets. The app palette is
-scoped to `.kali-app`; the shadcn palette in `globals.css` serves the auth, landing, docs, and admin
-routes. Both were moved to the brand together so the whole product reads as one system.
+**Token architecture note:** Tailwind v4 with CSS-based config — no `tailwind.config.js`. Tokens are
+declared in `@theme` blocks. The shadcn variables in `globals.css` and the app tokens in `kali.css`
+share one palette, so auth, landing, docs, admin, and the app read as one system.
 
 ---
 
-## 2. Design Tokens (Tailwind v4)
+## 2. Design Tokens
 
-### 2.1 Brand Palette
+### 2.1 How theming works
 
-The five canonical brand colors. Use these directly (`bg-brand-blue`, `text-brand-ink`, …) for
-brand moments; use the semantic tokens in §2.2 for everything else.
+- Light values live in the `@theme` block of `frontend/app/kali.css` and in `:root` of
+  `frontend/app/globals.css`.
+- Dark values override **base** tokens only, in `:root.dark` (kali.css) and `.dark` (globals.css).
+  Every alias (`ink-*`, `accent-*`, `sidebar-*`, `base-*`, …) is a `var()` reference to a base
+  token, so it follows the theme without its own dark entry. Add a new color as a base token with
+  both values, or as an alias of an existing one.
+- `lib/theme/theme.ts` stores the choice in `localStorage` (`fluely-theme`, default `light`) and
+  toggles `.dark` on `<html>`. An inline script in `app/layout.tsx` applies it before first paint;
+  `ThemeSync` follows OS changes when "System" is chosen.
+- `dark:*` utilities are class-based (`@custom-variant dark` in globals.css).
 
-| Token | Hex | Role |
-|-------|-----|------|
-| `--color-brand-blue` | `#3971b8` | Celtic Blue — primary buttons, active nav, links, sidebar rail |
-| `--color-brand-green` | `#c8d69b` | Tea Green — stat/tag block, success tint, active accent |
-| `--color-brand-vanilla` | `#f6e6a5` | Vanilla — stat/tag block, highlights |
-| `--color-brand-ivory` | `#fbfcee` | Ivory — page background, text on blue blocks |
-| `--color-brand-ink` | `#343b1b` | Drab Dark Brown — headings, body text, text on green/vanilla |
+### 2.2 Base palette
 
-```css
-@theme {
-  --color-brand-blue: #3971b8;
-  --color-brand-green: #c8d69b;
-  --color-brand-vanilla: #f6e6a5;
-  --color-brand-ivory: #fbfcee;
-  --color-brand-ink: #343b1b;
-}
-```
+| Token | Light | Dark | Role |
+|-------|-------|------|------|
+| `background` | `#f7f8fa` | `#0c0e12` | page canvas |
+| `surface` | `#ffffff` | `#14171d` | cards, sidebar, panels |
+| `surface-alt` | `#f1f3f6` | `#1b1f27` | insets, hover fills, list columns |
+| `surface-elevated` | `#ffffff` | `#1e222b` | popovers, board cards |
+| `text-primary` | `#0f172a` | `#e7e9ee` | headings, body |
+| `text-secondary` | `#475569` | `#a4acb9` | supporting copy |
+| `text-muted` | `#64748b` | `#7f8898` | metadata, placeholders |
+| `border` | `#e3e6eb` | `#262b34` | hairlines |
+| `border-strong` | `#cdd2da` | `#3a414e` | hover borders, dividers |
+| `primary` | `#2554c7` | `#3563e9` | the one accent; white text on it |
+| `primary-hover` | `#1e46a8` | `#4a76f0` | |
+| `primary-subtle` | `#ebf0fc` | `#172036` | selected rows, active nav |
+| `primary-text` | `#1e46a8` | `#93b2ff` | links and accent text on surfaces |
 
-### 2.2 Semantic Palette
+Semantic roles each have a solid, a `-subtle` background, and a `-text` foreground:
+success `#15803d`, warning `#b45309`, danger `#c2341f`, info = primary (dark values are lighter
+equivalents; see kali.css).
 
-Semantic tokens are the default vocabulary. They resolve to brand colors or to warm relatives of
-the ink brown, so the UI never drifts off-palette.
+### 2.3 Legacy names
 
-```css
-/* Surfaces */
---color-background: #fbfcee;        /* page — Ivory */
---color-surface: #ffffff;           /* cards — white, so they lift off the ivory page */
---color-surface-alt: #f4f3e2;       /* insets, hover fills */
---color-surface-elevated: #ffffff;  /* dropdowns, popovers */
+Ported Kali components still use some So Matcha names; they now resolve to neutral or cobalt roles,
+so the components re-sync with upstream without edits:
 
---color-text-primary: #343b1b;      /* headings and primary copy — Drab Dark Brown */
---color-text-secondary: #5f6740;    /* supporting copy */
---color-text-muted: #8a9068;        /* placeholders, timestamps */
+| Name | Now means |
+|------|-----------|
+| `brand-blue` | cobalt (= primary) |
+| `brand-green` | accent tint |
+| `brand-vanilla` | neutral tint |
+| `brand-ivory` | white — text on cobalt or on dark scrims |
+| `brand-ink` | primary text (flips in dark) — never use it for scrims; use `bg-black/50` |
+| `accent-teal-*`, `accent-green-*` | `primary-subtle` + `primary-text` |
+| `sidebar-bg` / `sidebar-active` | `surface` / `primary-subtle` |
 
---color-border: #e4e3cd;
---color-border-strong: #cfceac;
+### 2.4 Typography
 
-/* Primary = Celtic Blue */
---color-primary: #3971b8;
---color-primary-hover: #2f5c96;
---color-primary-foreground: #fbfcee;
---color-primary-subtle: #e6edf8;
---color-primary-text: #2f5c96;      /* blue text on light surfaces */
-
-/* Semantic status — success leans Tea Green */
---color-success: #8fa85c;      --color-success-subtle: #eef3de;  --color-success-text: #4c5c22;
---color-warning: #d9a520;      --color-warning-subtle: #fbf3d4;  --color-warning-text: #7a5c07;
---color-danger:  #cf4b40;      --color-danger-subtle:  #fbe9e7;  --color-danger-text:  #a3332a;
---color-info:    #4a86c8;      --color-info-subtle:    #e6edf8;  --color-info-text:    #2f5c96;
-
-/* Canvas + neutral ramp */
---color-board-canvas: #f4f3e2;
---color-list-default: #ffffff;
---color-base-bg: #f4f3e2;
---color-base-surface: #ffffff;
---color-base-surface-alt: #faf9ec;
---color-ink-900: #343b1b;  --color-ink-700: #5f6740;
---color-ink-500: #8a9068;  --color-ink-300: #cfceac;
-
-/* Flat brand blocks — NOT tinted washes */
---color-accent-purple-bg: #ffffff;  --color-accent-purple-text: #343b1b;  /* white neutral */
---color-accent-green-bg:  #c8d69b;  --color-accent-green-text:  #343b1b;  /* Tea Green */
---color-accent-yellow-bg: #f6e6a5;  --color-accent-yellow-text: #343b1b;  /* Vanilla */
---color-accent-teal-bg:   #3971b8;  --color-accent-teal-text:   #fbfcee;  /* Celtic Blue */
-
---color-sidebar-bg: #3971b8;       /* the rail is brand blue, not near-black */
---color-sidebar-active: #2f5c96;   /* deeper blue for the active row */
---color-sidebar-accent: #c8d69b;   /* Tea Green left-accent on the active item */
-```
-
-### 2.3 Typography
-
-Two families, loaded through `next/font` in `frontend/app/layout.tsx` and published as Tailwind
-utilities via `@theme inline` in `globals.css`.
+One family: **Geist** (`--font-geist-sans`), with Geist Mono for code. `font-heading` and
+`font-body` are kept as aliases of Geist. Headings differ by weight (600) and slight negative
+tracking only; stat numerals use tabular figures.
 
 ```css
-@theme inline {
-  --font-heading: var(--font-poppins);
-  --font-body: var(--font-comfortaa);
-}
+--text-display: 24px/32px 600;  --text-stat: 24px/30px 600;  --text-card-title: 14px/20px 600;
+--text-body: 13px/18px;         --text-label: 11px/14px 600, 0.04em tracking
 ```
 
-| Role | Family | Weights | Applied to |
-|------|--------|---------|------------|
-| Display, stat numbers, wordmark, `h1`–`h4` | Poppins | 600–700 | page titles, big numerals, logo-type |
-| Body, labels, table content, everything else | Comfortaa | 400–600 | paragraphs, labels, secondary copy |
-
-`.kali-app` sets Comfortaa as the inherited family and promotes Poppins for `h1`–`h4`,
-`.text-display`, `.text-stat`, and `.font-heading`. Components rarely need to opt in by hand;
-`font-heading` / `font-body` exist for the cases that do.
-
-Type scale (unchanged from v3, now rendered in Poppins):
-
-```css
---text-display: 28px;  --text-stat: 26px;  --text-card-title: 14px;
---text-body: 13px;     --text-label: 11px;
-```
-
-### 2.4 Radius & Elevation
-
-Geometry is deliberately exaggerated and pill-heavy — rounded edges are the brand, not a
-rounding-off of something else.
+### 2.5 Radius & elevation
 
 | Token | Value | Used by |
 |-------|-------|---------|
-| `--radius-hero` | 32px | hero and feature cards (`rounded-hero`) |
-| `--radius-card` | 24px | cards, modals, list columns (`rounded-card`) |
-| `--radius-chip` | 16px | chips, inputs, small tiles (`rounded-chip`) |
-| `--radius-pill` | 999px | buttons, tags, badges (`rounded-pill`) |
+| `--radius` (shadcn) | 0.5rem | buttons, inputs on shadcn surfaces |
+| `--radius-chip` | 6px | chips, small tiles, icon wells |
+| `--radius-card` | 10px | cards, list columns |
+| `--radius-hero` | 12px | large panels, modals |
+| `--radius-pill` | 999px | avatars and small status badges only |
 
-Tailwind's own scale is widened by `--radius: 1.25rem` in `globals.css`, so shadcn surfaces get
-the same rounder feel.
-
-Shadows are soft and low-opacity, tinted with the ink brown rather than neutral black. Cards are
-flat by default; elevation is reserved for things that float.
-
-```css
---shadow-card: 0 2px 10px rgba(52, 59, 27, 0.04);
---shadow-card-hover: 0 6px 20px rgba(52, 59, 27, 0.07);
---shadow-subtle: 0 1px 3px rgba(52, 59, 27, 0.05);
---shadow-medium: 0 6px 20px rgba(52, 59, 27, 0.08);   /* dropdowns */
---shadow-modal: 0 18px 50px rgba(52, 59, 27, 0.16);    /* modals, drawers */
-```
-
-Stat cards carry **no** shadow — the flat color block is the treatment.
+Borders do the structural work; shadows only lift. Shadow color is `--shadow-ink` (slate in light,
+black in dark) mixed at 4–18%.
 
 ---
 
 ## 3. Layout Structure
 
-Unchanged from v3. Sidebar rail (236px, 52px collapsed) → main scroll area, mobile bottom nav
-below `md`.
-
----
+Sidebar (236px, 52px collapsed) → main scroll area, mobile bottom nav below `md`. Unchanged.
 
 ## 4. Component Specs
 
-### 4.1 Sidebar
-
-Celtic Blue rail (`bg-sidebar-bg`), ivory text and icons, `--surface-*` adaptive vars seeded from
-`#3971b8` so contrast math matches the new rail. The active row gets the deeper
-`bg-sidebar-active` plus a Tea Green left-accent bar (`bg-brand-green`) — the accent had to move
-off `bg-primary` because primary is now the rail color itself.
-
-### 4.2 Stat Cards
-
-Four flat color blocks, rotating — no tinting, no shadow, 24px radius:
-
-| Tone | Block | Text |
-|------|-------|------|
-| `green` | Tea Green `#c8d69b` | Drab Dark Brown |
-| `vanilla` | Vanilla `#f6e6a5` | Drab Dark Brown |
-| `blue` | Celtic Blue `#3971b8` | Ivory |
-| `white` | White + hairline border | Drab Dark Brown |
-
-The Dashboard uses green / vanilla / blue / white for Boards, Due this week, Notifications, and
-Starred boards. Text color is carried on the block itself, so a tone is always readable.
-
-### 4.3 Hero Card
-
-`rounded-hero` (32px) white card on the ivory page. Chart stroke and the trend chip use the blue
-subtle/accent pair.
-
-### 4.4–4.7 Lists, Right Panel, Top Bar
-
-Unchanged structurally; all colors come from the tokens above. The Promo card is a Celtic Blue
-block (`bg-sidebar-bg`) with ivory copy and a Vanilla pill CTA.
-
----
+- **Sidebar** — plain `surface` with a right border; text tiers come from the app tokens. Active
+  item: `primary-subtle` background, `primary-text` label, and a 3px cobalt bar.
+- **Stat cards** — all one neutral bordered card; the `tone` prop colors only a small dot beside
+  the label (blue = primary, green = success, vanilla = warning, white = muted).
+- **Promo card** — neutral card with a cobalt primary button.
+- **Platform overview** — neutral header strip (`surface-alt`) for every card; the platform's own
+  brand color is reserved for its icon.
+- **Auth** — split card: a fixed dark-slate brand panel (same in both themes) and the form.
+- **Loading curtain** — the Fluely mark, a thin cobalt bar, one line of status text, on
+  `background`.
+- **Brand mark** — `components/brand/FluelyMark.tsx` (`FluelyMark`, `FluelyLogo`); favicon
+  `public/assets/fluely_mark.svg`. The mascot artwork is no longer used in product chrome.
 
 ## 5. Interaction & Motion
 
-Unchanged: 150ms color transitions, `scale-[0.98]` on press, 200ms sidebar width transition, the
-existing `animate-in` / `animate-drop` keyframes. Focus rings are `ring-primary/40` and
-`outline-primary`.
+150ms color transitions, 150–160ms fade/slide entrances (`animate-in`, `animate-drop`) with no
+overshoot, no idle animation (`animate-float` is a no-op). `prefers-reduced-motion` disables
+animation inside `.kali-app`. Focus: `outline-primary` / `ring-primary`.
 
----
+## 6. Content colors
 
-## 6. Dark Mode
-
-Removed. Every route sits on the ivory canvas and `app/kali.css` defines no `.dark` scope; the
-`darkMode` store flag and the `/settings` toggle are gone. Re-adding a dark theme means a second
-pass over every semantic token in `kali.css`.
-
----
-
-## 7. Implementation Notes
-
-Token edits:
-
-- `frontend/app/globals.css` — shadcn `:root` / `.dark` recolored to the brand; `--radius`
-  widened; `--font-heading` / `--font-body` published; `--font-heading: var(--font-mono)` bug fixed
-- `frontend/app/kali.css` — full `@theme` rewrite, `.kali-app` and `.dark .kali-app` scopes, the
-  Poppins/Comfortaa rules, `scroll-slim` recolored to blue
-
-Component edits (color and className only):
-
-- `dashboard/StatCard.tsx` — tone union renamed to `blue | green | vanilla | white`; per-tone text
-  colors; shadow removed
-- `dashboard/DashboardView.tsx` — the four tone call sites
-- `dashboard/HeroCard.tsx` — `rounded-hero`
-- `dashboard/PromoCard.tsx` — ivory copy, Vanilla pill
-- `layout/Sidebar.tsx` — blue rail accents, Tea Green active bar, Poppins wordmark, adaptive seed
-- `shared/Modal.tsx`, `card-modal/CoverPanel.tsx`, `boards/BoardMenuDrawer.tsx`,
-  `social/{AIGenerate,BulkSchedule,CardSocialPosts,Compose,MediaLibrary,PostDetail}Modal.tsx` —
-  scrims `bg-[#0f1a19]/50` → `bg-brand-ink/50`
-- `boards/BoardsHome.tsx` — scrims and the board-name pill
-- `boards/{ListMenu,ShareModal,TimelineView}.tsx`, `card-modal/CoverPanel.tsx`,
-  `content-planner/{TipsGoalsSidebar,ContentPostCard}.tsx`, `lib/kali/store/schema.ts` — the old
-  teal default swatch `#0DABA3` → `#3971B8`
-
-Platform brand colors, label swatches, and member avatar colors are **content**, not theme — those
-hex values stay as authored.
-
-Layout, data flow, and behavior are untouched.
+Label swatches, member/avatar colors, and board backgrounds are user content, but their defaults
+are muted mid-tones that carry white text at AA contrast (`lib/kali/store/schema.ts`,
+`shared/Avatar.tsx`, `settings/SettingsView.tsx`). Platform brand colors stay as authored. Colors
+already saved on boards and profiles are not migrated.

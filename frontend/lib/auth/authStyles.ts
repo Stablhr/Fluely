@@ -1,43 +1,36 @@
 /**
  * Shared class strings for the `(auth)` route group.
  *
- * The group renders inside the floating card defined in `app/(auth)/layout.tsx`,
- * so every page in it needs the same field treatment to look consistent. Tokens
- * come from the So Matcha palette in `app/kali.css` — no hex literals here.
+ * The group renders inside the card defined in `app/(auth)/layout.tsx`, so every
+ * page in it needs the same field treatment to look consistent. Colors are theme
+ * tokens (app/globals.css, app/kali.css), so the forms follow light and dark.
  */
 
 export const authTitleClass =
-  'font-heading text-[28px] font-bold leading-tight tracking-tight text-brand-ink';
+  'text-[24px] font-semibold leading-tight tracking-tight text-foreground';
 
-export const authSubtitleClass =
-  'font-body text-[15px] leading-relaxed text-muted-foreground';
+export const authSubtitleClass = 'text-[14px] leading-relaxed text-muted-foreground';
 
-export const authLabelClass =
-  'font-body text-[14px] font-medium text-brand-ink';
+export const authLabelClass = 'text-[13px] font-medium text-foreground';
 
-// `--radius` is 1.25rem here, so stock `rounded-2xl` would resolve to 36px and
-// read as a pill on a 48px field. `rounded-xl` (28px) keeps the soft rounding
-// the design calls for while staying distinct from the pill-shaped button.
 export const authInputClass =
-  'h-12 rounded-xl border-border bg-background px-4 py-2.5 font-body text-[15px] text-brand-ink placeholder:text-ink-faint focus-visible:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue/25 dark:bg-background dark:text-brand-ink md:text-[15px]';
+  'h-10 rounded-md border-input bg-card px-3 py-2 text-[14px] text-foreground placeholder:text-muted-foreground/70 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 md:text-[14px]';
 
 export const authPrimaryButtonClass =
-  'h-12 w-full rounded-full bg-brand-blue px-6 font-body text-[15px] font-semibold text-white hover:bg-blue-hover';
+  'h-10 w-full rounded-md bg-primary px-4 text-[14px] font-medium text-primary-foreground hover:bg-primary-hover';
 
 export const authSecondaryButtonClass =
-  'h-12 w-full rounded-full border-border bg-background px-6 font-body text-[15px] font-semibold text-brand-ink hover:bg-secondary';
+  'h-10 w-full rounded-md border-input bg-card px-4 text-[14px] font-medium text-foreground hover:bg-secondary';
 
 export const authPasswordToggleClass =
-  'absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-ink-secondary transition-colors hover:text-brand-ink';
+  'absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground';
 
-export const authInlineLinkClass =
-  'font-body font-semibold text-brand-blue hover:underline';
+export const authInlineLinkClass = 'text-[13px] font-medium text-primary-text hover:underline';
 
-export const authFooterClass =
-  'text-center font-body text-[15px] text-muted-foreground';
+export const authFooterClass = 'text-center text-[14px] text-muted-foreground';
 
 export const authErrorClass =
-  'rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 font-body text-sm text-destructive';
+  'rounded-md border border-destructive/30 bg-danger-subtle px-3 py-2.5 text-sm text-danger-text';
 
 export const authSuccessClass =
-  'rounded-2xl border border-brand-green/60 bg-green-subtle px-4 py-3 font-body text-sm text-brand-ink';
+  'rounded-md border border-success/30 bg-success-subtle px-3 py-2.5 text-sm text-success-text';
