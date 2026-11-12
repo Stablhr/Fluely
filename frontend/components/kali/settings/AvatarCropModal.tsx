@@ -11,7 +11,12 @@ type Props = {
 
 export default function AvatarCropModal({ file, onCancel, onConfirm }: Props) {
   const [src, setSrc] = useState<string | null>(null)
-  const [loadError, setLoadError] = useState(false)
+  // The file that failed to decode; a new file is tried fresh without a reset.
+  const [failedFile, setFailedFile] = useState<File | null>(null)
+  const loadError = failedFile === file
+  // Smallest zoom at which the image still covers the circle. Measured once the
+  // image has loaded; kept in state because refs must not be read during render.
+  const [minZoom, setMinZoom] = useState(1)
   const [scale, setScale] = useState(1)
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [dragging, setDragging] = useState(false)
@@ -21,9 +26,11 @@ export default function AvatarCropModal({ file, onCancel, onConfirm }: Props) {
   const containerSize = 280
 
   useEffect(() => {
+    // Owning an object URL is a real external resource: it is created here and
+    // revoked in the cleanup, so state has to be set from the effect.
     const url = URL.createObjectURL(file)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSrc(url)
-    setLoadError(false)
     return () => URL.revokeObjectURL(url)
   }, [file])
 
@@ -31,18 +38,13 @@ export default function AvatarCropModal({ file, onCancel, onConfirm }: Props) {
   const handleImgLoad = () => {
     const img = imgRef.current
     if (!img) return
-    const minScale = Math.max(containerSize / img.naturalWidth, containerSize / img.naturalHeight)
-    setScale(minScale)
+    const coverScale = Math.max(containerSize / img.naturalWidth, containerSize / img.naturalHeight)
+    setMinZoom(coverScale)
+    setScale(coverScale)
     setOffset({ x: 0, y: 0 })
   }
 
-  const minScale = () => {
-    const img = imgRef.current
-    if (!img) return 1
-    return Math.max(containerSize / img.naturalWidth, containerSize / img.naturalHeight)
-  }
-
-  const clampScale = (v: number) => Math.max(minScale(), Math.min(4, v))
+  const clampScale = (v: number) => Math.max(minZoom, Math.min(4, v))
 
   const onPointerDown = (e: React.PointerEvent) => {
     setDragging(true)
@@ -114,7 +116,7 @@ export default function AvatarCropModal({ file, onCancel, onConfirm }: Props) {
         </div>
         <div className="flex flex-col items-center gap-4 p-4">
           {loadError ? (
-            <p className="text-sm text-danger-text">We couldn't read that image. Try a different file.</p>
+            <p className="text-sm text-danger-text">We couldn&apos;t read that image. Try a different file.</p>
           ) : (
             <div
               className="relative overflow-hidden rounded-full bg-surface-alt"
@@ -131,7 +133,7 @@ export default function AvatarCropModal({ file, onCancel, onConfirm }: Props) {
                   alt="Preview"
                   draggable={false}
                   onLoad={handleImgLoad}
-                  onError={() => setLoadError(true)}
+                  onError={() => setFailedFile(file)}
                   style={{
                     position: 'absolute',
                     left: '50%',
@@ -152,7 +154,7 @@ export default function AvatarCropModal({ file, onCancel, onConfirm }: Props) {
               <ZoomIn size={16} className="text-text-secondary" />
               <input
                 type="range"
-                min={minScale()}
+                min={minZoom}
                 max={4}
                 step={0.01}
                 value={scale}

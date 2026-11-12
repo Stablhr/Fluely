@@ -67,15 +67,19 @@ export default function BoardView() {
   }, [boardId, hasServerBoard, loadCollaborators])
 
   // Open a card (and optionally highlight a comment) when arriving from a
-  // notification link such as an @mention.
-  useEffect(() => {
-    const cardId = searchParams.get('card')
-    const commentId = searchParams.get('comment')
-    if (cardId) {
-      setOpenCardId(cardId)
-      setHighlightCommentId(commentId || null)
+  // notification link such as an @mention. Adjusted during render when the
+  // params change, rather than in an effect, so there is no extra render pass.
+  const linkCardId = searchParams.get('card')
+  const linkCommentId = searchParams.get('comment')
+  const linkKey = `${linkCardId ?? ''}|${linkCommentId ?? ''}`
+  const [handledLinkKey, setHandledLinkKey] = useState('|')
+  if (linkKey !== handledLinkKey) {
+    setHandledLinkKey(linkKey)
+    if (linkCardId) {
+      setOpenCardId(linkCardId)
+      setHighlightCommentId(linkCommentId || null)
     }
-  }, [searchParams])
+  }
 
   if (!board) {
     return (

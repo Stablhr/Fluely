@@ -1182,7 +1182,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
     mutate((prev) => ({
       ...prev,
-      boards: { ...prev.boards, [boardId]: board as any },
+      boards: { ...prev.boards, [boardId]: board },
       lists: { ...prev.lists, ...lists },
       ui: { ...prev.ui, lastVisitedBoardId: boardId },
     }));
@@ -2515,7 +2515,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       id: newBoardId,
       name: `${srcBoard.name} (template)`,
       description: srcBoard.description,
-      visibility: "private" as any,
+      visibility: "private",
       starred: false,
       background: srcBoard.background,
       createdAt: now(),
@@ -2523,7 +2523,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       listOrder,
       labels,
       collaborators: [],
-      access: "owner" as any,
+      access: "owner",
       ownerId: null,
       workspaceId: null,
       publicSlug: null,
@@ -2804,7 +2804,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     const boardId = uid();
     const listId = uid();
     const cardIds: string[] = [];
-    const cards: Record<string, any> = {};
+    const cards: Record<string, Card> = {};
     items.forEach((item) => {
       const cardId = uid();
       cardIds.push(cardId);
@@ -2831,7 +2831,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         updatedAt: item.createdAt,
       };
     });
-    const list = {
+    const list: List = {
       id: listId,
       boardId,
       name: "Captured",
@@ -2841,11 +2841,11 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       cardOrder: cardIds,
       backgroundColor: "",
     };
-    const board = {
+    const board: Board = {
       id: boardId,
       name: "Inbox (migrated)",
       description: "",
-      visibility: "private" as any,
+      visibility: "private",
       starred: false,
       background: "",
       createdAt: now(),
@@ -2853,7 +2853,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       listOrder: [listId],
       labels: {},
       collaborators: [],
-      access: "owner" as any,
+      access: "owner",
       ownerId: currentUser?.id ?? null,
       ownerName: currentUser?.name ?? null,
       workspaceId: null,
@@ -2866,7 +2866,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     };
     mutate((prev) => ({
       ...prev,
-      boards: { ...prev.boards, [boardId]: board as any },
+      boards: { ...prev.boards, [boardId]: board },
       lists: { ...prev.lists, [listId]: list },
       cards: { ...prev.cards, ...cards },
     }));

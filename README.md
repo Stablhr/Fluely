@@ -257,7 +257,7 @@ git push origin feature/content-planner
 ### Merging
 
 1. Open a Pull Request from your branch into `development` and get it reviewed. CI (build and lint
-   for both projects) runs on every push and pull request; run `npm test` in `backend/` yourself.
+   for both projects, plus the backend tests) runs on every push and pull request.
 2. When `development` is ready to ship, open a Pull Request from `development` into `production`.
 3. A `hotfix/...` branch goes into `production` first, then gets merged back into `development` so
    the two don't drift.

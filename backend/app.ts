@@ -13,6 +13,13 @@ import {notFoundHandler} from './api/middleware/notFound';
 
 const app = express();
 
+// On Vercel every request arrives through one proxy hop, and Vercel overwrites
+// `X-Forwarded-For` with the real client address. Trusting that one hop makes
+// `req.ip` the client rather than the proxy, which the rate limiters key on.
+if (process.env.VERCEL === '1') {
+  app.set('trust proxy', 1);
+}
+
 const allowedOrigins = env.CORS_ORIGINS
   ? env.CORS_ORIGINS.split(',').map(o => o.trim().replace(/\/+$/, ''))
   : ['http://localhost:3000', 'https://fluely.vercel.app'];

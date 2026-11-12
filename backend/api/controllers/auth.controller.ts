@@ -119,7 +119,7 @@ export const authController = {
     try {
       const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE] as string | undefined;
       if (refreshToken) {
-        authService.logout(refreshToken);
+        await authService.logout(refreshToken);
       }
 
       const opts = COOKIE_OPTIONS;

@@ -34,3 +34,11 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Test
+        if: matrix.project == 'backend'
+        run: npm test
+        env:
+          MONGO_URI: mongodb://localhost:27017/ci-test
+          JWT_SECRET: ci-test-secret
+          JWT_REFRESH_SECRET: ci-test-refresh-secret

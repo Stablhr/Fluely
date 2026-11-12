@@ -2,7 +2,7 @@
 
 import { Fragment, useRef, useState, useEffect, useCallback } from 'react'
 import { MessageSquare, SmilePlus, Trash2, Send } from 'lucide-react'
-import EmojiPicker, { Theme } from 'emoji-picker-react'
+import EmojiPicker, { Theme, type EmojiClickData } from 'emoji-picker-react'
 import type { Card, Member } from '@/lib/kali/store/schema'
 import { YOU_ID } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
@@ -410,7 +410,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
           {pickerOpen && (
             <div className="absolute left-0 top-8 z-30 max-w-[min(320px,100%)] animate-in">
               <EmojiPicker
-                onEmojiClick={(emojiData: any) => {
+                onEmojiClick={(emojiData: EmojiClickData) => {
                   toggleCommentReaction(comment.id, emojiData.emoji)
                   setActivePicker(null)
                 }}

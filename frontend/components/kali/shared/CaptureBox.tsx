@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Plus, ChevronDown } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import { useToast } from '@/components/kali/shared/useToastState'
@@ -19,21 +19,22 @@ export default function CaptureBox({ autoFocus = false, variant = 'sidebar' }: {
     .sort((a, b) => Number(b.starred) - Number(a.starred) || b.updatedAt.localeCompare(a.updatedAt))
 
   const [text, setText] = useState('')
-  const [boardId, setBoardId] = useState<string>('')
+  const [chosenBoardId, setChosenBoardId] = useState<string>('')
 
-  useEffect(() => {
-    if (writableBoards.length === 0) {
-      setBoardId('')
-      return
-    }
+  // The picked board while it is still writable; otherwise the last board this
+  // person captured into, otherwise the first writable board. Derived on each
+  // render, so a board list change needs no syncing effect.
+  const canUse = (id: string | null): id is string => !!id && writableBoards.some((b) => b.id === id)
+  const lastUsedBoardId = (() => {
+    if (typeof window === 'undefined') return null
     const userId = data.members[YOU_ID]?.id ?? 'anon'
-    const last = typeof window !== 'undefined' ? window.localStorage.getItem(`${LAST_BOARD_KEY}:${userId}`) : null
-    if (last && writableBoards.some((b) => b.id === last)) {
-      setBoardId(last)
-      return
-    }
-    setBoardId(writableBoards[0].id)
-  }, [writableBoards.map((b) => b.id).join(','), data.members[YOU_ID]?.id])
+    return window.localStorage.getItem(`${LAST_BOARD_KEY}:${userId}`)
+  })()
+  const boardId = canUse(chosenBoardId)
+    ? chosenBoardId
+    : canUse(lastUsedBoardId)
+      ? lastUsedBoardId
+      : writableBoards[0]?.id ?? ''
 
   const submit = () => {
     const t = text.trim()
@@ -109,7 +110,7 @@ export default function CaptureBox({ autoFocus = false, variant = 'sidebar' }: {
       <label className="relative flex shrink-0 items-center">
         <select
           value={boardId}
-          onChange={(e) => setBoardId(e.target.value)}
+          onChange={(e) => setChosenBoardId(e.target.value)}
           aria-label="Capture board"
           className="appearance-none bg-transparent pr-4 text-xs font-medium text-text-secondary outline-none"
         >
