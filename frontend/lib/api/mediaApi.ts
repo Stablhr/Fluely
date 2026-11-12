@@ -182,7 +182,15 @@ export async function uploadMediaDirect(
       body: form,
     })
 
-    let json: any = null
+    // Cloudinary's upload response: the result fields on the final chunk, or an
+    // `error` object on failure.
+    let json: {
+      secure_url?: string
+      url?: string
+      public_id?: string
+      resource_type?: string
+      error?: { message?: string }
+    } | null = null
     try {
       json = await res.json()
     } catch {
@@ -195,9 +203,10 @@ export async function uploadMediaDirect(
     }
 
     // The final chunk's response carries the full upload result.
-    if (json && (json.secure_url || json.url)) {
+    const secureUrl = json?.secure_url || json?.url
+    if (json && secureUrl && json.public_id) {
       uploaded = {
-        secure_url: json.secure_url || json.url,
+        secure_url: secureUrl,
         public_id: json.public_id,
         resource_type: json.resource_type || 'auto',
       }

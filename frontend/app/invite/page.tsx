@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useMeQuery } from '@/lib/hooks/auth/useMeQuery'
 import { getDashboardPath } from '@/lib/auth/redirects'
 import { httpClient } from '@/lib/api/httpClient'
+import { getFriendlyErrorMessage } from '@/lib/api/getFriendlyErrorMessage'
+import type { NormalizedApiError } from '@/lib/api/types'
 import { Button } from '@/components/ui/button'
 
 interface InviteDetails {
@@ -15,6 +17,14 @@ interface InviteDetails {
   inviterName: string
   inviteeEmail: string
   expiresAt: string | null
+}
+
+/**
+ * `httpClient` rejects with an already-normalized error (`{status, code,
+ * message}`), not a raw Axios error, so read those fields directly.
+ */
+function apiErrorOf(err: unknown): Partial<NormalizedApiError> {
+  return err && typeof err === 'object' ? (err as Partial<NormalizedApiError>) : {}
 }
 
 export default function InvitePage() {
@@ -37,37 +47,33 @@ export default function InvitePage() {
   }, [data, isSuccess, router])
 
   useEffect(() => {
-    if (!token) {
-      setError('This invitation link is missing a token.')
-      setLoading(false)
-      return
-    }
+    // A missing token is derived at render time (see `shownError`), not set here.
+    if (!token) return
     if (isLoading) return
     if (!isSuccess) {
       // Not signed in: send to sign-in, preserving the token.
       router.replace(`/sign-in?redirect=${encodeURIComponent(`/invite?token=${token}`)}`)
       return
     }
+    // `loading` starts true and `error` null, and this runs once per token, so
+    // there is nothing to reset before the request.
     let cancelled = false
-    setLoading(true)
-    setError(null)
     httpClient
       .get<InviteDetails>(`/invitations/${encodeURIComponent(token)}`)
       .then((res) => {
         if (cancelled) return
         setDetails(res.data)
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         if (cancelled) return
-        const code = err?.response?.data?.code
+        const { code, status } = apiErrorOf(err)
         if (code === 'INVITATION_EXPIRED') {
           setError('This invitation has expired. Ask the board owner to send a new one.')
         } else if (code === 'INVITATION_NOT_FOUND') {
           setError('This invitation is invalid or has already been used.')
-        } else if (err?.response?.status === 403) {
+        } else if (status === 403) {
           setError(
-            err?.response?.data?.message ||
-              'This invitation was sent to a different account. Sign in with the invited email to accept it.',
+            'This invitation was sent to a different account. Sign in with the invited email to accept it.',
           )
         } else {
           setError('Could not load this invitation. Please try again.')
@@ -87,19 +93,20 @@ export default function InvitePage() {
     try {
       await httpClient.post(`/invitations/${encodeURIComponent(token)}/respond`, { decision })
       setDone(decision)
-    } catch (err: any) {
-      const code = err?.response?.data?.code
-      if (code === 'INVITATION_EXPIRED') {
+    } catch (err: unknown) {
+      if (apiErrorOf(err).code === 'INVITATION_EXPIRED') {
         setError('This invitation has expired.')
       } else {
-        setError(err?.response?.data?.message || 'Could not respond to this invitation.')
+        setError(getFriendlyErrorMessage(err, 'Could not respond to this invitation.'))
       }
     } finally {
       setAnswering(false)
     }
   }
 
-  if (isLoading || loading) {
+  const shownError = token ? error : 'This invitation link is missing a token.'
+
+  if (token && (isLoading || loading)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-sm text-text-secondary">Loading invitation…</p>
@@ -107,12 +114,12 @@ export default function InvitePage() {
     )
   }
 
-  if (error) {
+  if (shownError) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="max-w-md rounded-xl border border-border bg-surface-elevated p-6 text-center">
           <h1 className="text-lg font-semibold text-text-primary">Invitation unavailable</h1>
-          <p className="mt-2 text-sm text-text-secondary">{error}</p>
+          <p className="mt-2 text-sm text-text-secondary">{shownError}</p>
           <Button className="mt-4" onClick={() => router.push('/boards')}>
             Go to boards
           </Button>

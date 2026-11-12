@@ -68,7 +68,10 @@ function displayedUrl(url: string): string {
 
 export default function ImageViewer({ images, startIndex, canEdit, onClose, onRemoveCover, onDelete }: ImageViewerProps) {
   const [index, setIndex] = useState(Math.max(0, Math.min(startIndex, images.length - 1)))
-  const [loading, setLoading] = useState(true)
+  // The index whose image has finished loading (or failed); anything else is
+  // still loading, so moving to a new index shows the spinner without an effect.
+  const [settledIndex, setSettledIndex] = useState<number | null>(null)
+  const loading = settledIndex !== index
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const backdropRef = useRef<HTMLDivElement>(null)
@@ -86,11 +89,6 @@ export default function ImageViewer({ images, startIndex, canEdit, onClose, onRe
       document.body.style.overflow = prev
     }
   }, [])
-
-  // Reset loading on index change.
-  useEffect(() => {
-    setLoading(true)
-  }, [index])
 
   // Preload neighbors.
   useEffect(() => {
@@ -220,8 +218,8 @@ export default function ImageViewer({ images, startIndex, canEdit, onClose, onRe
           <img
             src={displayedUrl(img.url)}
             alt={img.name}
-            onLoad={() => setLoading(false)}
-            onError={() => setLoading(false)}
+            onLoad={() => setSettledIndex(index)}
+            onError={() => setSettledIndex(index)}
             className="max-h-[calc(100vh-160px)] max-w-full rounded-lg object-contain shadow-2xl"
             style={{ maxWidth: '100%' }}
           />
@@ -295,7 +293,7 @@ export default function ImageViewer({ images, startIndex, canEdit, onClose, onRe
         >
           <div className="w-full max-w-sm rounded-xl bg-surface p-4 text-text-primary shadow-medium">
             <p className="text-sm font-semibold">Delete this attachment?</p>
-            <p className="mt-1 text-xs text-text-muted">This can't be undone.</p>
+            <p className="mt-1 text-xs text-text-muted">This can&apos;t be undone.</p>
             <div className="mt-3 flex justify-end gap-2">
               <button
                 type="button"

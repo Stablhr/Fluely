@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useRef, useState, useEffect, useMemo } from 'react'
+import { useRef, useState, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield } from 'lucide-react'
 import AvatarCropModal from './AvatarCropModal'
 import { useQueryClient } from '@tanstack/react-query'
@@ -12,6 +12,7 @@ import {
   updateMyProfile,
   checkUsernameAvailable,
   type MyProfile,
+  type PublicProfile,
 } from '@/lib/api/profileApi'
 import { getFriendlyErrorMessage } from '@/lib/api/getFriendlyErrorMessage'
 import { formatSize } from '@/lib/kali/utils/format'
@@ -62,6 +63,9 @@ const SECTIONS = [
 
 type TabId = (typeof SECTIONS)[number]['id']
 
+/** The URL is only changed by this page (replaceState), so nothing to subscribe to. */
+const noopSubscribe = () => () => {}
+
 export default function SettingsView() {
   const { data: me } = useMeQuery()
   const queryClient = useQueryClient()
@@ -78,7 +82,17 @@ export default function SettingsView() {
   const abortRef = useRef<AbortController | null>(null)
   const uploadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [tab, setTabState] = useState<TabId>('profile')
+  // `?tab=` is read through useSyncExternalStore so the server render and the
+  // first client render agree ('profile'), then the URL's tab takes over. An
+  // explicit pick (setTab) wins after that.
+  const urlTab = useSyncExternalStore(
+    noopSubscribe,
+    () => new URLSearchParams(window.location.search).get('tab'),
+    () => null,
+  )
+  const [pickedTab, setTabState] = useState<TabId | null>(null)
+  const tab: TabId =
+    pickedTab ?? (SECTIONS.some((s) => s.id === urlTab) ? (urlTab as TabId) : 'profile')
   const setTab = (t: TabId) => {
     setTabState(t)
     if (typeof window !== 'undefined') {
@@ -87,12 +101,6 @@ export default function SettingsView() {
       window.history.replaceState({}, '', url.toString())
     }
   }
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const params = new URLSearchParams(window.location.search)
-    const t = params.get('tab') as TabId | null
-    if (t && SECTIONS.some((s) => s.id === t)) setTabState(t)
-  }, [])
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['myProfile'],
@@ -107,11 +115,16 @@ export default function SettingsView() {
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false)
 
   const [usernameQuery, setUsernameQuery] = useState('')
-  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
-  const [checkingUsername, setCheckingUsername] = useState(false)
+  // Result of the last availability check, tagged with the name it was for, so
+  // "checking" and "available" are derived rather than reset in an effect.
+  const [usernameResult, setUsernameResult] = useState<{ name: string; available: boolean | null } | null>(null)
 
-  useEffect(() => {
-    if (profile) {
+  // Reset the draft whenever a new profile arrives from the server. Done during
+  // render (comparing against the last profile seen) instead of in an effect.
+  const [draftSource, setDraftSource] = useState<typeof profile>(undefined)
+  if (profile && profile !== draftSource) {
+    setDraftSource(profile)
+    {
       setDraft({
         displayName: profile.displayName ?? '',
         username: profile.username ?? '',
@@ -126,33 +139,33 @@ export default function SettingsView() {
       })
       setUsernameQuery(profile.username ?? '')
     }
-  }, [profile, me?.user?.id])
+  }
+
+  const normalizedUsername = usernameQuery.trim().toLowerCase()
+  const usernameCheckable =
+    !!normalizedUsername &&
+    normalizedUsername !== (profile?.username ?? '') &&
+    /^[a-z0-9_.]{3,24}$/.test(normalizedUsername)
+  const usernameSettled = usernameResult?.name === normalizedUsername
+  const checkingUsername = usernameCheckable && !usernameSettled
+  const usernameAvailable = usernameCheckable && usernameSettled ? usernameResult.available : null
 
   useEffect(() => {
-    const u = usernameQuery.trim().toLowerCase()
-    if (!u || u === (profile?.username ?? '')) {
-      setUsernameAvailable(null)
-      return
-    }
-    if (!/^[a-z0-9_.]{3,24}$/.test(u)) {
-      setUsernameAvailable(null)
-      return
-    }
-    setCheckingUsername(true)
+    if (!usernameCheckable) return
+    const u = normalizedUsername
     const t = setTimeout(async () => {
+      let available: boolean | null = null
       try {
-        const avail = await checkUsernameAvailable(u)
-        setUsernameAvailable(avail)
+        available = await checkUsernameAvailable(u)
       } catch {
-        setUsernameAvailable(null)
-      } finally {
-        setCheckingUsername(false)
+        available = null
       }
+      setUsernameResult({ name: u, available })
     }, 400)
     return () => clearTimeout(t)
-  }, [usernameQuery, profile])
+  }, [normalizedUsername, usernameCheckable])
 
-  const setField = (key: keyof MyProfile, value: any) => {
+  const setField = <K extends keyof MyProfile>(key: K, value: MyProfile[K]) => {
     setDraft((d) => ({ ...d, [key]: value }))
     setDirty(true)
     setSaveMessage(null)
@@ -333,7 +346,7 @@ export default function SettingsView() {
   const pronounsIsPreset = PRONOUNS_OPTIONS.includes(pronounsValue) && pronounsValue !== 'custom'
   const pronounsSelectValue = pronounsIsPreset ? pronounsValue : (pronounsValue === '' ? '' : 'custom')
 
-  const previewProfile: any = {
+  const previewProfile: PublicProfile = {
     id: profile?.id ?? user?.id ?? 'you',
     displayName: (draft.displayName ?? profile?.displayName ?? displayName).trim() || displayName,
     username: (draft.username ?? profile?.username) || null,

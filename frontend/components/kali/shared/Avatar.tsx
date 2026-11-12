@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 /**
  * Brand palette for initials swatches. Matches `ProfileCard` and the settings
@@ -78,11 +78,12 @@ export default function Avatar({
   src,
   stacked,
 }: Props) {
-  const [failed, setFailed] = useState(false)
   const resolvedName = name ?? member?.name ?? null
   const resolvedColor = color ?? member?.avatarColor ?? member?.color ?? (member?.id ? colorFromId(member.id) : '#3971b8')
   const resolvedSrc = src ?? member?.avatarUrl ?? null
-  useEffect(() => { setFailed(false) }, [resolvedSrc])
+  // Remember which address failed, so a new src is tried again without an effect.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const failed = failedSrc !== null && failedSrc === resolvedSrc
   const showImage = !!resolvedSrc && !failed
   const displaySrc = showImage ? avatarDisplayUrl(resolvedSrc, Math.max(40, size * 2)) : null
   const px = size
@@ -105,7 +106,7 @@ export default function Avatar({
           src={displaySrc!}
           alt={resolvedName ?? 'Avatar'}
           className="h-full w-full object-cover object-center"
-          onError={() => setFailed(true)}
+          onError={() => setFailedSrc(resolvedSrc)}
           loading="lazy"
           decoding="async"
         />
