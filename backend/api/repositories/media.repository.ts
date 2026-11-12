@@ -78,5 +78,16 @@ export const mediaRepository = {
     MediaAttachmentModel.find({cardId}).exec(),
 
   deleteByCard: (cardId: Types.ObjectId) =>
-    MediaAttachmentModel.deleteMany({cardId}).exec()
+    MediaAttachmentModel.deleteMany({cardId}).exec(),
+
+  /** Every attachment on the given boards (cards, covers, backgrounds). */
+  listForBoards: (boardIds: Types.ObjectId[]) =>
+    MediaAttachmentModel.find({boardId: {$in: boardIds}}).exec(),
+
+  /** The account's own library items that are not attached to any board or card. */
+  listUnattachedForOwner: (ownerId: Types.ObjectId) =>
+    MediaAttachmentModel.find({ownerId, boardId: null, cardId: null}).exec(),
+
+  deleteByIds: (ids: Types.ObjectId[], session?: ProductSession) =>
+    MediaAttachmentModel.deleteMany({_id: {$in: ids}}, {session}).exec()
 };

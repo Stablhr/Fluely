@@ -37,11 +37,10 @@ const LoadingScreenContext = createContext<LoadingScreenContextValue | null>(
  * It is NOT raised for the initial page load. That case belongs to
  * app/loading.tsx, which renders the same curtain as the route's Suspense
  * fallback. The provider used to open its own curtain on mount as well, and
- * during the overlap the two mascots ran at independent offsets — so on screen
- * there were two drawings crossfading at half opacity on top of each other,
- * which reads as a blur rather than a run cycle. One curtain at a time fixes
- * that, and app/loading.tsx is in the server HTML too, so a refresh still shows
- * the mascot in the first flush rather than a bare ivory page.
+ * during the overlap two animations ran at independent offsets on top of each
+ * other. One curtain at a time fixes that, and app/loading.tsx is in the server
+ * HTML too, so a refresh still shows the curtain in the first flush rather than
+ * a bare page.
  */
 export default function LoadingScreenProvider({
   children,

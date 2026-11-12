@@ -484,6 +484,17 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     withCurrentUser(loadData(currentUser?.id), currentUser),
   );
   const [error, setError] = useState<string | null>(null);
+  // Load progress, so pages can show a skeleton instead of an empty state
+  // while the first fetch is in flight.
+  const [boardsLoaded, setBoardsLoaded] = useState(false);
+  const [loadedStructures, setLoadedStructures] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const markStructureLoaded = useCallback((boardId: string) => {
+    setLoadedStructures((prev) =>
+      prev.has(boardId) ? prev : new Set(prev).add(boardId),
+    );
+  }, []);
   const [pendingBoardId, setPendingBoardId] = useState<string | null>(null);
   const [pendingInvitations, setPendingInvitations] = useState<
     PendingInvitation[]
@@ -992,12 +1003,14 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           },
         };
       });
+      markStructureLoaded(boardId);
     } catch (err) {
+      markStructureLoaded(boardId);
       setError(
         getFriendlyErrorMessage(err, "Could not load this board’s contents."),
       );
     }
-  }, [currentUser?.id, currentUser?.name, importLocalChildren, mutate, repairBoardChildren, setError]);
+  }, [currentUser?.id, currentUser?.name, importLocalChildren, markStructureLoaded, mutate, repairBoardChildren, setError]);
 
   /**
    * Sends a child write to the server and adopts the new board revision.
@@ -1120,6 +1133,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const createBoard = async (
     templateId: string,
     name: string,
+    visibility: Visibility = "private",
   ): Promise<string> => {
     const template =
       BOARD_TEMPLATES.find((t) => t.id === templateId) ?? BOARD_TEMPLATES[0];
@@ -1139,6 +1153,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         background: template.swatch,
         templateId: template.id,
         labels: labelPayload,
+        visibility,
       });
     } catch (err) {
       setError(
@@ -2778,6 +2793,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         await syncBoards();
       } catch {
         // syncBoards has already put a readable message in the error slot.
+      } finally {
+        setBoardsLoaded(true);
       }
     }
     void load();
@@ -3598,6 +3615,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     /* Collaboration */
     syncBoards,
     syncBoardStructure,
+    boardsLoaded,
+    isBoardLoaded: (boardId: string) => loadedStructures.has(boardId),
     pendingBoardId,
     currentUserId: currentUser?.id ?? null,
     canWrite,

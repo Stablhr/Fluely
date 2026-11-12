@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {MAX_PREVIEW_URL_LENGTH} from '../constants/linkPreview';
+import {BoardVisibilities} from '../constants/product';
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid ObjectId');
 const text = (max: number) => z.string().trim().max(max);
@@ -265,6 +266,30 @@ export const mediaListQuerySchema = paginationQuerySchema.extend({
   search: text(200).optional()
 });
 
+const notificationChannelPatchSchema = z
+  .object({
+    mentions: z.boolean().optional(),
+    invitationResponses: z.boolean().optional()
+  })
+  .strict();
+
+/**
+ * Partial preferences: any subset of the nested keys, deep-merged by the
+ * service. Strict at every level so a typo is a 400 rather than a silent no-op.
+ */
+export const accountPreferencesPatchSchema = z
+  .object({
+    notifications: z
+      .object({
+        inApp: notificationChannelPatchSchema.optional(),
+        email: notificationChannelPatchSchema.optional()
+      })
+      .strict()
+      .optional(),
+    defaultBoardVisibility: z.enum(BoardVisibilities).optional()
+  })
+  .strict();
+
 export const profilePatchSchema = z.object({
   displayName: z.string().trim().min(2).max(50).optional().nullable(),
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9_.]{3,24}$/).optional().nullable(),
@@ -275,8 +300,22 @@ export const profilePatchSchema = z.object({
   accentColor: z.string().trim().max(30).optional().nullable(),
   avatarColor: z.string().trim().max(30).optional().nullable(),
   phone: z.string().trim().max(40).optional().nullable(),
-  profileVisibility: z.record(z.enum(['me', 'boards'])).optional().nullable()
+  profileVisibility: z.record(z.enum(['me', 'boards'])).optional().nullable(),
+  preferences: accountPreferencesPatchSchema.optional()
 });
+
+/**
+ * Deleting an account is irreversible, so the caller re-proves who they are
+ * with the current password and types the literal word `DELETE`.
+ */
+export const accountDeleteSchema = z
+  .object({
+    password: z.string().min(1, 'Password is required').max(200),
+    confirmation: z.literal('DELETE', {
+      errorMap: () => ({message: 'Type DELETE to confirm'})
+    })
+  })
+  .strict();
 
 /** Scope for a direct-to-Cloudinary upload (video / large files). */
 export const mediaSignatureSchema = z.object({
@@ -407,3 +446,5 @@ export type SocialAccountPatchInput = z.infer<typeof socialAccountPatchSchema>;
 export type RunDueInput = z.infer<typeof runDueSchema>;
 export type CaptionInput = z.infer<typeof captionSchema>;
 
+export type AccountPreferencesPatchInput = z.infer<typeof accountPreferencesPatchSchema>;
+export type AccountDeleteInput = z.infer<typeof accountDeleteSchema>;

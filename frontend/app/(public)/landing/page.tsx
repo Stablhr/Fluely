@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import {BRAND} from '@/lib/brand';
 import {
   ArrowRight,
   Bell,
@@ -97,22 +98,43 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Hero */}
-      <section className="px-6 pt-24 pb-20 text-center sm:pt-28">
-        <div className="mx-auto max-w-3xl">
-          <p className="text-sm font-medium text-primary-text">Projects and content in one workspace</p>
+      <section className="relative overflow-hidden px-6 pt-24 pb-20 text-center sm:pt-28">
+        {/* Hero backdrop: a fading grid, a cobalt glow, and a slow beam. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 text-foreground opacity-[0.06]"
+          style={{
+            backgroundImage:
+              'linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)',
+            backgroundSize: '44px 44px',
+            maskImage: 'radial-gradient(ellipse at 50% 0%, black 25%, transparent 70%)'
+          }}
+        />
+        <div
+          aria-hidden
+          className="animate-halo pointer-events-none absolute left-1/2 top-0 h-80 w-[640px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-primary/25 blur-3xl"
+        />
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[560px] overflow-hidden">
+          <div className="animate-beam absolute inset-x-0 h-1/2 bg-linear-to-b from-transparent via-primary/10 to-transparent" />
+        </div>
+        <div className="stagger relative mx-auto max-w-3xl">
+          <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1 text-xs font-medium text-primary-text backdrop-blur">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            Projects and content in one workspace
+          </p>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl md:text-6xl">
             Plan the work.
             <br />
             Schedule the content.
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground">
-            Fluely brings your team&apos;s boards, deadlines, and social calendar together, so
+            {BRAND.name} brings your team&apos;s boards, deadlines, and social calendar together, so
             nothing ships late and nothing posts by surprise.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
             <Link
               href="/sign-up"
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+              className="btn-sheen inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
             >
               Create free account
               <ArrowRight size={16} />
@@ -125,7 +147,9 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-        <ProductPreview />
+        <div className="animate-rise relative" style={{animationDelay: '320ms'}}>
+          <ProductPreview />
+        </div>
       </section>
 
       {/* Features */}
@@ -137,7 +161,7 @@ export default function HomePage() {
               Replace the spreadsheet, the task app, and the content calendar with one tool.
             </p>
           </div>
-          <div className="mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="stagger mt-14 grid gap-x-10 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map(({icon: Icon, title, description}) => (
               <div key={title}>
                 <span className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-primary-text">
@@ -161,7 +185,7 @@ export default function HomePage() {
           <div className="mt-8 flex justify-center gap-3">
             <Link
               href="/sign-up"
-              className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+              className="btn-sheen rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
             >
               Create free account
             </Link>
@@ -172,7 +196,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-border px-6 py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Fluely</p>
+          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} {BRAND.name}</p>
           <div className="flex gap-6">
             <Link href="/docs" className="text-sm text-muted-foreground hover:text-foreground">
               Developer docs

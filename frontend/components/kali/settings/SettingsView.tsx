@@ -3,7 +3,11 @@
 import { useRef, useState, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield } from 'lucide-react'
 import AvatarCropModal from './AvatarCropModal'
-import ThemePicker from './ThemePicker'
+import AccountSection from './AccountSection'
+import AppearanceSection from './AppearanceSection'
+import NotificationsSection from './NotificationsSection'
+import SharingSection from './SharingSection'
+import DangerZoneSection from './DangerZoneSection'
 import { useQueryClient } from '@tanstack/react-query'
 import { meQueryKey, useMeQuery } from '@/lib/hooks/auth/useMeQuery'
 import { getDisplayName } from '@/lib/api/authApi'
@@ -804,80 +808,15 @@ export default function SettingsView() {
               </div>
             )}
 
-            {tab === 'account' && (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 max-w-[1600px]">
-                <Section title="Password" description="Change your password via the reset flow.">
-                  <p className="text-[13px] text-text-secondary">
-                    Use the &quot;Forgot password&quot; link on the sign-in page to reset your password.
-                  </p>
-                </Section>
-                <Section title="Active sessions" description="Devices currently signed in.">
-                  <p className="text-[13px] text-text-muted">Session management is not available yet.</p>
-                </Section>
-              </div>
-            )}
+            {tab === 'account' && <AccountSection />}
 
-            {tab === 'appearance' && (
-              <div className="grid max-w-[960px] grid-cols-1 gap-4">
-                <Section title="Theme" description="Choose how Fluely looks on this device.">
-                  <ThemePicker />
-                </Section>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <Section title="Density" description="Compact or comfortable spacing.">
-                    <p className="text-[13px] text-text-muted">Density options are not available yet.</p>
-                  </Section>
-                  <Section title="Motion" description="Reduce animations.">
-                    <p className="text-[13px] text-text-muted">
-                      Fluely follows your device&apos;s reduce-motion setting.
-                    </p>
-                  </Section>
-                </div>
-              </div>
-            )}
+            {tab === 'appearance' && <AppearanceSection />}
 
-            {tab === 'notifications' && (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 max-w-[1600px]">
-                <Section title="In-app" description="Notifications shown in the app.">
-                  <ul className="divide-y divide-border">
-                    {['Mentions', 'Invitations', 'Card moves'].map((label) => (
-                      <li key={label} className="flex items-center justify-between py-2.5">
-                        <span className="text-[13px] text-text-primary">{label}</span>
-                        <span className="text-[11px] text-text-muted">On</span>
-                      </li>
-                    ))}
-                  </ul>
-                </Section>
-                <Section title="Email" description="Email digests and alerts.">
-                  <ul className="divide-y divide-border">
-                    {['Weekly digest', 'Mentions', 'Invitations'].map((label) => (
-                      <li key={label} className="flex items-center justify-between py-2.5">
-                        <span className="text-[13px] text-text-primary">{label}</span>
-                        <span className="text-[11px] text-text-muted">On</span>
-                      </li>
-                    ))}
-                  </ul>
-                </Section>
-              </div>
-            )}
+            {tab === 'notifications' && <NotificationsSection />}
 
-            {tab === 'sharing' && (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 max-w-[1600px]">
-                <Section title="Default visibility" description="Who can see your new boards by default.">
-                  <p className="text-[13px] text-text-muted">Default visibility options are not available yet.</p>
-                </Section>
-                <Section title="Privacy" description="Control what is shared with collaborators.">
-                  <p className="text-[13px] text-text-muted">Additional privacy controls are not available yet.</p>
-                </Section>
-              </div>
-            )}
+            {tab === 'sharing' && <SharingSection onOpenProfile={() => setTab('profile')} />}
 
-            {tab === 'danger' && (
-              <div className="grid grid-cols-1 gap-4 max-w-[1600px]">
-                <Section title="Delete account" description="Permanently remove your account and all data.">
-                  <p className="text-[13px] text-text-muted">Account deletion is not available yet. Contact support.</p>
-                </Section>
-              </div>
-            )}
+            {tab === 'danger' && <DangerZoneSection />}
           </div>
 
           {/* Sticky save bar */}

@@ -14,6 +14,20 @@ const COOKIE_OPTIONS: CookieOptions = {
   path: '/'
 };
 
+/**
+ * Ends the session carried by this request: revokes its refresh token (as
+ * logout does) and clears both auth cookies. Used by logout and by account
+ * deletion.
+ */
+export async function endRequestSession(req: Request, res: Response): Promise<void> {
+  const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE] as string | undefined;
+  if (refreshToken) {
+    await authService.logout(refreshToken);
+  }
+  res.clearCookie(ACCESS_TOKEN_COOKIE, COOKIE_OPTIONS);
+  res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
+}
+
 export const authController = {
   async me(req: Request, res: Response, next: NextFunction) {
     try {
@@ -117,14 +131,7 @@ export const authController = {
 
   async logout(req: Request, res: Response, next: NextFunction) {
     try {
-      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE] as string | undefined;
-      if (refreshToken) {
-        await authService.logout(refreshToken);
-      }
-
-      const opts = COOKIE_OPTIONS;
-      res.clearCookie(ACCESS_TOKEN_COOKIE, opts);
-      res.clearCookie(REFRESH_TOKEN_COOKIE, opts);
+      await endRequestSession(req, res);
       res.status(200).json({message: 'Logged out'});
     } catch (error) {
       next(error);

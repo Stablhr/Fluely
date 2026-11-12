@@ -107,5 +107,12 @@ export const boardCollaboratorRepository = {
     BoardCollaboratorModel.deleteMany({boardId}, {session}).exec(),
 
   deleteForBoardAndUser: (boardId: Types.ObjectId, userId: Types.ObjectId) =>
-    BoardCollaboratorModel.deleteOne({boardId, userId}).exec()
+    BoardCollaboratorModel.deleteOne({boardId, userId}).exec(),
+
+  deleteForBoards: (boardIds: Types.ObjectId[], session?: ProductSession) =>
+    BoardCollaboratorModel.deleteMany({boardId: {$in: boardIds}}, {session}).exec(),
+
+  /** Every collaborator row (any status) the account holds on any board. */
+  deleteForUser: (userId: Types.ObjectId, session?: ProductSession) =>
+    BoardCollaboratorModel.deleteMany({userId}, {session}).exec()
 };

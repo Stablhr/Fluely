@@ -4,19 +4,19 @@ import { Skeleton } from '../shared/Skeleton'
 
 export default function DashboardSkeleton() {
   return (
-    <div className="h-full overflow-y-auto p-4 sm:p-6 lg:px-8 lg:py-6">
+    <div className="h-full overflow-y-auto p-4 sm:p-6 lg:px-8 lg:py-6" aria-busy="true" aria-label="Loading dashboard">
       <Skeleton className="h-7 w-40" />
       <Skeleton className="mt-2 h-4 w-72" />
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
-        <div className="rounded-card bg-base-surface p-6 shadow-card">
+      <div className="stagger mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_3fr]">
+        <div className="rounded-card border border-border bg-surface p-6">
           <Skeleton className="h-4 w-28" />
           <Skeleton className="mt-4 h-8 w-16" />
           <Skeleton className="mt-2 h-12 w-full" />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="stagger grid grid-cols-2 gap-4">
           {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="rounded-card bg-base-surface p-5 shadow-card">
+            <div key={i} className="rounded-card border border-border bg-surface p-5">
               <Skeleton className="h-3 w-20" />
               <Skeleton className="mt-2 h-8 w-12" />
             </div>
@@ -24,12 +24,12 @@ export default function DashboardSkeleton() {
         </div>
       </div>
 
-      <Skeleton className="mt-6 h-11 max-w-md rounded-pill" />
+      <Skeleton className="mt-6 h-11 max-w-md rounded-card" />
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:mt-8 lg:grid-cols-[1fr_320px]">
         <div className="space-y-4">
           {/* DueSoonList skeleton */}
-          <div className="rounded-card bg-base-surface p-6 shadow-card">
+          <div className="rounded-card border border-border bg-surface p-6">
             <div className="flex items-center gap-2">
               <Skeleton className="h-7 w-7 rounded-chip" />
               <Skeleton className="h-3 w-20" />
@@ -38,15 +38,15 @@ export default function DashboardSkeleton() {
               {Array.from({ length: 4 }, (_, i) => (
                 <div key={i} className="flex items-center gap-3 py-3">
                   <Skeleton className="h-3.5 flex-1" />
-                  <Skeleton className="h-5 w-20 rounded-pill" />
-                  <Skeleton className="h-5 w-16 rounded-pill" />
+                  <Skeleton className="h-5 w-20 rounded-md" />
+                  <Skeleton className="h-5 w-16 rounded-md" />
                 </div>
               ))}
             </div>
           </div>
 
           {/* RecentBoardsList skeleton */}
-          <div className="rounded-card bg-base-surface p-6 shadow-card">
+          <div className="rounded-card border border-border bg-surface p-6">
             <div className="flex items-center gap-2">
               <Skeleton className="h-7 w-7 rounded-chip" />
               <Skeleton className="h-3 w-24" />
@@ -61,7 +61,7 @@ export default function DashboardSkeleton() {
 
         <div className="space-y-4">
           {/* PlannerPreview skeleton */}
-          <div className="rounded-card bg-base-surface p-6 shadow-card">
+          <div className="rounded-card border border-border bg-surface p-6">
             <div className="flex items-center gap-2">
               <Skeleton className="h-7 w-7 rounded-chip" />
               <Skeleton className="h-3 w-20" />
@@ -69,7 +69,7 @@ export default function DashboardSkeleton() {
             </div>
             <div className="mt-4 grid grid-cols-7 gap-1.5">
               {Array.from({ length: 7 }, (_, i) => (
-                <div key={i} className="flex flex-col items-center rounded-chip px-1 py-2 shadow-card">
+                <div key={i} className="flex flex-col items-center rounded-chip bg-surface-alt px-1 py-2">
                   <Skeleton className="h-2.5 w-3" />
                   <Skeleton className="mt-1 h-4 w-4" />
                   <Skeleton className="mt-1 h-1.5 w-1.5 rounded-full" />
@@ -79,11 +79,11 @@ export default function DashboardSkeleton() {
           </div>
 
           {/* PromoCard skeleton */}
-          <div className="rounded-card border border-border bg-surface p-6 shadow-card">
+          <div className="rounded-card border border-border bg-surface p-6">
             <Skeleton className="h-9 w-9 rounded-chip" />
             <Skeleton className="mt-4 h-4 w-32" />
             <Skeleton className="mt-2 h-3 w-44" />
-            <Skeleton className="mt-4 h-8 w-28 rounded-pill" />
+            <Skeleton className="mt-4 h-8 w-28 rounded-md" />
           </div>
         </div>
       </div>

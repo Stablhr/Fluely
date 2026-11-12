@@ -1,5 +1,6 @@
 import {Types} from 'mongoose';
 import {MentionDocument, MentionModel} from '../models/Mention.model';
+import {ProductSession} from '../utils/transaction';
 
 export const mentionRepository = {
   create: (data: {
@@ -33,5 +34,16 @@ export const mentionRepository = {
     MentionModel.find({cardId, commentId}).exec(),
 
   deleteByCard: (cardId: Types.ObjectId) =>
-    MentionModel.deleteMany({cardId}).exec()
+    MentionModel.deleteMany({cardId}).exec(),
+
+  /** Mentions of the account anywhere, plus every mention on the given boards. */
+  deleteForUserOrBoards: (
+    userId: Types.ObjectId,
+    boardIds: Types.ObjectId[],
+    session?: ProductSession
+  ) =>
+    MentionModel.deleteMany(
+      {$or: [{mentionedUserId: userId}, {boardId: {$in: boardIds}}]},
+      {session}
+    ).exec()
 };

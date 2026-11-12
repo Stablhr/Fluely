@@ -1,10 +1,11 @@
-# Design.md — Fluely App Design System (v5, "Slate")
+# Design.md — Cadence App Design System (v5, "Slate")
 
 ## 1. Direction Summary
 
 Previous state (v4, "So Matcha"): warm ivory page, pastel Tea Green / Vanilla color blocks, a
 Celtic Blue rail, 24–32px "blobby" radii, Poppins + Comfortaa type, bouncy motion, and a mascot on
-the loading and sign-in screens. It read as playful; Fluely's users are professionals.
+the loading and sign-in screens. It read as playful; the product's users are professionals. The product is now named Cadence
+(`lib/brand.ts`).
 
 Current state (v5): a neutral **slate** ramp for surfaces, text, and borders, **one cobalt accent**
 for primary actions, links, focus, and selection, semantic colors only where they carry meaning,
@@ -109,18 +110,53 @@ Sidebar (236px, 52px collapsed) → main scroll area, mobile bottom nav below `m
 - **Platform overview** — neutral header strip (`surface-alt`) for every card; the platform's own
   brand color is reserved for its icon.
 - **Auth** — split card: a fixed dark-slate brand panel (same in both themes) and the form.
-- **Loading curtain** — the Fluely mark, a thin cobalt bar, one line of status text, on
-  `background`.
-- **Brand mark** — `components/brand/FluelyMark.tsx` (`FluelyMark`, `FluelyLogo`); favicon
-  `public/assets/fluely_mark.svg`. The mascot artwork is no longer used in product chrome.
+- **Loading curtain** — the brand mark (bars draw in) inside a thin orbiting arc with a breathing
+  cobalt halo, the product name, and one status line with an animated ellipsis, on `background`.
+  Held for at least `MIN_CURTAIN_MS` (600ms) so it never flashes.
+- **Skeletons** — `shared/Skeleton` is a flat `surface-alt` block with a light band sweeping across
+  (a transformed pseudo-element) that appears only after 120ms, so fast loads never flash. Every main
+  page has a matching skeleton (dashboard, boards, board, schedule), shown until the store reports
+  `boardsLoaded` / `isBoardLoaded(id)`.
+- **Brand mark** — `components/brand/Logo.tsx` (`BrandMark`, `BrandLogo`; `animated` draws the
+  bars in); favicon `public/assets/brand_mark.svg`. All mascot artwork has been deleted.
 
 ## 5. Interaction & Motion
 
-150ms color transitions, 150–160ms fade/slide entrances (`animate-in`, `animate-drop`) with no
-overshoot, no idle animation (`animate-float` is a no-op). `prefers-reduced-motion` disables
-animation inside `.kali-app`. Focus: `outline-primary` / `ring-primary`.
+One easing family and three durations, defined on `:root` in `kali.css`:
+`--ease-out` (a long deceleration, no overshoot), `--ease-in-out`, and `--dur-fast` 120ms /
+`--dur-base` 200ms / `--dur-slow` 420ms. Entrances move a few pixels and resolve from a slight blur;
+nothing bounces, and nothing idles except progress indicators and the hero glows.
 
-## 6. Content colors
+| Utility | Use |
+|---------|-----|
+| `animate-in` / `animate-drop` | menus, toasts, inline messages (4px fade) |
+| `animate-rise` | a page header or section entering |
+| `stagger` | on a container: children rise 45ms apart |
+| `animate-dialog` / `animate-overlay` | modal panel / its scrim |
+| `animate-draw` | SVG strokes with `pathLength={1}` draw themselves in |
+| `hover-lift` | interactive cards lift 1px and deepen their shadow |
+| `btn-sheen` | primary buttons: a highlight sweeps across on hover |
+| `animate-orbit`, `animate-halo`, `animate-beam`, `.loading-dots` | loading curtain and hero effects |
+
+Entrance utilities use `animation-fill-mode: backwards` so they release their end state and hover
+transforms keep working. Dashboard numbers count up (`lib/kali/hooks/useCountUp.ts`). Motion is off
+under the OS reduce-motion setting unless the user picks **Full**, and always off with **Reduced**
+(`html[data-motion]`, Settings → Appearance).
+
+## 6. Settings
+
+- **Profile** — identity, about, contact and visibility (server).
+- **Account & security** — sign-in email, change password (`PUT /auth/password`; does not sign out
+  other devices), sign out of this device.
+- **Appearance** — theme, density (compact sets `html[data-density]`, which tightens Tailwind's
+  `--spacing` unit inside the app), and motion. Per browser, `lib/theme`.
+- **Notifications** — in-app and email switches for mentions and invitation responses, saved to the
+  account (`preferences.notifications`); board invitations are always delivered.
+- **Sharing & privacy** — default visibility for new boards (`preferences.defaultBoardVisibility`,
+  used by `CreateBoardModal`).
+- **Danger zone** — delete account (`DELETE /account/me`, password plus typing DELETE).
+
+## 7. Content colors
 
 Label swatches, member/avatar colors, and board backgrounds are user content, but their defaults
 are muted mid-tones that carry white text at AA contrast (`lib/kali/store/schema.ts`,

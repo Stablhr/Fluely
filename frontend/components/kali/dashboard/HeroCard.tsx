@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { TrendingUp } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import { addDays, startOfWeek, toISODate } from '@/lib/kali/utils/dates'
+import { useCountUp } from '@/lib/kali/hooks/useCountUp'
 
 const W = 200
 const H = 48
@@ -41,12 +42,13 @@ export default function HeroCard() {
   }, [data.cards])
 
   const total = points.reduce((acc, d) => acc + d.count, 0)
+  const shownTotal = useCountUp(total)
   const peak = points.reduce((best, d) => (d.count > best.count ? d : best), points[0])
   const line = points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
   const area = `${PAD},${H - PAD} ${line} ${W - PAD},${H - PAD}`
 
   return (
-    <div className="flex flex-col rounded-hero border border-border bg-surface p-6 shadow-card transition-shadow duration-150 hover:shadow-card-hover">
+    <div className="flex flex-col rounded-hero border border-border bg-surface p-6 shadow-card hover-lift">
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-chip bg-accent-teal-bg text-accent-teal-text">
           <TrendingUp size={14} />
@@ -59,7 +61,7 @@ export default function HeroCard() {
         )}
       </div>
 
-      <p className="mt-4 text-stat text-ink-900">{total}</p>
+      <p className="mt-4 text-stat text-ink-900">{shownTotal}</p>
       <p className="mt-1 text-body text-ink-500">
         {total === 0 ? 'Nothing scheduled this week.' : `${total} task${total === 1 ? '' : 's'} due across the next week.`}
       </p>
@@ -88,14 +90,15 @@ export default function HeroCard() {
             <title>{`${p.short} ${new Date(p.iso + 'T00:00:00').getDate()} · ${p.count} task${p.count === 1 ? '' : 's'}`}</title>
           </circle>
         ))}
-        <polygon points={area} fill="url(#hero-spark-fill)" />
+        <polygon points={area} fill="url(#hero-spark-fill)" className="animate-in" style={{ animationDelay: '300ms', animationDuration: '600ms' }} />
         <polyline
           points={line}
           fill="none"
           strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="stroke-brand-blue"
+          pathLength={1}
+          className="animate-draw stroke-brand-blue"
         />
       </svg>
 

@@ -1,4 +1,4 @@
-# Fluely — Design Direction
+# Cadence — Design Direction
 
 Scope: product and UI direction. Implementation-level tokens, type scale, and component specs live
 in [`frontend/Design.md`](./frontend/Design.md) — this document does not restate them. Current work
@@ -12,7 +12,8 @@ appear only where they mean something. Light and dark themes are both first-clas
 browser in Settings → Appearance.
 
 One typeface, **Geist**, carries the whole product; hierarchy comes from weight and size, not from
-mixing families. The mark is a simple cobalt "F" tile (`components/brand/FluelyMark.tsx`).
+mixing families. The product name lives in `lib/brand.ts`; the mark is a cobalt tile with three rising bars
+(`components/brand/Logo.tsx`), interim until the final logo.
 
 Cards are 10–12px radius on `surface`, separated by hairline borders; shadows only lift things that
 float. Motion is short and straight — no bounce, no idle animation.
@@ -98,8 +99,8 @@ status needs renaming, it is a one-file change.
 
 ## Open design questions
 
-- The "F" tile is a placeholder-quality mark drawn in code. A designed logo can replace
-  `FluelyMark` without touching its call sites.
+- The rising-bars tile is an interim mark drawn in code. A designed logo can replace
+  `BrandMark` without touching its call sites.
 - `social/ComposeModal.tsx` and `content-planner/PostDetailPanel.tsx` are two post editors with
   different field sets. The long-term shape should be one editor, or one composing the other.
 - The engagement/tips sidebar survived the planner rebuild as a toggle. It is not part of the

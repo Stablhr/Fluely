@@ -50,5 +50,8 @@ export const activityLogRepository = {
       .exec(),
 
   deleteForBoard: (boardId: Types.ObjectId, session?: ProductSession) =>
-    ActivityLogModel.deleteMany({boardId}, {session}).exec()
+    ActivityLogModel.deleteMany({boardId}, {session}).exec(),
+
+  deleteForBoards: (boardIds: Types.ObjectId[], session?: ProductSession) =>
+    ActivityLogModel.deleteMany({boardId: {$in: boardIds}}, {session}).exec()
 };

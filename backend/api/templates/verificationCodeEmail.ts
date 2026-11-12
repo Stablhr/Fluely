@@ -6,7 +6,7 @@ type VerificationCodeEmailParams = {
 };
 
 export function verificationCodeEmailTemplate({
-  appName = 'Fluely',
+  appName = 'Cadence',
   code,
   expiresMinutes,
   recipientName

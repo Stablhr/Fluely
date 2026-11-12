@@ -98,6 +98,15 @@ leaves the server (`PublicAccount` carries `avatarUrl` only).
 > instead: `POST /media/signature` returns signed parameters, the browser uploads to Cloudinary in
 > chunks, and `POST /media/register` records the result as a `MediaAttachment`.
 
+## Account Settings
+
+`User.preferences` (notification switches per channel for `mentions` and `invitationResponses`,
+plus `defaultBoardVisibility`) has schema defaults, so older accounts need no migration;
+`GET/PATCH /account/me/profile` read and deep-merge it, and `notification.service.ts` honours it.
+Board invitations are always delivered. `DELETE /account/me` (`{password, confirmation: "DELETE"}`)
+removes the account and what it owns via `accountService.deleteAccount`; workspaces it owns that
+have other members pass to the longest-standing member instead of being deleted.
+
 ## Routes and Cron
 
 Mounted in `api/routes/index.ts`: `/auth`, `/account`, `/boards` (boards, lists, cards, collaborators,
@@ -109,7 +118,8 @@ in production: the endpoint then requires Vercel's `Authorization: Bearer <CRON_
 ## Testing
 
 - Jest suites live in `backend/tests/`: board access, board children (lists/cards), board polling,
-  media access, and shared security state (blocklist + rate-limit store)
+  media access, shared security state (blocklist + rate-limit store), and account settings
+  (preferences, notification preferences, account deletion)
 - Tests that need a database use `mongodb-memory-server-core` (downloads a MongoDB binary on first
   run); never point tests at the real `MONGO_URI`
 - CI runs `npm test` for the backend on every push and pull request

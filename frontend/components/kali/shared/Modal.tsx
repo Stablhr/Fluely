@@ -24,9 +24,9 @@ export default function Modal({ open, onClose, children, className = '' }: Modal
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-3 sm:p-6 md:p-8">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="animate-overlay absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
       <div
-        className={`animate-in relative z-10 flex h-full w-full flex-col overflow-hidden rounded-[14px] border border-border bg-surface shadow-modal ${className}`}
+        className={`animate-dialog relative z-10 flex h-full w-full flex-col overflow-hidden rounded-hero border border-border bg-surface shadow-modal ${className}`}
       >
         {children}
       </div>

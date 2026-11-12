@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { useCountUp } from '@/lib/kali/hooks/useCountUp'
 
 export type StatTone = 'blue' | 'green' | 'vanilla' | 'white'
 
@@ -23,9 +24,10 @@ interface StatCardProps {
 }
 
 export default function StatCard({ tone, label, value, icon, className = '' }: StatCardProps) {
+  const shown = useCountUp(value)
   return (
     <div
-      className={`rounded-card border border-border bg-surface p-5 text-text-primary shadow-card transition-shadow duration-150 hover:shadow-card-hover ${className}`}
+      className={`hover-lift rounded-card border border-border bg-surface p-5 text-text-primary shadow-card ${className}`}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-[13px] font-medium text-text-secondary">
@@ -34,7 +36,7 @@ export default function StatCard({ tone, label, value, icon, className = '' }: S
         </span>
         {icon}
       </div>
-      <p className="text-stat mt-3">{value}</p>
+      <p className="text-stat mt-3">{shown}</p>
     </div>
   )
 }

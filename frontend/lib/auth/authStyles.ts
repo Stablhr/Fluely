@@ -17,7 +17,7 @@ export const authInputClass =
   'h-10 rounded-md border-input bg-card px-3 py-2 text-[14px] text-foreground placeholder:text-muted-foreground/70 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 md:text-[14px]';
 
 export const authPrimaryButtonClass =
-  'h-10 w-full rounded-md bg-primary px-4 text-[14px] font-medium text-primary-foreground hover:bg-primary-hover';
+  'btn-sheen h-10 w-full rounded-md bg-primary px-4 text-[14px] font-medium text-primary-foreground hover:bg-primary-hover';
 
 export const authSecondaryButtonClass =
   'h-10 w-full rounded-md border-input bg-card px-4 text-[14px] font-medium text-foreground hover:bg-secondary';

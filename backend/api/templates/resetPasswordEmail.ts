@@ -6,7 +6,7 @@ type ResetPasswordEmailParams = {
 };
 
 export function resetPasswordEmailTemplate({
-  appName = 'Fluely',
+  appName = 'Cadence',
   code,
   expiresMinutes,
   recipientName

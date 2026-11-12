@@ -1,5 +1,5 @@
 /**
- * Shared, branded email layout for Fluely transactional mail.
+ * Shared, branded email layout for Cadence transactional mail.
  *
  * Every template (invitations, mentions, password reset) renders through
  * `renderEmailLayout` so the chrome -- logo, palette, footer, dark-mode-safe
@@ -32,7 +32,7 @@ const BRAND = {
 };
 
 export function renderEmailLayout(params: EmailLayoutParams): {subject: string; text: string; html: string} {
-  const appName = params.appName ?? 'Fluely';
+  const appName = params.appName ?? 'Cadence';
   const footer =
     params.footer ??
     "If you weren't expecting this, you can ignore this email. " +
@@ -101,7 +101,7 @@ export function renderInviteEmail(params: InviteEmailParams) {
       ? 'Editors can create, edit, and move cards on this board.'
       : 'Viewers can view the board and its cards but cannot make changes.';
 
-  const title = `${params.inviterName} invited you to collaborate on "${params.boardName}" on Fluely`;
+  const title = `${params.inviterName} invited you to collaborate on "${params.boardName}" on ${params.appName ?? 'Cadence'}`;
 
   const bodyHtml = `
     ${safeRecipient ? `<p style="margin:0 0 10px;">Hi ${safeRecipient},</p>` : ''}

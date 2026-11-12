@@ -117,5 +117,12 @@ export const cardRepository = {
     CardModel.find({done: true, doneAt: {$ne: null, $lt: cutoff}})
       .sort({doneAt: 1})
       .limit(limit)
-      .exec()
+      .exec(),
+
+  deleteForBoards: (boardIds: Types.ObjectId[], session?: ProductSession) =>
+    CardModel.deleteMany({boardId: {$in: boardIds}}, {session}).exec(),
+
+  /** Unassigns an account from every card it is a member of. */
+  pullMember: (userId: Types.ObjectId, session?: ProductSession) =>
+    CardModel.updateMany({memberIds: userId}, {$pull: {memberIds: userId}}, {session}).exec()
 };

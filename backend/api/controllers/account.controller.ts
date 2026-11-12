@@ -4,6 +4,8 @@ import {actorFromRequest} from '../utils/actor';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
 import {Types} from 'mongoose';
+import {endRequestSession} from './auth.controller';
+import type {AccountDeleteInput} from '../dtos/product.dto';
 
 export const accountController = {
   async uploadAvatar(req: Request, res: Response, next: NextFunction) {
@@ -41,6 +43,18 @@ export const accountController = {
     try {
       const actor = actorFromRequest(req);
       res.status(200).json(await accountService.updateProfile(actor.actorId, req.body));
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async deleteAccount(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actor = actorFromRequest(req);
+      const body = req.body as AccountDeleteInput;
+      const result = await accountService.deleteAccount(actor.actorId, body.password);
+      await endRequestSession(req, res);
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }

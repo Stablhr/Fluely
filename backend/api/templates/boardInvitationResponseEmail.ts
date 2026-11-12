@@ -7,7 +7,7 @@ type BoardInvitationResponseEmailParams = {
 };
 
 export function boardInvitationResponseEmailTemplate({
-  appName = 'Fluely',
+  appName = 'Cadence',
   recipientName,
   inviteeName,
   boardName,

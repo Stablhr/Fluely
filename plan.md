@@ -1,4 +1,4 @@
-# Fluely — Project Plan
+# Cadence — Project Plan
 
 Companion docs:
 
@@ -6,7 +6,7 @@ Companion docs:
 - [`frontend/Design.md`](./frontend/Design.md) — implementation-level design tokens and component specs.
 - [`AGENTS.md`](./AGENTS.md) — stack overview and conventions. Sub-guides live in `frontend/` and `backend/`.
 
-## What Fluely is
+## What Cadence is
 
 A social content planner: plan posts across platforms, see them on a calendar, board, or table, and
 edit them in place. Built on an auth boilerplate — a Next.js 16 frontend plus an Express API with
@@ -30,7 +30,7 @@ JWT auth, roles, email verification, and password reset. The planner UI is porte
 | Cleanup | Daily Vercel cron deletes cards done for longer than `DONE_CARD_RETENTION_DAYS` (default 2). |
 | Social Posting | `/content-planner`: platform overview + calendar / board / table views over one shared post state, with a right-side slide-over editor. |
 | Schedule | `/schedule` (and the `/planner` alias): day columns of board cards by due date, plus an unscheduled pool. |
-| Branding | Slate design system (neutral slate + one cobalt accent, Geist type), light and dark themes in Settings → Appearance, Fluely "F" mark, professional auth, landing, and loading screens. |
+| Branding | Slate design system (neutral slate + one cobalt accent, Geist type), light and dark themes in Settings → Appearance, Cadence name (formerly Fluely; repo, domain, storage keys, and Cloudinary folders still say fluely), interim rising-bars mark pending a final logo, animated loading curtain, skeletons on every main page, and a shared motion system. |
 | Tests | Backend Jest suites for board access, board children, board polling, media access, and shared security state (76 tests), run in CI. |
 
 Removed: the Inbox page. Capture now goes into boards, and legacy inbox items are migrated into a
@@ -66,9 +66,8 @@ Ordered by dependency, not by size.
 4. **Add frontend tests.** The store reducer, the `boardChildren.ts` mappers, and the status/stage
    folding map in `planner-model.ts` are pure functions with branching logic and the best first
    targets. No frontend test runner is configured yet.
-5. **Decide the logo situation.** The small inline logo in the auth page's left panel and the large
-   overlapping wordmark both point at `fluely_logo.png`. If the intent was two distinct marks, the
-   small one should point at `fluely_favicon.png`.
+5. **Final logo.** `components/brand/Logo.tsx` (`BrandMark`) and `public/assets/brand_mark.svg`
+   carry an interim mark; replace both with the designed Cadence logo.
 
 ## Known gaps
 

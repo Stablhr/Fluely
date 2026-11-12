@@ -1,7 +1,7 @@
 'use client';
 import {useSearchParams} from 'next/navigation';
 import Link from 'next/link';
-import {FluelyLogo} from '@/components/brand/FluelyMark';
+import {BrandLogo} from '@/components/brand/Logo';
 import {useSignOut} from '@/lib/hooks/auth/useSignOut';
 import {Home, Settings, LogOut, LayoutDashboard} from 'lucide-react';
 
@@ -61,7 +61,7 @@ export default function AdminDashboardLayout({
     <div className="flex h-screen cursor-default bg-background">
       <aside className="hidden md:flex flex-col w-64 min-h-screen bg-black shadow-xl z-40">
         <div className="flex items-center px-5 py-5 border-b border-gray-800">
-          <FluelyLogo textClassName="text-white" />
+          <BrandLogo textClassName="text-white" />
         </div>
 
         <div className="px-4 pt-4 pb-2">

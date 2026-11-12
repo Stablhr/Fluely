@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
 import { BOARD_TEMPLATES } from "@/lib/kali/store/schema";
 import { useStore } from "@/lib/kali/store/useStore";
+import { useQuery } from "@tanstack/react-query";
+import { getMyProfile } from "@/lib/api/profileApi";
 import Modal from "../shared/Modal";
 
 interface CreateBoardModalProps {
@@ -17,6 +19,14 @@ export default function CreateBoardModal({
   onClose,
 }: CreateBoardModalProps) {
   const { createBoard } = useStore();
+  // New boards start at the visibility chosen in Settings → Sharing & privacy.
+  const { data: profile } = useQuery({
+    queryKey: ["myProfile"],
+    queryFn: getMyProfile,
+    staleTime: 30_000,
+    enabled: open,
+  });
+  const defaultVisibility = profile?.preferences?.defaultBoardVisibility ?? "private";
   const router = useRouter();
   const [selected, setSelected] = useState(BOARD_TEMPLATES[0].id);
   const [name, setName] = useState("");
@@ -33,7 +43,7 @@ export default function CreateBoardModal({
     const boardName = name.trim() || template.name;
     setIsCreating(true);
     try {
-      const boardId = await createBoard(template.id, boardName);
+      const boardId = await createBoard(template.id, boardName, defaultVisibility);
       setName("");
       onClose();
       router.push(`/boards/${boardId}`);

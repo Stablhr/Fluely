@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/kali/store/useStore";
 import { YOU_ID } from "@/lib/kali/store/schema";
-import { FluelyMark } from "@/components/brand/FluelyMark";
+import { BrandMark } from "@/components/brand/Logo";
+import { BRAND } from "@/lib/brand";
 import { useSignOut } from "@/lib/hooks/auth/useSignOut";
 import Avatar from "../shared/Avatar";
 
@@ -58,10 +59,10 @@ const NAV = [
 function Logo({ collapsed }: { collapsed: boolean }) {
   return (
     <div className="flex items-center gap-2.5 px-2 py-3">
-      <FluelyMark size={collapsed ? 28 : 30} />
+      <BrandMark size={collapsed ? 28 : 30} />
       {!collapsed && (
         <span className="text-[16px] font-semibold tracking-tight text-text-primary">
-          Fluely
+          {BRAND.name}
         </span>
       )}
     </div>

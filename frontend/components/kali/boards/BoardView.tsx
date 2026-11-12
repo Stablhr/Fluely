@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import BoardViewSkeleton from './BoardViewSkeleton'
 import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
@@ -82,6 +83,9 @@ export default function BoardView() {
   }
 
   if (!board) {
+    // Boards arrive with the first fetch after sign-in; until it settles an
+    // unknown id is "not loaded yet", not "does not exist".
+    if (!store.boardsLoaded) return <BoardViewSkeleton />
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8">
         <p className="text-sm text-text-secondary">This board doesn&apos;t exist.</p>
@@ -94,6 +98,9 @@ export default function BoardView() {
 
   const lists = store.getLists(boardId)
   const mayWrite = store.canWrite(boardId)
+
+  // First open of a board: its lists are still on the way.
+  if (lists.length === 0 && !store.isBoardLoaded(boardId)) return <BoardViewSkeleton />
 
   const onDragEnd = (result: DropResult) => {
     endDragCursor()
