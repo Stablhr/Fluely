@@ -1,11 +1,35 @@
 import rateLimit from 'express-rate-limit';
 import type {Request, RequestHandler} from 'express';
+import {MongoRateLimitStore} from './rateLimitStore';
 
 const enabled = process.env.RATE_LIMIT_ENABLED !== 'false';
 const noop: RequestHandler = (_req, _res, next) => next();
 
-function makeLimiter(opts: Parameters<typeof rateLimit>[0]): RequestHandler {
+type LimiterOptions = Parameters<typeof rateLimit>[0];
+
+/**
+ * In-memory limiter: each server instance counts on its own. Fine for the
+ * high-frequency read and poll budgets below, which only cap a runaway signed-in
+ * client and would otherwise cost a database write per poll.
+ */
+function makeLimiter(opts: LimiterOptions): RequestHandler {
   return enabled ? (rateLimit(opts) as RequestHandler) : noop;
+}
+
+/**
+ * Limiter whose counters live in MongoDB, so the budget holds across every
+ * serverless instance. Used where the limit is a security control (brute force,
+ * uploads, outbound fetches, writes). `passOnStoreError` lets requests through
+ * if the database is briefly unreachable rather than failing every request --
+ * those routes need the database to do anything anyway.
+ */
+function makeSharedLimiter(prefix: string, opts: LimiterOptions): RequestHandler {
+  if (!enabled) return noop;
+  return rateLimit({
+    ...opts,
+    store: new MongoRateLimitStore(prefix),
+    passOnStoreError: true
+  }) as RequestHandler;
 }
 
 const rateLimitHandler: RequestHandler = (_req, res) => {
@@ -38,7 +62,7 @@ function accountOrIp(req: Request): string {
  * Sensitive pre-auth writes (register, verify, login, password reset). Keyed by
  * address because no account exists yet, and left strict for brute-force.
  */
-export const authLimiter = makeLimiter({
+export const authLimiter = makeSharedLimiter('auth', {
   windowMs: 15 * 60 * 1000,
   max: 5,
   standardHeaders: true,
@@ -51,7 +75,7 @@ export const authLimiter = makeLimiter({
  * removal, token refresh. Sized for an editing session -- a card drag is one
  * write -- while still capping a runaway client.
  */
-export const authActionLimiter = makeLimiter({
+export const authActionLimiter = makeSharedLimiter('action', {
   windowMs: 15 * 60 * 1000,
   max: 120,
   keyGenerator: accountOrIp,
@@ -79,7 +103,7 @@ export const authReadLimiter = makeLimiter({
  * third-party hosts, so this gets its own small budget instead of the
  * human-paced read allowance.
  */
-export const linkPreviewLimiter = makeLimiter({
+export const linkPreviewLimiter = makeSharedLimiter('link-preview', {
   windowMs: 15 * 60 * 1000,
   max: 60,
   keyGenerator: accountOrIp,
@@ -103,7 +127,7 @@ export const backgroundReadLimiter = makeLimiter({
   handler: rateLimitHandler
 });
 
-export const uploadLimiter = makeLimiter({
+export const uploadLimiter = makeSharedLimiter('upload', {
   windowMs: 15 * 60 * 1000,
   max: 20,
   keyGenerator: accountOrIp,
