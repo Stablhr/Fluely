@@ -8,6 +8,7 @@ import {ApiError} from '../utils/error';
 import {emailService} from './email.service';
 import {blocklistService} from './blocklist.service';
 import {ErrorCodes} from '../constants/errorCodes';
+import {createSecureToken} from '../utils/crypto';
 import {verificationCodeEmailTemplate} from '../templates/verificationCodeEmail';
 import {resetPasswordEmailTemplate} from '../templates/resetPasswordEmail';
 import {workspaceService} from './workspace.service';
@@ -385,7 +386,9 @@ export const authService = {
     const refreshToken = jwt.sign(
       {userId: account.id, type: userType},
       env.JWT_REFRESH_SECRET,
-      {expiresIn: REFRESH_TOKEN_TTL_SECONDS}
+      // A unique id per token: without it, two tokens issued for the same account
+      // in the same second are byte-identical, so revoking one revokes both.
+      {expiresIn: REFRESH_TOKEN_TTL_SECONDS, jwtid: createSecureToken(16)}
     );
 
     return {accessToken, refreshToken, user: account, userType};
@@ -407,7 +410,7 @@ export const authService = {
 
   async refreshAccessToken(refreshToken: string) {
     try {
-      if (blocklistService.isRevoked(refreshToken)) {
+      if (await blocklistService.isRevoked(refreshToken)) {
         throw new ApiError(401, ErrorCodes.UNAUTHORIZED, 'Token revoked');
       }
 
@@ -426,7 +429,7 @@ export const authService = {
         throw new ApiError(403, ErrorCodes.NOT_VERIFIED, 'Email not verified');
       }
 
-      blocklistService.revoke(refreshToken);
+      await blocklistService.revoke(refreshToken);
 
       const accessToken = jwt.sign(
         {userId: account.id, type: payload.type},
@@ -437,7 +440,7 @@ export const authService = {
       const newRefreshToken = jwt.sign(
         {userId: account.id, type: payload.type},
         env.JWT_REFRESH_SECRET,
-        {expiresIn: REFRESH_TOKEN_TTL_SECONDS}
+        {expiresIn: REFRESH_TOKEN_TTL_SECONDS, jwtid: createSecureToken(16)}
       );
 
       return {accessToken, refreshToken: newRefreshToken};
@@ -446,7 +449,7 @@ export const authService = {
     }
   },
 
-  logout(refreshToken: string) {
-    blocklistService.revoke(refreshToken);
+  async logout(refreshToken: string): Promise<void> {
+    await blocklistService.revoke(refreshToken);
   }
 };
