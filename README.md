@@ -2,26 +2,32 @@
 
 ## 📖 Project Overview
 
-Fluely is a social media content planning and scheduling app. It provides a weekly time-grid content
-planner where you can drag posts into time slots, manage boards with multiple views, keep track of
-and get an at-a-glance dashboard of what's coming up.
+Fluely is a social media content planning and scheduling app. Plan posts across platforms on a
+calendar, board, or table; run collaborative boards with multiple views; and get an at-a-glance
+dashboard of what's coming up.
 
 The app UI is ported from [Stablhr/Kali](https://github.com/Stablhr/Kali) and runs as a Next.js 16
-app behind a JWT auth boundary, with an Express.js API alongside it. App data currently lives in a
-local store in the browser; the remote API client in `frontend/lib/kali/api/` stays inert until
-`NEXT_PUBLIC_KALI_API_URL` points at a backend that serves it.
+app behind a JWT auth boundary, with an Express.js + MongoDB API alongside it. Boards, lists, cards,
+collaborators, media, profiles, and notifications are stored on the server. Social posts and
+connected social accounts don't have backend routes yet, so they are kept in browser storage.
 
 ### Key Features
 
 - **Dashboard** — At-a-glance overview of boards, due-soon items, and planner previews.
-- **Boards** — Kanban boards with board views: Board, Calendar, Table, Timeline, and Map.
-- **Schedule** — Day-column planner with drag-and-drop between days and an unscheduled pool.
-- **Content Planner** — Weekly time grid (6 AM – 11 PM) to schedule social posts by hour; drag posts
-  between slots and the unscheduled pool.
-- **Social** — Compose modal, bulk scheduling, analytics, media library, and OAuth account connection
+- **Boards** — Kanban boards with Board, Calendar, Table, Timeline, and Map views; workspaces,
+  collaborators, email invitations, public boards, live updates (polling), archive, and activity.
+- **Cards** — Comments with mentions, attachments and image/video covers on Cloudinary (videos up
+  to 500 MB), autolinked URLs, inline embeds for YouTube, Vimeo, Google Drive, and video files, and
+  link cards. Done cards are cleaned up automatically after two days.
+- **Schedule** — Day-column planner of board cards by due date, with drag-and-drop between days and
+  an unscheduled pool.
+- **Social Posting** — Platform overview plus calendar, board (Idea → Posted), and table views over
+  one set of social posts, edited in a slide-over panel.
+- **Social** — Compose modal, bulk scheduling, analytics, media library, and account connection
   (YouTube, Facebook, Instagram, TikTok).
-- **Theme** — Light & dark mode with adaptive surfaces.
-- **Accounts** — Sign up, sign in, email verification, password reset, and a role-based admin area.
+- **Notifications** — Bell for mentions and board invitations.
+- **Accounts** — Sign up, sign in, email verification, password reset, profile with avatar and
+  visibility settings, and a role-based admin area.
 
 ## 🛠️ Tech Stack
 
@@ -61,32 +67,36 @@ fluely/
 │   ├── app/
 │   │   ├── (app)/                # Authenticated app — owns /
 │   │   │   ├── boards/           # /boards, /boards/[boardId]
-│   │   │   ├── content-planner/  # /content-planner, /planner
+│   │   │   ├── content-planner/  # /content-planner (Social Posting)
 │   │   │   ├── dev/              # Contrast test page
+│   │   │   ├── planner/          # /planner → redirects to /schedule
 │   │   │   ├── schedule/         # /schedule
+│   │   │   ├── settings/         # /settings (profile, account)
 │   │   │   └── layout.tsx        # Auth guard, .kali-app wrapper, providers
 │   │   ├── (admin)/              # /admin/dashboard (parallel routes)
 │   │   ├── (auth)/               # sign-in, sign-up, forgot/reset, verify
 │   │   ├── (public)/             # /landing, /docs
+│   │   ├── invite/               # Board invitation landing
 │   │   ├── globals.css           # Tailwind entry + shadcn tokens
 │   │   └── kali.css              # App design system, scoped to .kali-app
 │   ├── components/
 │   │   ├── kali/                 # Ported app components
 │   │   │   ├── boards/           # Boards, lists, cards & views
 │   │   │   ├── card-modal/       # Card detail modal & fields
-│   │   │   ├── content-planner/  # Weekly time grid planner
+│   │   │   ├── content-planner/  # Social Posting: overview, calendar/board/table
 │   │   │   ├── dashboard/        # Home dashboard
 │   │   │   ├── dev/              # Contrast test page
-│   │   │   ├── layout/           # Sidebar, app shell, top bar
+│   │   │   ├── layout/           # Sidebar, app shell, top bar, notifications
+│   │   │   ├── settings/         # Settings, avatar crop
 │   │   │   ├── planner/          # Day-column schedule planner
 │   │   │   ├── shared/           # Buttons, inputs, modals, skeletons
 │   │   │   └── social/           # Compose, analytics, media library
 │   │   └── ui/                   # shadcn/ui primitives
 │   ├── lib/
-│   │   ├── api/                  # Axios client, auth API, error mapping
+│   │   ├── api/                  # Axios client; auth, account, media, embed APIs; error mapping
 │   │   ├── auth/                 # Redirect utilities
 │   │   ├── hooks/                # useMeQuery, useLogout
-│   │   ├── kali/                 # Store, hooks, utils, optional API client
+│   │   ├── kali/                 # Store, board API modules, realtime polling, utils
 │   │   └── provider/             # ReactQueryProvider
 │   ├── public/assets/            # Static assets & logos
 │   └── .env.example
@@ -97,16 +107,15 @@ fluely/
     │   ├── controllers/          # Route handlers
     │   ├── dtos/                 # Zod validation schemas
     │   ├── logging/              # Pino logger
-    │   ├── middleware/           # Auth, error handler, rate limit, sanitize
-    │   ├── models/               # User & Admin models
+    │   ├── middleware/           # Auth, CSRF, board access, upload, rate limit, sanitize
+    │   ├── models/               # Users, workspaces, boards, lists, cards, media, notifications
     │   ├── repositories/         # Data access layer
     │   ├── routes/               # Express router definitions
-    │   ├── services/             # Business logic (auth, email, blocklist)
+    │   ├── services/             # Business logic
     │   ├── templates/            # HTML email templates
     │   └── utils/                # Error, crypto, pagination, serialization
-    ├── scripts/
-    │   ├── seed-admin.ts         # Admin seed script
-    │   └── migrate-media-to-cloudinary.ts  # Upload legacy local files to Cloudinary
+    ├── scripts/                  # Admin seed + one-off migrations
+    ├── tests/                    # Jest suites
     ├── .env.example
     └── package.json
 ```
@@ -164,8 +173,8 @@ npm install
 cp .env.example .env
 ```
 
-`NEXT_PUBLIC_API_URL` defaults to `http://localhost:5000/api`. Leave
-`NEXT_PUBLIC_KALI_API_URL` unset to run entirely on the local store.
+`NEXT_PUBLIC_API_URL` defaults to `http://localhost:5000/api`. The backend must be running: boards
+and accounts are loaded from it.
 
 ```bash
 npm run dev
@@ -177,7 +186,8 @@ requires a session. The marketing page is at `/landing`.
 ### 4. Deploy
 
 Both halves are deployable to Vercel (`backend/vercel.json` covers the API). Set the same
-environment variables in each Vercel project, and deploy them independently.
+environment variables in each Vercel project, and deploy them independently. `backend/vercel.json`
+also schedules the daily done-card cleanup cron; set `CRON_SECRET` so only Vercel can call it.
 
 ## 📜 Available Scripts
 
@@ -189,8 +199,9 @@ environment variables in each Vercel project, and deploy them independently.
 | `npm run build` | Compile TypeScript |
 | `npm start` | Start the production server |
 | `npm run seed:admin` | Seed an admin account |
+| `npm run migrate:media-to-cloudinary` | One-off: upload legacy local files to Cloudinary |
 | `npm run lint` | Run ESLint |
-| `npm test` | Run tests with Jest |
+| `npm test` | Run the Jest suites in `tests/` |
 
 ### Frontend
 
@@ -207,26 +218,30 @@ environment variables in each Vercel project, and deploy them independently.
 ### Branch Structure
 
 ```
-main
-└── feature/<short-description>
+production                         # default branch — what is deployed
+└── development                    # integration branch — day-to-day work lands here
+    ├── feature/<short-description>
     ├── fix/<short-description>
-    ├── hotfix/<short-description>       # (urgent production fixes)
-    └── chore/<short-description>        # (configs, deps, refactors)
+    └── chore/<short-description>  # (configs, deps, refactors)
+hotfix/<short-description>         # urgent fixes, branched from production
 ```
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| Feature | `feature/<short-description>` | `feature/content-planner` |
-| Bug Fix | `fix/<short-description>` | `fix/sidebar-tooltip` |
-| Hotfix | `hotfix/<short-description>` | `hotfix/login-redirect` |
-| Chore | `chore/<short-description>` | `chore/update-deps` |
+| Type | Branch from | Pattern | Example |
+|------|-------------|---------|---------|
+| Feature | `development` | `feature/<short-description>` | `feature/content-planner` |
+| Bug Fix | `development` | `fix/<short-description>` | `fix/sidebar-tooltip` |
+| Chore | `development` | `chore/<short-description>` | `chore/update-deps` |
+| Hotfix | `production` | `hotfix/<short-description>` | `hotfix/login-redirect` |
+
+`main` is a leftover from before this workflow and is no longer updated — don't branch from it or
+merge into it.
 
 ### Starting a new feature
 
 ```bash
-# 1. Make sure main is up to date
-git checkout main
-git pull origin main
+# 1. Make sure development is up to date
+git checkout development
+git pull origin development
 
 # 2. Create your branch
 git checkout -b feature/content-planner
@@ -239,9 +254,13 @@ git commit -m "feat: add content planner calendar"
 git push origin feature/content-planner
 ```
 
-### Merging back to main
+### Merging
 
-Open a Pull Request (`feature/...` → `main`) and get it reviewed before merging.
+1. Open a Pull Request from your branch into `development` and get it reviewed. CI (build and lint
+   for both projects) runs on every push and pull request; run `npm test` in `backend/` yourself.
+2. When `development` is ready to ship, open a Pull Request from `development` into `production`.
+3. A `hotfix/...` branch goes into `production` first, then gets merged back into `development` so
+   the two don't drift.
 
 ## 📝 Commit Message Convention
 
@@ -274,8 +293,8 @@ git commit -m "docs: update README setup steps"
 
 ## 🤝 Contributing
 
-Branch off `main` using the branch naming above. Follow the commit message convention. Open a Pull
-Request into `main` and request a code review before merging.
+Branch off `development` using the branch naming above. Follow the commit message convention. Open a
+Pull Request into `development` and request a code review before merging.
 
 More detail for agents and contributors lives in [AGENTS.md](./AGENTS.md) and
 [frontend/AGENTS.md](./frontend/AGENTS.md).

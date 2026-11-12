@@ -28,7 +28,7 @@ components/ui/      # shadcn/ui primitives, used by the auth and admin routes
 lib/api/            # Axios HTTP client, auth API calls, error handling
 lib/hooks/          # React Query hooks (useMeQuery, useLogout)
 lib/auth/           # Redirect utilities
-lib/kali/           # App store, hooks, utils, optional remote API client
+lib/kali/           # App store, API modules, realtime polling, hooks, utils
 lib/provider/       # ReactQueryProvider
 ```
 
@@ -38,7 +38,7 @@ The product UI is ported from [Stablhr/Kali](https://github.com/Stablhr/Kali) an
 `components/kali/` and `lib/kali/`. Three rules keep it isolated from the rest of the app:
 
 - **Token scoping.** `app/kali.css` defines the app's colors, radii, and type scale on `.kali-app`
-  and `.dark .kali-app`. `app/(app)/layout.tsx` renders `AppShell` inside that wrapper. Any new
+  (light only — dark mode was removed). `app/(app)/layout.tsx` renders `AppShell` inside that wrapper. Any new
   page that should look like the app must be rendered under it — outside the wrapper, elements
   fall back to the shadcn theme in `globals.css`.
 - **Own primitives.** The app uses `components/kali/shared/` (Button, Input, Modal, Toast) instead
@@ -49,13 +49,26 @@ The product UI is ported from [Stablhr/Kali](https://github.com/Stablhr/Kali) an
   a hex in a component; the full system is documented in [Design.md](./Design.md).
 
 App data lives in `lib/kali/store/`, a `useSyncExternalStore` store backed by `localStorage` and
-namespaced per user id. The remote API in `lib/kali/api/` is inert until `NEXT_PUBLIC_KALI_API_URL`
-is set, so treat those modules as a contract for backend work rather than live endpoints.
+namespaced per user id. For boards it is a cache in front of the server:
 
-Uploaded files are the exception to "data lives in the store": they go to the backend's Cloudinary
-pipeline via `lib/api/mediaApi.ts` (`POST /api/media`, multipart field `files`), and only the
-returned HTTPS URL plus the media `id` are kept in the store. Never persist base64 file bytes in
-`localStorage`.
+- `lib/kali/api/boards.ts`, `boardChildren.ts`, `invitations.ts`, and `notifications.ts` go through
+  the shared `httpClient` (cookies, CSRF, refresh-on-401, error normalization). `StoreProvider`
+  loads boards from the API, writes changes through with the board's `revision`, and does a one-time
+  import of any board children that still exist only locally.
+- `lib/kali/realtime/useBoardPoll.ts` polls the open board every 3.5 s to pick up collaborators'
+  changes.
+- `lib/kali/api/social-posts.ts` and `social-accounts.ts` still use the legacy fetch wrapper in
+  `lib/kali/api/client.ts`, which is inert unless `NEXT_PUBLIC_KALI_API_URL` is set. The backend has
+  no social-post or social-account routes, so social posts live in `localStorage` only. Move them to
+  `httpClient` when those routes are built; don't add new callers of `client.ts`.
+- `AppData.inbox` is deprecated: the Inbox page was removed and legacy items are migrated into a
+  board on load. Nothing should read or write it.
+
+Uploaded files go to Cloudinary through `lib/api/mediaApi.ts`, and only the returned HTTPS URL plus
+the media `id` are kept in the store. Small files post through the API (`POST /api/media`,
+multipart field `files`); large videos use a signed direct upload (`POST /api/media/signature`,
+chunked upload to Cloudinary, then `POST /api/media/register`) to get past Vercel's request-body cap.
+Never persist base64 file bytes in `localStorage`.
 
 ## Code Style
 
@@ -67,7 +80,8 @@ returned HTTPS URL plus the media `id` are kept in the store. Never persist base
   surfaces — never build form inputs or modals from scratch there
 - Keep `components/kali/` as close to upstream as possible; a change there is easier to re-sync than
   one to shadcn components
-- API calls live in `frontend/lib/api/authApi.ts` — keep them centralized
+- Auth calls live in `lib/api/authApi.ts`; account, profile, media, and embed calls have their own
+  modules in `lib/api/`; app (board) calls live in `lib/kali/api/`. All of them use `httpClient`
 
 ## Error Handling
 

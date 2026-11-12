@@ -169,8 +169,7 @@ below `md`.
 Celtic Blue rail (`bg-sidebar-bg`), ivory text and icons, `--surface-*` adaptive vars seeded from
 `#3971b8` so contrast math matches the new rail. The active row gets the deeper
 `bg-sidebar-active` plus a Tea Green left-accent bar (`bg-brand-green`) — the accent had to move
-off `bg-primary` because primary is now the rail color itself. Inbox count badges are Vanilla pills
-with ink text so they stay legible on blue.
+off `bg-primary` because primary is now the rail color itself.
 
 ### 4.2 Stat Cards
 
@@ -183,7 +182,7 @@ Four flat color blocks, rotating — no tinting, no shadow, 24px radius:
 | `blue` | Celtic Blue `#3971b8` | Ivory |
 | `white` | White + hairline border | Drab Dark Brown |
 
-The Dashboard uses green / vanilla / blue / white for Boards, Due this week, Inbox unread, and
+The Dashboard uses green / vanilla / blue / white for Boards, Due this week, Notifications, and
 Starred boards. Text color is carried on the block itself, so a tone is always readable.
 
 ### 4.3 Hero Card
@@ -208,17 +207,9 @@ existing `animate-in` / `animate-drop` keyframes. Focus rings are `ring-primary/
 
 ## 6. Dark Mode
 
-The So Matcha palette is designed as the light theme. Dark mode keeps the same hues at lower
-luminance — brand blue lifts to `#5b93d6`, the ivory page becomes `#1a1d12`, ink text inverts to
-`#f2f3e4`, and Tea Green / Vanilla become muted block colors — so the brand still reads rather
-than turning into a different product.
-
-`.dark .kali-app` overrides every semantic token; the `.kali-app` scope also re-declares the four
-tokens that `globals.css` maps onto the shadcn variables (`--background`, `--primary`,
-`--primary-foreground`, `--border`), because `@theme inline` in `globals.css` wins for those
-names.
-
-The theme lives in the local store (`data.ui.darkMode`) and is toggled from `/settings`.
+Removed. Every route sits on the ivory canvas and `app/kali.css` defines no `.dark` scope; the
+`darkMode` store flag and the `/settings` toggle are gone. Re-adding a dark theme means a second
+pass over every semantic token in `kali.css`.
 
 ---
 

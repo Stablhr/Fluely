@@ -14,7 +14,7 @@ npm run start        # Start production server
 npm run seed:admin   # Seed admin account
 npm run migrate:media-to-cloudinary  # One-off: upload legacy local files to Cloudinary
 npm run lint         # ESLint
-npm test             # Jest (no test suite included)
+npm test             # Jest suites in tests/
 ```
 
 ## Architecture
@@ -23,16 +23,17 @@ npm test             # Jest (no test suite included)
 api/config/          # DB connection (db.ts), env validation (env.ts), Cloudinary client (cloudinary.ts)
 api/constants/       # Error codes, cookies, product enums (board roles, platforms, statuses)
 api/controllers/     # Route handlers (thin — delegate to services)
-api/services/        # Business logic (auth, email, blocklist)
-api/repositories/    # Data access layer (user, admin)
+api/services/        # Business logic (auth, account, boards, cards, media, notifications, link previews, cleanup)
+api/repositories/    # Data access layer, one per model
 api/middleware/       # Auth, validation, rate limiting, sanitize (NoSQL injection prevention), error handler
-api/models/          # Mongoose models (Admin.model.ts, User.model.ts) extending BaseUser schema
+api/models/          # Mongoose models: User/Admin (extend BaseUser), Workspace, Board, List, Card,
+                     #   collaborators, presence, activity, media, mentions, notifications, link previews
 api/routes/          # Express router definitions
 api/templates/       # HTML email templates
 api/dtos/            # Zod validation schemas
 api/utils/           # ApiError, actor resolution, crypto, pagination, serialization, transactions
 api/logging/         # Pino logger configuration
-scripts/             # Seed and one-off migration scripts (seed-admin.ts, migrate-media-to-cloudinary.ts)
+scripts/             # Seed and one-off migration scripts (seed-admin, media, card positions, profile visibility, public slug index)
 ```
 
 ## Code Style
@@ -87,10 +88,20 @@ account (`avatarUrl`, `avatarPublicId`) served by `api/services/account.service.
 leaves the server (`PublicAccount` carries `avatarUrl` only).
 
 > **Serverless body limit.** On Vercel, a Serverless Function request body is capped (~4.5 MB), so
-> large video uploads cannot pass through `POST /api/media`. Those need a direct (signed) upload to
-> Cloudinary from the browser instead of the proxy-through-the-API path.
+> large video uploads cannot pass through `POST /api/media`. They use the signed direct path
+> instead: `POST /media/signature` returns signed parameters, the browser uploads to Cloudinary in
+> chunks, and `POST /media/register` records the result as a `MediaAttachment`.
+
+## Routes and Cron
+
+Mounted in `api/routes/index.ts`: `/auth`, `/account`, `/boards` (boards, lists, cards, collaborators,
+activity, polling), `/invitations`, `/media`, `/notifications`, `/embeds` (SSRF-guarded link
+unfurl), `/workspaces`, and `/cron`. `vercel.json` schedules `/api/cron/cleanup-done-cards` daily
+at 03:00 UTC, which deletes cards that have been done for longer than `DONE_CARD_RETENTION_DAYS` (default 2). Set `CRON_SECRET`
+in production: the endpoint then requires Vercel's `Authorization: Bearer <CRON_SECRET>` header.
 
 ## Testing
 
-- Jest + Supertest tooling is available, but no test suite is included in this repository
-- When adding tests, place them in `backend/tests/` and assert against the error shape above
+- Jest suites live in `backend/tests/`: board access, board children (lists/cards), board polling,
+  and media access
+- Add new tests there and assert against the error shape above
