@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { parseBoardBackground } from '@/lib/kali/utils/boardBackground'
 import Link from 'next/link'
 import {
   ChevronLeft,
@@ -131,9 +132,15 @@ export default function BoardTopBar({
 
   const filterActive = filter.labelIds.length > 0 || filter.memberIds.length > 0
 
+  const hasBackdrop = parseBoardBackground(board.background).kind !== 'none'
+
   return (
     <div
-      className="relative flex items-center border-b border-border bg-surface px-2 py-2 sm:px-4 sm:py-2.5"
+      className={`relative flex items-center border-b px-2 py-2 sm:px-4 sm:py-2.5 ${
+        // Over a board color or photo the bar is frosted, so the background
+        // reads as one surface from edge to edge; otherwise it's a plain bar.
+        hasBackdrop ? 'border-white/10 bg-surface/80 backdrop-blur-md' : 'border-border bg-surface'
+      }`}
       style={{ minHeight: 52 }}
     >
       <div className="flex min-w-0 flex-1 items-center gap-1 sm:gap-1.5">

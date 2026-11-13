@@ -37,7 +37,6 @@ export function cloudinaryVariant(url: string, transform: string): string {
 }
 
 const THUMB = 'c_fill,w_480,h_200,g_auto,q_auto,f_auto'
-const CANVAS = 'c_limit,w_2560,q_auto,f_auto'
 
 /** Small surfaces: board tiles, sidebar dots, recent-board swatches. */
 export function boardThumbStyle(value?: string | null): CSSProperties {
@@ -47,19 +46,4 @@ export function boardThumbStyle(value?: string | null): CSSProperties {
     return { background: `center / cover no-repeat url("${cloudinaryVariant(bg.url, THUMB)}")` }
   }
   return { background: 'var(--color-surface-alt)' }
-}
-
-/** The board canvas behind the lists. */
-export function boardCanvasStyle(value?: string | null): CSSProperties | undefined {
-  const bg = parseBoardBackground(value)
-  if (bg.kind === 'color') return { background: bg.color }
-  if (bg.kind === 'image') {
-    return {
-      backgroundImage: `url("${cloudinaryVariant(bg.url, CANVAS)}")`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-    }
-  }
-  return undefined
 }
