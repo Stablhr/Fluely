@@ -286,6 +286,18 @@ export default function Sidebar({
           <div
             className="flex flex-col items-center gap-2 border-t border-border px-2 py-3"
           >
+            {/* The rail still says who is signed in; the name shows on hover
+                and expands into the full row when the sidebar opens. */}
+            {you && (
+              <Link
+                href="/settings?tab=profile"
+                title={you.name}
+                aria-label={`${you.name} — profile settings`}
+                className="rounded-full outline-none ring-offset-2 ring-offset-sidebar-bg transition-shadow duration-150 hover:ring-2 hover:ring-border-strong focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <Avatar member={you} size={28} />
+              </Link>
+            )}
             <LogoutButton collapsed={collapsed} />
           </div>
         ) : (

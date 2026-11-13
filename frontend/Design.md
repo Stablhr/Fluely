@@ -104,9 +104,13 @@ Sidebar (236px, 52px collapsed) → main scroll area, mobile bottom nav below `m
 
 - **Sidebar** — plain `surface` with a right border; text tiers come from the app tokens. Active
   item: `primary-subtle` background, `primary-text` label, and a 3px cobalt bar.
-- **Stat cards** — all one neutral bordered card; the `tone` prop colors only a small dot beside
-  the label (blue = primary, green = success, vanilla = warning, white = muted).
-- **Promo card** — neutral card with a cobalt primary button.
+- **Dashboard** — greeting header with New board / View schedule; four KPI cards (open tasks, due
+  this week, overdue, scheduled posts) that link to where you act on them, overdue flagged with
+  icon + text rather than color alone; a 7-day workload bar chart with a text summary; Due soon
+  grouped Overdue → Today → Upcoming; Upcoming posts; Recent boards. Every widget is built from the
+  compound `dashboard/Panel` (`Panel.Header`, `Panel.Body`, `Panel.Empty`, `Panel.Link`), and all
+  numbers come from `dashboard/useDashboardData`.
+- **Sidebar (collapsed)** — the user's avatar sits above sign out and links to profile settings.
 - **Platform overview** — neutral header strip (`surface-alt`) for every card; the platform's own
   brand color is reserved for its icon.
 - **Auth** — split card: a fixed dark-slate brand panel (same in both themes) and the form.

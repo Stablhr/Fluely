@@ -1,20 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { Star, Clock3, LayoutGrid } from 'lucide-react'
-import { useStore } from '@/lib/kali/store/useStore'
+import { Clock3, Columns3, Star } from 'lucide-react'
+import type { Board } from '@/lib/kali/store/schema'
 import { formatDate } from '@/lib/kali/utils/dates'
+import { Panel } from './Panel'
 
-function boardColor(bg?: string): string {
-  if (!bg || bg.startsWith('data:') || bg.startsWith('http') || bg.startsWith('linear-') || bg.startsWith('radial-')) {
-    return 'var(--color-primary)'
-  }
-  return bg
+function swatch(bg?: string): React.CSSProperties {
+  if (!bg) return { background: 'var(--color-surface-alt)' }
+  if (bg.startsWith('data:') || bg.startsWith('http')) return { background: `url(${bg}) center/cover` }
+  return { background: bg }
 }
 
 function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60_000)
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)
   if (mins < 1) return 'just now'
   if (mins < 60) return `${mins}m ago`
   const hrs = Math.floor(mins / 60)
@@ -24,55 +23,37 @@ function relativeTime(iso: string): string {
   return formatDate(iso.slice(0, 10))
 }
 
-export default function RecentBoardsList({ limit = 4 }: { limit?: number }) {
-  const { data } = useStore()
-
-  const boards = Object.values(data.boards)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, limit)
-
+export default function RecentBoardsList({ boards }: { boards: Board[] }) {
   return (
-    <div className="rounded-card bg-base-surface p-6 shadow-card transition-shadow duration-150 hover:shadow-card-hover">
-      <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-chip bg-accent-teal-bg">
-          <Clock3 size={14} className="text-accent-teal-text" />
-        </span>
-        <h2 className="text-label uppercase text-ink-500">Recently active</h2>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {boards.map((board) => {
-          const color = boardColor(board.background)
-          return (
-            <Link
-              key={board.id}
-              href={`/boards/${board.id}`}
-              className="flex items-center gap-3 rounded-card bg-base-surface-alt p-4 transition-shadow duration-150 hover:shadow-card"
-            >
-              <span
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-chip"
-                style={{ background: `${color}1A`, color }}
+    <Panel>
+      <Panel.Header icon={Clock3} title="Recent boards" action={<Panel.Link href="/boards">All</Panel.Link>} />
+      {boards.length === 0 ? (
+        <Panel.Empty
+          icon={Columns3}
+          title="No boards yet"
+          description="Create a board to start planning your work."
+        />
+      ) : (
+        <ul className="flex-1 py-1">
+          {boards.map((board) => (
+            <li key={board.id}>
+              <Link
+                href={`/boards/${board.id}`}
+                className="group flex items-center gap-3 px-5 py-2.5 transition-colors duration-150 hover:bg-surface-alt focus-visible:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               >
-                <LayoutGrid size={16} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-card-title text-ink-900">{board.name}</span>
-                <span className="block text-[11px] text-ink-500">
-                  Updated {relativeTime(board.updatedAt)}
+                <span aria-hidden className="h-7 w-7 shrink-0 rounded-chip ring-1 ring-inset ring-black/10" style={swatch(board.background)} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium text-text-primary group-hover:text-primary-text">
+                    {board.name}
+                  </span>
+                  <span className="block text-[12px] text-text-muted">Updated {relativeTime(board.updatedAt)}</span>
                 </span>
-              </span>
-              {board.starred && (
-                <Star size={14} className="shrink-0 fill-warning text-warning" />
-              )}
-            </Link>
-          )
-        })}
-        {boards.length === 0 && (
-          <p className="col-span-full rounded-md px-2 py-3 text-center text-body font-medium text-ink-500">
-            No boards yet.
-          </p>
-        )}
-      </div>
-    </div>
+                {board.starred && <Star size={14} aria-label="Starred" className="shrink-0 fill-warning text-warning" />}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   )
 }

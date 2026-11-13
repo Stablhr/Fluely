@@ -479,6 +479,16 @@ body.kali-dragging .kali-app * {
   }
 }
 
+/* Dashboard workload bars grow up from the baseline. */
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
 /* Kept so existing class names still compile; idle motion is intentionally off. */
 @utility animate-float {
   animation: none;
