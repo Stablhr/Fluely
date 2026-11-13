@@ -1,5 +1,6 @@
 'use client'
 
+import { flushSync } from 'react-dom'
 import { Check, Monitor, Moon, Sun } from 'lucide-react'
 import { useThemePreference } from '@/lib/theme/useTheme'
 import type { ThemePreference } from '@/lib/theme/theme'
@@ -58,7 +59,18 @@ export default function ThemePicker() {
               type="button"
               role="radio"
               aria-checked={selected}
-              onClick={() => setPreference(id)}
+              onClick={(e) => {
+                // Spread the new theme from the pointer; keyboard presses
+                // (detail 0) start from the centre of the card instead.
+                const rect = e.currentTarget.getBoundingClientRect()
+                const origin =
+                  e.detail > 0
+                    ? { x: e.clientX, y: e.clientY }
+                    : { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+                // flushSync so the picker's own "selected" state is part of the
+                // snapshot the transition animates to, not a frame later.
+                setPreference(id, origin, (apply) => flushSync(apply))
+              }}
               className={`rounded-card border bg-surface p-2.5 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                 selected ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-border-strong'
               }`}

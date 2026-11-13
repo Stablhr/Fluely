@@ -97,8 +97,74 @@ export function setDisplayPreference<K extends keyof DisplayPreferences>(
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
-export function setThemePreference(pref: ThemePreference): void {
-  setDisplayPreference('theme', pref);
+/** Point the theme change spreads out from, in viewport pixels. */
+export type ThemeOrigin = {x: number; y: number};
+
+const REVEAL_MS = 560;
+const FADE_MS = 320;
+
+function motionReduced(): boolean {
+  const pref = getDisplayPreferences().motion;
+  if (pref === 'reduce') return true;
+  if (pref === 'full') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+type ViewTransitionDoc = Document & {
+  startViewTransition?: (update: () => void) => {ready: Promise<void>; finished: Promise<void>};
+};
+
+/**
+ * Switches the theme with an animation when the visible colors actually change:
+ * - browsers with the View Transitions API: the new theme spreads out as a
+ *   circle from `origin` (the click) until it covers the screen;
+ * - other browsers: every color cross-fades for FADE_MS;
+ * - reduced motion, or a change that resolves to the same theme (e.g. Light
+ *   to System on a light OS): applied instantly.
+ *
+ * `run` wraps the update; React callers pass `(apply) => flushSync(apply)` so
+ * their re-render lands in the snapshot the transition animates to rather than
+ * a frame later. (Kept out of this module so it stays importable from server
+ * components, which only need DISPLAY_INIT_SCRIPT.)
+ */
+export function setThemePreference(
+  pref: ThemePreference,
+  origin?: ThemeOrigin,
+  run: (apply: () => void) => void = (apply) => apply()
+): void {
+  const apply = () => run(() => setDisplayPreference('theme', pref));
+
+  const changesColors = resolveTheme(getThemePreference()) !== resolveTheme(pref);
+  if (!changesColors || motionReduced()) {
+    apply();
+    return;
+  }
+
+  const doc = document as ViewTransitionDoc;
+  if (!doc.startViewTransition) {
+    const root = document.documentElement;
+    root.classList.add('theme-fading');
+    apply();
+    window.setTimeout(() => root.classList.remove('theme-fading'), FADE_MS + 40);
+    return;
+  }
+
+  const x = origin?.x ?? window.innerWidth / 2;
+  const y = origin?.y ?? window.innerHeight / 2;
+  // Radius that reaches the farthest corner from the origin.
+  const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+
+  const transition = doc.startViewTransition(apply);
+  transition.ready
+    .then(() => {
+      document.documentElement.animate(
+        {clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`]},
+        {duration: REVEAL_MS, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', pseudoElement: '::view-transition-new(root)'}
+      );
+    })
+    .catch(() => {
+      // The transition was skipped (e.g. tab hidden); the theme is applied anyway.
+    });
 }
 
 /** Subscribe for useSyncExternalStore: same-tab changes, other tabs, and OS changes. */

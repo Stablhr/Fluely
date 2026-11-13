@@ -631,6 +631,33 @@ html[data-motion="reduce"] *::after {
   transition-duration: 0.01ms !important;
 }
 
+/* Theme switch (lib/theme/theme.ts → setThemePreference).
+   With View Transitions, the new theme is revealed as a circle growing from
+   the click; the browser's default cross-fade is turned off so only the
+   circle moves. Without them, `.theme-fading` cross-fades every color. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+}
+
+html.theme-fading,
+html.theme-fading *,
+html.theme-fading *::before,
+html.theme-fading *::after {
+  transition:
+    background-color 320ms ease,
+    border-color 320ms ease,
+    color 320ms ease,
+    fill 320ms ease,
+    stroke 320ms ease,
+    box-shadow 320ms ease !important;
+}
+
 /* Compact density (Settings → Appearance): every Tailwind spacing utility is
    calc(var(--spacing) * n), so tightening the unit inside the app tightens
    padding, gaps, and margins together without touching components. */

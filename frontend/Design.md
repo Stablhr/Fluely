@@ -137,6 +137,7 @@ nothing bounces, and nothing idles except progress indicators and the hero glows
 | `hover-lift` | interactive cards lift 1px and deepen their shadow |
 | `btn-sheen` | primary buttons: a highlight sweeps across on hover |
 | `animate-orbit`, `animate-halo`, `animate-beam`, `.loading-dots` | loading curtain and hero effects |
+| theme switch | `setThemePreference(pref, origin)`: the new theme spreads as a circle from the click (View Transitions); other browsers cross-fade colors (`html.theme-fading`) |
 
 Entrance utilities use `animation-fill-mode: backwards` so they release their end state and hover
 transforms keep working. Dashboard numbers count up (`lib/kali/hooks/useCountUp.ts`). Motion is off
