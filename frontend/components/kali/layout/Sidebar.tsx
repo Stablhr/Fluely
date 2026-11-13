@@ -14,6 +14,7 @@ import {
 import { useStore } from "@/lib/kali/store/useStore";
 import { YOU_ID } from "@/lib/kali/store/schema";
 import { BrandMark } from "@/components/brand/Logo";
+import { boardThumbStyle } from "@/lib/kali/utils/boardBackground";
 import { BRAND } from "@/lib/brand";
 import { useSignOut } from "@/lib/hooks/auth/useSignOut";
 import Avatar from "../shared/Avatar";
@@ -236,9 +237,6 @@ export default function Sidebar({
                 </p>
                 <div className="space-y-0.5">
                   {section.boards.map((board) => {
-                    const isBgUrl =
-                      board.background?.startsWith("data:") ||
-                      board.background?.startsWith("http");
                     return (
                       <NavLink
                         key={board.id}
@@ -248,17 +246,7 @@ export default function Sidebar({
                       >
                         <span
                           className="h-3 w-3 shrink-0 rounded-sm ring-1 ring-black/10"
-                          style={
-                            isBgUrl
-                              ? {
-                                  background: `url(${board.background}) center/cover no-repeat`,
-                                }
-                              : {
-                                  background:
-                                    board.background ||
-                                    "var(--color-surface-alt)",
-                                }
-                          }
+                          style={boardThumbStyle(board.background)}
                         />
                         <span className="truncate">{board.name}</span>
                         {board.starred && (

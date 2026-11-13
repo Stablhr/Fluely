@@ -4,13 +4,8 @@ import Link from 'next/link'
 import { Clock3, Columns3, Star } from 'lucide-react'
 import type { Board } from '@/lib/kali/store/schema'
 import { formatDate } from '@/lib/kali/utils/dates'
+import { boardThumbStyle } from '@/lib/kali/utils/boardBackground'
 import { Panel } from './Panel'
-
-function swatch(bg?: string): React.CSSProperties {
-  if (!bg) return { background: 'var(--color-surface-alt)' }
-  if (bg.startsWith('data:') || bg.startsWith('http')) return { background: `url(${bg}) center/cover` }
-  return { background: bg }
-}
 
 function relativeTime(iso: string): string {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000)
@@ -41,7 +36,7 @@ export default function RecentBoardsList({ boards }: { boards: Board[] }) {
                 href={`/boards/${board.id}`}
                 className="group flex items-center gap-3 px-5 py-2.5 transition-colors duration-150 hover:bg-surface-alt focus-visible:bg-surface-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               >
-                <span aria-hidden className="h-7 w-7 shrink-0 rounded-chip ring-1 ring-inset ring-black/10" style={swatch(board.background)} />
+                <span aria-hidden className="h-7 w-7 shrink-0 rounded-chip ring-1 ring-inset ring-black/10" style={boardThumbStyle(board.background)} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-medium text-text-primary group-hover:text-primary-text">
                     {board.name}

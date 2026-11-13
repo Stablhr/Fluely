@@ -95,3 +95,53 @@ export async function deleteFromCloudinary(
 export function toResourceType(value: string): CloudinaryResourceType {
   return value === 'video' || value === 'raw' ? value : 'image';
 }
+
+/** What Cloudinary itself reports about an uploaded asset. */
+export interface UploadedAsset {
+  secureUrl: string;
+  bytes: number;
+  resourceType: CloudinaryResourceType;
+  /**
+   * The folder the asset was uploaded into. Accounts with dynamic folders
+   * report it as `asset_folder` (the public id has no folder prefix); older
+   * fixed-folder accounts encode it as the public id's path prefix.
+   */
+  folder: string;
+}
+
+/**
+ * Looks an asset up with the Admin API, so a direct (browser-to-Cloudinary)
+ * upload is recorded from Cloudinary's own answer instead of whatever URL and
+ * size the browser reports. Resolves to `null` when no such asset exists under
+ * any resource type.
+ */
+export async function getUploadedAsset(publicId: string): Promise<UploadedAsset | null> {
+  if (!isCloudinaryConfigured) {
+    throw new ApiError(503, ErrorCodes.INTERNAL_ERROR, 'Media storage is not configured');
+  }
+  for (const resourceType of ['image', 'video', 'raw'] as const) {
+    try {
+      const res = (await cloudinary.api.resource(publicId, {resource_type: resourceType})) as {
+        secure_url: string;
+        bytes: number;
+        resource_type: string;
+        asset_folder?: string;
+        public_id: string;
+      };
+      const slash = res.public_id.lastIndexOf('/');
+      return {
+        secureUrl: res.secure_url,
+        bytes: res.bytes,
+        resourceType: toResourceType(res.resource_type),
+        folder: res.asset_folder || (slash === -1 ? '' : res.public_id.slice(0, slash))
+      };
+    } catch (error) {
+      // 404 means "not under this resource type"; try the next one. Anything
+      // else (auth, network) is a real failure and must surface.
+      const status = (error as {error?: {http_code?: number}; http_code?: number}).error?.http_code ??
+        (error as {http_code?: number}).http_code;
+      if (status !== 404) throw error;
+    }
+  }
+  return null;
+}

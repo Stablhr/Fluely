@@ -81,6 +81,10 @@ export function getFriendlyErrorMessage(
         return "That person is no longer a collaborator on this board.";
       case "COLLABORATOR_EXISTS":
         return "That person is already a collaborator on this board.";
+      case "CARD_NOT_FOUND":
+        return "That card no longer exists. Refresh the board and try again.";
+      case "FORBIDDEN":
+        return "You don't have permission to do that. Ask the board owner for edit access.";
       case "LIST_NOT_FOUND":
         return "That list no longer exists.";
       case "CANNOT_INVITE_SELF":
@@ -95,6 +99,8 @@ export function getFriendlyErrorMessage(
         return "That person is already a member of this workspace.";
       case "QUOTA_EXCEEDED":
         return "Storage quota reached. Delete some files and try again.";
+      case "INVALID_BACKGROUND_MEDIA":
+        return "That photo can't be used as this board's background. Upload it again from the board menu.";
       case "UNSUPPORTED_MEDIA_TYPE":
         return "That file type is not supported.";
       case "FILE_TOO_LARGE":

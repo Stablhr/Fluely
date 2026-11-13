@@ -26,7 +26,7 @@ export default function AddListForm({ boardId }: { boardId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-[272px] shrink-0 items-center gap-2 rounded-lg border border-dashed border-border-strong px-3 py-2.5 text-sm font-medium text-text-secondary transition-colors duration-150 hover:bg-surface hover:text-text-primary"
+        className="flex w-[272px] shrink-0 items-center gap-2 rounded-lg border border-dashed border-border-strong bg-surface/80 px-3 py-2.5 text-sm font-medium text-text-secondary backdrop-blur-sm transition-colors duration-150 hover:bg-surface hover:text-text-primary"
       >
         <Plus size={16} />
         Add another list

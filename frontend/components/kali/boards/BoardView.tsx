@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { boardCanvasStyle } from '@/lib/kali/utils/boardBackground'
 import BoardViewSkeleton from './BoardViewSkeleton'
 import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
@@ -97,6 +98,8 @@ export default function BoardView() {
   }
 
   const lists = store.getLists(boardId)
+  // The board's own color or photo, behind the lists (none → theme canvas).
+  const canvasStyle = boardCanvasStyle(board.background)
   const mayWrite = store.canWrite(boardId)
 
   // First open of a board: its lists are still on the way.
@@ -139,7 +142,8 @@ export default function BoardView() {
               <div
                 ref={provided.innerRef}
                 {...provided.droppableProps}
-                className="scroll-slim flex h-full items-stretch gap-3 overflow-x-auto bg-board-canvas p-4"
+                className={`scroll-slim flex h-full items-stretch gap-3 overflow-x-auto p-4 ${canvasStyle ? '' : 'bg-board-canvas'}`}
+                style={canvasStyle}
               >
                 {lists.map((list, index) => (
                   <Draggable key={list.id} draggableId={list.id} index={index} isDragDisabled={!mayWrite}>

@@ -35,25 +35,48 @@ jest.mock('../api/repositories/workspace.repository', () => ({
 jest.mock('../api/services/cloudinary.service', () => ({
   uploadToCloudinary: jest.fn(),
   deleteFromCloudinary: jest.fn(async () => undefined),
+  getUploadedAsset: jest.fn(),
   folderForMedia: (scope: {boardId?: string; cardId?: string}) =>
     scope.cardId ? 'fluely/tasks' : scope.boardId ? 'fluely/boards' : 'fluely/content-planner'
+}));
+
+jest.mock('../api/repositories/card.repository', () => ({
+  cardRepository: {
+    findByIdForBoard: jest.fn()
+  }
 }));
 
 import {mediaRepository} from '../api/repositories/media.repository';
 import {boardRepository} from '../api/repositories/board.repository';
 import {boardCollaboratorRepository} from '../api/repositories/boardCollaborator.repository';
 import {mediaService} from '../api/services/media.service';
+import {cardRepository} from '../api/repositories/card.repository';
+import {getUploadedAsset, uploadToCloudinary} from '../api/services/cloudinary.service';
+import {env} from '../api/config/env';
 
 const OWNER = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaa1');
 const EDITOR = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaa2');
 const VIEWER = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaa3');
+const STRANGER = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaa4');
 const BOARD = new Types.ObjectId('ccccccccccccccccccccccc1');
+const CARD = new Types.ObjectId('ddddddddddddddddddddddd1');
+
+/** A delivery URL on this account's Cloudinary (what the Admin API returns). */
+const OWN_URL = (path: string) =>
+  `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME ?? 'demo'}/${path}`;
 
 const mockedMedia = mediaRepository as jest.Mocked<typeof mediaRepository>;
 const mockedBoards = boardRepository as jest.Mocked<typeof boardRepository>;
 const mockedCollaborators = boardCollaboratorRepository as jest.Mocked<
   typeof boardCollaboratorRepository
 >;
+const mockedCards = cardRepository as jest.Mocked<typeof cardRepository>;
+const mockedAsset = getUploadedAsset as jest.MockedFunction<typeof getUploadedAsset>;
+const mockedUpload = uploadToCloudinary as jest.MockedFunction<typeof uploadToCloudinary>;
+
+function asCollaborator(role: 'editor' | 'viewer') {
+  mockedCollaborators.find.mockResolvedValue({role, status: 'accepted'} as never);
+}
 
 function board() {
   return {
@@ -89,6 +112,13 @@ beforeEach(() => {
   mockedMedia.usedBytes.mockResolvedValue([] as never);
   mockedBoards.findById.mockResolvedValue(board());
   mockedCollaborators.find.mockResolvedValue(null as never);
+  mockedCards.findByIdForBoard.mockResolvedValue({_id: CARD, boardId: BOARD} as never);
+  mockedAsset.mockImplementation(async (publicId: string) => ({
+    secureUrl: OWN_URL('image/upload/v1/photo.png'),
+    bytes: 100,
+    resourceType: 'image',
+    folder: publicId.slice(0, publicId.lastIndexOf('/'))
+  }));
   // `create` returns the stored row; fake a saved document so the serializer
   // has an id to report.
   mockedMedia.create.mockImplementation(async data => {
@@ -103,17 +133,20 @@ beforeEach(() => {
 
 describe('mediaService.register', () => {
   it('records a video as a video so the asset can be destroyed later', async () => {
-    mockedCollaborators.find.mockResolvedValue({
-      role: 'editor',
-      status: 'accepted'
-    } as never);
+    asCollaborator('editor');
+    mockedAsset.mockResolvedValue({
+      secureUrl: OWN_URL('video/upload/v1/clip.mp4'),
+      bytes: 2048,
+      resourceType: 'video',
+      folder: 'fluely/boards'
+    });
 
     await mediaService.register(
       EDITOR,
       {
         name: 'clip.mp4',
         url: 'https://res.cloudinary.com/demo/video/upload/clip.mp4',
-        publicId: 'fluely/tasks/clip',
+        publicId: 'fluely/boards/clip',
         mimeType: 'video/mp4',
         sizeBytes: 2048,
         resourceType: 'video'
@@ -132,7 +165,7 @@ describe('mediaService.register', () => {
       {
         name: 'photo.png',
         url: 'https://res.cloudinary.com/demo/image/upload/photo.png',
-        publicId: 'fluely/tasks/photo',
+        publicId: 'fluely/content-planner/photo',
         mimeType: 'image/png',
         sizeBytes: 100,
         resourceType: 'auto'
@@ -184,6 +217,202 @@ describe('mediaService.register', () => {
       )
     ).rejects.toMatchObject({statusCode: 403});
     expect(mockedMedia.create).not.toHaveBeenCalled();
+  });
+
+  it('stores the URL and size Cloudinary reports, not what the browser sent', async () => {
+    await mediaService.register(
+      OWNER,
+      {
+        name: 'photo.png',
+        url: 'https://tracker.example.com/pixel.png',
+        publicId: 'fluely/boards/photo',
+        mimeType: 'image/png',
+        sizeBytes: 1,
+        resourceType: 'image'
+      },
+      {boardId: BOARD.toString()}
+    );
+
+    expect(mockedAsset).toHaveBeenCalledWith('fluely/boards/photo');
+    expect(mockedMedia.create).toHaveBeenCalledWith(
+      expect.objectContaining({url: OWN_URL('image/upload/v1/photo.png'), sizeBytes: 100})
+    );
+  });
+
+  it('rejects an asset outside the folder its signature was issued for', async () => {
+    await expect(
+      mediaService.register(
+        OWNER,
+        {
+          name: 'photo.png',
+          url: OWN_URL('image/upload/photo.png'),
+          publicId: 'someone-else/photo',
+          mimeType: 'image/png',
+          sizeBytes: 100,
+          resourceType: 'image'
+        },
+        {boardId: BOARD.toString()}
+      )
+    ).rejects.toMatchObject({statusCode: 400, code: 'VALIDATION_ERROR'});
+    expect(mockedMedia.create).not.toHaveBeenCalled();
+  });
+
+  it('accepts a dynamic-folder asset whose public id has no folder prefix', async () => {
+    mockedAsset.mockResolvedValue({
+      secureUrl: OWN_URL('image/upload/v1/photo_abc.png'),
+      bytes: 100,
+      resourceType: 'image',
+      folder: 'fluely/boards'
+    });
+    await mediaService.register(
+      OWNER,
+      {
+        name: 'photo.png',
+        url: 'ignored',
+        publicId: 'photo_abc',
+        mimeType: 'image/png',
+        sizeBytes: 100,
+        resourceType: 'image'
+      },
+      {boardId: BOARD.toString()}
+    );
+    expect(mockedMedia.create).toHaveBeenCalledWith(expect.objectContaining({publicId: 'photo_abc'}));
+  });
+
+  it('rejects an asset Cloudinary does not have', async () => {
+    mockedAsset.mockResolvedValue(null);
+    await expect(
+      mediaService.register(
+        OWNER,
+        {
+          name: 'photo.png',
+          url: OWN_URL('image/upload/photo.png'),
+          publicId: 'fluely/content-planner/ghost',
+          mimeType: 'image/png',
+          sizeBytes: 100,
+          resourceType: 'image'
+        },
+        {}
+      )
+    ).rejects.toMatchObject({statusCode: 400});
+    expect(mockedMedia.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an asset whose delivery URL is not on our Cloudinary', async () => {
+    mockedAsset.mockResolvedValue({
+      secureUrl: 'https://res.cloudinary.com/some-other-cloud/image/upload/x.png',
+      bytes: 100,
+      resourceType: 'image',
+      folder: 'fluely/content-planner'
+    });
+    await expect(
+      mediaService.register(
+        OWNER,
+        {
+          name: 'x.png',
+          url: 'ignored',
+          publicId: 'fluely/content-planner/x',
+          mimeType: 'image/png',
+          sizeBytes: 100,
+          resourceType: 'image'
+        },
+        {}
+      )
+    ).rejects.toMatchObject({statusCode: 400});
+  });
+
+  it('enforces the size limit on the real size, not the reported one', async () => {
+    mockedAsset.mockResolvedValue({
+      secureUrl: OWN_URL('video/upload/huge.mp4'),
+      bytes: 10 * 1024 * 1024 * 1024,
+      resourceType: 'video',
+      folder: 'fluely/content-planner'
+    });
+    await expect(
+      mediaService.register(
+        OWNER,
+        {
+          name: 'huge.mp4',
+          url: 'ignored',
+          publicId: 'fluely/content-planner/huge',
+          mimeType: 'video/mp4',
+          sizeBytes: 10,
+          resourceType: 'video'
+        },
+        {}
+      )
+    ).rejects.toMatchObject({statusCode: 413});
+  });
+});
+
+describe('upload scope (proxied upload, signature, register)', () => {
+  const file = {
+    buffer: Buffer.from('x'),
+    size: 1,
+    mimetype: 'image/png',
+    originalname: 'a.png'
+  } as Express.Multer.File;
+
+  it('hides a board from someone with no access to it', async () => {
+    await expect(
+      mediaService.create(STRANGER, [file], {boardId: BOARD.toString()})
+    ).rejects.toMatchObject({statusCode: 404, code: 'BOARD_NOT_FOUND'});
+    await expect(
+      mediaService.signature(STRANGER, {boardId: BOARD.toString()})
+    ).rejects.toMatchObject({statusCode: 404, code: 'BOARD_NOT_FOUND'});
+    expect(mockedUpload).not.toHaveBeenCalled();
+  });
+
+  it('refuses a viewer on every path', async () => {
+    asCollaborator('viewer');
+    await expect(
+      mediaService.create(VIEWER, [file], {boardId: BOARD.toString()})
+    ).rejects.toMatchObject({statusCode: 403});
+    await expect(
+      mediaService.signature(VIEWER, {boardId: BOARD.toString()})
+    ).rejects.toMatchObject({statusCode: 403});
+    expect(mockedUpload).not.toHaveBeenCalled();
+  });
+
+  it('reports a board that does not exist as not found', async () => {
+    mockedBoards.findById.mockResolvedValue(null as never);
+    await expect(
+      mediaService.create(OWNER, [file], {boardId: BOARD.toString()})
+    ).rejects.toMatchObject({statusCode: 404, code: 'BOARD_NOT_FOUND'});
+  });
+
+  it('lets an editor upload to the board', async () => {
+    asCollaborator('editor');
+    mockedUpload.mockResolvedValue({
+      secure_url: OWN_URL('image/upload/a.png'),
+      public_id: 'fluely/boards/a',
+      resource_type: 'image'
+    } as never);
+    const items = await mediaService.create(EDITOR, [file], {boardId: BOARD.toString()});
+    expect(items).toHaveLength(1);
+    expect(mockedMedia.create).toHaveBeenCalledWith(expect.objectContaining({boardId: BOARD}));
+  });
+
+  it('needs a board for a card, and the card must be on that board', async () => {
+    await expect(
+      mediaService.create(OWNER, [file], {cardId: CARD.toString()})
+    ).rejects.toMatchObject({statusCode: 400});
+
+    mockedCards.findByIdForBoard.mockResolvedValue(null as never);
+    await expect(
+      mediaService.create(OWNER, [file], {boardId: BOARD.toString(), cardId: CARD.toString()})
+    ).rejects.toMatchObject({statusCode: 404, code: 'CARD_NOT_FOUND'});
+    expect(mockedUpload).not.toHaveBeenCalled();
+  });
+
+  it('keeps personal uploads (no board) open to any signed-in user', async () => {
+    mockedUpload.mockResolvedValue({
+      secure_url: OWN_URL('image/upload/a.png'),
+      public_id: 'fluely/content-planner/a',
+      resource_type: 'image'
+    } as never);
+    const items = await mediaService.create(STRANGER, [file], {});
+    expect(items).toHaveLength(1);
   });
 });
 

@@ -78,6 +78,7 @@ import {
 } from "@/lib/kali/api/notifications";
 import type { AppNotificationDto } from "@/lib/kali/api/notifications";
 import { getFriendlyErrorMessage } from "@/lib/api/getFriendlyErrorMessage";
+import { uploadMediaFile, type UploadProgress } from "@/lib/api/mediaApi";
 
 function patchRecord<T extends { id: string }>(
   rec: Record<string, T>,
@@ -2405,10 +2406,21 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }
   };
 
-  const setBoardBackground = (id: string, background: string) =>
+  /** Adopts the server's view of a board after a successful board PATCH. */
+  const adoptServerBoard = (boardId: string, dto: BoardDto) =>
+    mutate((prev) => {
+      const current = prev.boards[boardId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        boards: { ...prev.boards, [boardId]: { ...current, ...mergeServerBoard(current, dto) } },
+      };
+    });
+
+  const writeBoardBackground = (id: string, background: string) =>
     mutate((prev) => {
       const board = prev.boards[id];
-      if (!board || !canWrite(id)) return prev;
+      if (!board) return prev;
       return {
         ...prev,
         boards: {
@@ -2425,6 +2437,45 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         },
       };
     });
+
+  /**
+   * Sets a color (or "default") as the background. Applied at once, then saved;
+   * a failed save puts the previous background back and says why.
+   */
+  const setBoardBackground = (id: string, background: string) => {
+    const board = dataRef.current.boards[id];
+    if (!board || !canWrite(id)) return;
+    const previous = board.background;
+    writeBoardBackground(id, background);
+    if (!isServerBoard(board)) return;
+    void (async () => {
+      try {
+        adoptServerBoard(id, await updateBoardOnServer(id, { background }, board.revision));
+      } catch (err) {
+        writeBoardBackground(id, previous);
+        setError(getFriendlyErrorMessage(err, "Could not change the board background."));
+      }
+    })();
+  };
+
+  /**
+   * Uploads a photo to the board's media and makes it the background. Resolves
+   * once both are saved; rejects (with the store untouched) if either fails, so
+   * the picker can show the error in place.
+   */
+  const setBoardBackgroundImage = async (id: string, file: File, onProgress?: UploadProgress) => {
+    const board = dataRef.current.boards[id];
+    if (!board || !canWrite(id) || !isServerBoard(board)) {
+      throw new Error("This board can't have a photo background.");
+    }
+    const media = await uploadMediaFile(file, { boardId: id }, onProgress);
+    const dto = await updateBoardOnServer(
+      id,
+      { backgroundMediaId: media.id },
+      dataRef.current.boards[id]?.revision ?? board.revision,
+    );
+    adoptServerBoard(id, dto);
+  };
 
   const setBoardDescription = (id: string, description: string) =>
     mutate((prev) => {
@@ -3607,6 +3658,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     toggleDone,
     setBoardVisibility,
     setBoardBackground,
+    setBoardBackgroundImage,
     setBoardDescription,
     addLabel,
     updateLabel,

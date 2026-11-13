@@ -45,11 +45,29 @@ export const preferencesSchema = z.object({
 
 export const preferencesPatchSchema = preferencesSchema;
 
+/**
+ * A board background the client may set directly: the default surface or a hex
+ * colour. The frontend renders `background` straight into CSS, so a URL,
+ * `url(...)`, gradient or any other free text is refused here -- a photo
+ * background is chosen through `backgroundMediaId` instead, and the server fills
+ * in the stored media's Cloudinary URL itself.
+ */
+export const BOARD_BACKGROUND_HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+const boardBackground = z
+  .string()
+  .trim()
+  .refine(
+    value => value === 'default' || BOARD_BACKGROUND_HEX.test(value),
+    'Background must be "default" or a hex colour like #1f2937'
+  );
+
 export const boardCreateSchema = z.object({
   name: requiredText(120),
   description: text(5000).default(''),
   visibility: z.enum(['private', 'workspace', 'public']).default('private'),
-  background: text(500).default('default'),
+  // Same rule as PATCH: a photo can only be set afterwards, from media
+  // uploaded to the board, so a new board can't point at an outside URL.
+  background: boardBackground.default('default'),
   settings: z.object({
     commentPermission: z.enum(['everyone', 'members', 'editors']).default('members'),
     selfJoin: z.boolean().default(false)
@@ -62,11 +80,13 @@ export const boardCreateSchema = z.object({
   template: z.enum(['blank', 'simple', 'social_content']).default('blank')
 });
 
+
 export const boardPatchSchema = z.object({
   name: requiredText(120).optional(),
   description: text(5000).optional(),
   visibility: z.enum(['private', 'workspace', 'public']).optional(),
-  background: text(500).optional(),
+  background: boardBackground.optional(),
+  backgroundMediaId: objectId.nullable().optional(),
   settings: z.object({
     commentPermission: z.enum(['everyone', 'members', 'editors']).optional(),
     selfJoin: z.boolean().optional()
@@ -79,7 +99,12 @@ export const boardPatchSchema = z.object({
   listOrder: z.array(objectId).max(1000).optional(),
   archivedAt: z.string().datetime({offset: true}).nullable().optional(),
   expectedRevision: z.number().int().positive().optional()
-}).refine(value => Object.keys(value).length > 0, 'At least one field is required');
+})
+  .refine(value => Object.keys(value).length > 0, 'At least one field is required')
+  .refine(
+    value => value.background === undefined || value.backgroundMediaId === undefined,
+    'Send either background or backgroundMediaId, not both'
+  );
 
 export const boardListQuerySchema = paginationQuerySchema.extend({
   scope: z.enum(['accessible', 'discoverable']).default('accessible'),

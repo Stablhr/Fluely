@@ -6,12 +6,7 @@ import { Columns3, Plus, Star } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import CreateBoardModal from './CreateBoardModal'
 import BoardsHomeSkeleton from './BoardsHomeSkeleton'
-
-function boardBgStyle(bg: string): React.CSSProperties {
-  if (!bg) return { background: 'var(--color-surface-alt)' }
-  if (bg.startsWith('data:')) return { background: `url(${bg}) center/cover no-repeat` }
-  return { background: bg }
-}
+import { boardThumbStyle } from '@/lib/kali/utils/boardBackground'
 
 export default function BoardsHome() {
   const { data, toggleStar, boardsLoaded } = useStore()
@@ -78,7 +73,7 @@ export default function BoardsHome() {
               className="hover-lift group relative cursor-pointer overflow-hidden rounded-card border border-border bg-surface shadow-card hover:border-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               {/* The board's color is an accent band, not the whole tile. */}
-              <div className="h-14 sm:h-16" style={boardBgStyle(board.background)} />
+              <div className="h-14 sm:h-16" style={boardThumbStyle(board.background)} />
               <button
                 type="button"
                 onClick={(e) => {

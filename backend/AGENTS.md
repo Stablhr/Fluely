@@ -84,6 +84,13 @@ Uploaded files go to Cloudinary; nothing is written to local disk. `multer` uses
 shared helpers in `api/services/cloudinary.service.ts`, which read the client configured once in
 `api/config/cloudinary.ts`. Assets live under `fluely/{avatars,boards,tasks,content-planner}`.
 
+Every upload path (`POST /media`, `/media/signature`, `/media/register`) runs the same scope check:
+no board means a personal upload; a `boardId` needs edit access (a board the caller cannot see is
+reported as not found); a `cardId` needs its `boardId` and must belong to it. `register` records the
+asset from Cloudinary's Admin API (`getUploadedAsset`): URL, size, resource type and folder come from
+Cloudinary, the folder must match the scope's, and the URL must pass `isOwnCloudinaryUrl`
+(`api/utils/cloudinaryUrl.ts`). Never store a media URL the browser supplied.
+
 A record stores the Cloudinary `url` (`secure_url`), `publicId`, and `resourceType`; deletion calls
 `deleteFromCloudinary(publicId, resourceType)` with the exact resource type it was uploaded as.
 
@@ -117,7 +124,7 @@ in production: the endpoint then requires Vercel's `Authorization: Bearer <CRON_
 
 ## Testing
 
-- Jest suites live in `backend/tests/`: board access, board children (lists/cards), board polling,
+- Jest suites live in `backend/tests/`: board access, board backgrounds, board children (lists/cards), board polling,
   media access, shared security state (blocklist + rate-limit store), and account settings
   (preferences, notification preferences, account deletion)
 - Tests that need a database use `mongodb-memory-server-core` (downloads a MongoDB binary on first

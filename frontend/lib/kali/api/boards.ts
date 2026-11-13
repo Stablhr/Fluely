@@ -272,6 +272,8 @@ export async function updateBoardOnServer(
     name?: string;
     description?: string;
     background?: string;
+    /** Use an image already uploaded to this board as its background. */
+    backgroundMediaId?: string | null;
     labels?: { id: string; name: string; color: string }[];
     listOrder?: string[];
     archivedAt?: string | null;

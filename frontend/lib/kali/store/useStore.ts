@@ -118,6 +118,12 @@ export interface Store {
   toggleDone: (id: string) => void;
   setBoardVisibility: (id: string, visibility: Visibility) => Promise<void>;
   setBoardBackground: (id: string, background: string) => void;
+  /** Upload a photo to the board and make it the background. Rejects on failure. */
+  setBoardBackgroundImage: (
+    id: string,
+    file: File,
+    onProgress?: (percent: number) => void,
+  ) => Promise<void>;
   setBoardDescription: (id: string, description: string) => void;
   addLabel: (boardId: string, name: string, color: string) => string;
   updateLabel: (
