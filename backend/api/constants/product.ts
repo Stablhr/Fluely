@@ -115,3 +115,6 @@ export const NotificationTypes = [
   'mention'
 ] as const;
 export type NotificationType = (typeof NotificationTypes)[number];
+
+/** At most this many distinct emojis on one comment. */
+export const MAX_COMMENT_REACTION_EMOJIS = 20;

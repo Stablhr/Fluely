@@ -122,6 +122,155 @@ export const cardRepository = {
   deleteForBoards: (boardIds: Types.ObjectId[], session?: ProductSession) =>
     CardModel.deleteMany({boardId: {$in: boardIds}}, {session}).exec(),
 
+  // ── Comment reactions ───────────────────────────────────────────
+  //
+  // Each of these is one conditional update on a single comment, addressed by
+  // the array filter `c`. The emoji is a field name inside `reactions`; the DTO
+  // only admits non-ASCII keys, so it can never hold `.` or `$`. A write that
+  // matches nothing reports `modifiedCount: 0` and the service re-reads.
+
+  /** Replaces a missing or malformed `reactions` value with `{}`, so the
+   *  emoji paths below have an object to land in. */
+  resetMalformedReactions: (
+    id: string,
+    boardId: Types.ObjectId,
+    commentId: string,
+    session?: ProductSession
+  ) =>
+    CardModel.updateOne(
+      {_id: id, boardId},
+      {$set: {'comments.$[c].reactions': {}}},
+      {session, arrayFilters: [{'c.id': commentId, 'c.reactions': {$not: {$type: 'object'}}}]}
+    ).exec(),
+
+  /** Rewrites a legacy bare count into `{userIds: [], legacy: n}`. Only
+   *  matches while the value is still that number. */
+  convertLegacyReaction: (
+    id: string,
+    boardId: Types.ObjectId,
+    commentId: string,
+    emoji: string,
+    legacy: number,
+    session?: ProductSession
+  ) =>
+    CardModel.updateOne(
+      {_id: id, boardId},
+      {$set: {[`comments.$[c].reactions.${emoji}`]: {userIds: [], legacy}}},
+      {session, arrayFilters: [{'c.id': commentId, [`c.reactions.${emoji}`]: legacy}]}
+    ).exec(),
+
+  /**
+   * Adds one person to an emoji. Matches only when they are not already there,
+   * the emoji is not a legacy number, and -- if the emoji is new to the comment
+   * -- the comment holds fewer than `maxEmojis` emojis. The cap is part of the
+   * filter, so two people adding different emojis at once cannot both pass it.
+   */
+  addReaction: (
+    id: string,
+    boardId: Types.ObjectId,
+    commentId: string,
+    emoji: string,
+    userId: Types.ObjectId,
+    maxEmojis: number,
+    session?: ProductSession
+  ) =>
+    CardModel.updateOne(
+      {
+        _id: id,
+        boardId,
+        comments: {
+          $elemMatch: {
+            id: commentId,
+            [`reactions.${emoji}`]: {$not: {$type: 'number'}},
+            [`reactions.${emoji}.userIds`]: {$ne: userId}
+          }
+        },
+        $or: [
+          {comments: {$elemMatch: {id: commentId, [`reactions.${emoji}`]: {$exists: true}}}},
+          {
+            $expr: {
+              $lt: [
+                {
+                  $size: {
+                    $objectToArray: {
+                      $ifNull: [
+                        {
+                          $let: {
+                            vars: {
+                              comment: {
+                                $arrayElemAt: [
+                                  {
+                                    $filter: {
+                                      input: '$comments',
+                                      // $literal: an id starting with `$`
+                                      // must not read as a field path.
+                                      cond: {$eq: ['$$this.id', {$literal: commentId}]}
+                                    }
+                                  },
+                                  0
+                                ]
+                              }
+                            },
+                            in: '$$comment.reactions'
+                          }
+                        },
+                        {}
+                      ]
+                    }
+                  }
+                },
+                maxEmojis
+              ]
+            }
+          }
+        ]
+      },
+      {$addToSet: {[`comments.$[c].reactions.${emoji}.userIds`]: userId}},
+      {session, arrayFilters: [{'c.id': commentId}]}
+    ).exec(),
+
+  /** Removes one person from an emoji; never touches its `legacy` count. */
+  removeReaction: (
+    id: string,
+    boardId: Types.ObjectId,
+    commentId: string,
+    emoji: string,
+    userId: Types.ObjectId,
+    session?: ProductSession
+  ) =>
+    CardModel.updateOne(
+      {
+        _id: id,
+        boardId,
+        comments: {$elemMatch: {id: commentId, [`reactions.${emoji}.userIds`]: userId}}
+      },
+      {$pull: {[`comments.$[c].reactions.${emoji}.userIds`]: userId}},
+      {session, arrayFilters: [{'c.id': commentId}]}
+    ).exec(),
+
+  /** Drops an emoji that has no people and no legacy count left. */
+  unsetEmptyReaction: (
+    id: string,
+    boardId: Types.ObjectId,
+    commentId: string,
+    emoji: string,
+    session?: ProductSession
+  ) =>
+    CardModel.updateOne(
+      {_id: id, boardId},
+      {$unset: {[`comments.$[c].reactions.${emoji}`]: ''}},
+      {
+        session,
+        arrayFilters: [
+          {
+            'c.id': commentId,
+            [`c.reactions.${emoji}.userIds`]: {$size: 0},
+            [`c.reactions.${emoji}.legacy`]: {$in: [0, null]}
+          }
+        ]
+      }
+    ).exec(),
+
   /** Unassigns an account from every card it is a member of. */
   pullMember: (userId: Types.ObjectId, session?: ProductSession) =>
     CardModel.updateMany({memberIds: userId}, {$pull: {memberIds: userId}}, {session}).exec()

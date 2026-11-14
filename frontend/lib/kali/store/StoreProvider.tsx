@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type {
+  Reactions,
   AppData,
   Board,
   Card,
@@ -64,6 +65,7 @@ import {
   reorderCardsOnServer,
   reorderListsOnServer,
   setCardMemberOnServer,
+  toggleCommentReactionOnServer,
   toCard,
   toList,
   updateCardOnServer,
@@ -186,7 +188,8 @@ function toCardPatch(patch: Partial<Card>): Partial<CreateCardInput> {
       authorId: c.authorId,
       parentId: c.parentId ?? null,
       text: c.text,
-      reactions: c.reactions,
+      // Reactions are not sent: the server owns them per person and changes
+      // them only through the reactions endpoint.
       createdAt: c.createdAt,
     }));
   }
@@ -533,6 +536,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
    * depends on it in turn). Assigned next to its definition below.
    */
   const scheduleStructureSyncRef = useRef<(boardId: string) => void>(() => {});
+  /** Per-board backoff for catching up to a newer server revision (see applyBoardPoll). */
+  const catchUpRef = useRef(new Map<string, { at: number; attempts: number }>());
 
   useEffect(() => {
     dataRef.current = data;
@@ -1917,6 +1922,59 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     );
   };
 
+  /** Replaces one comment's reactions in the store, without a card write. */
+  const setCommentReactions = (cardId: string, commentId: string, reactions: Reactions) =>
+    mutate((prev) => {
+      const current = prev.cards[cardId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        cards: {
+          ...prev.cards,
+          [cardId]: {
+            ...current,
+            comments: current.comments.map((c) => (c.id === commentId ? { ...c, reactions } : c)),
+          },
+        },
+      };
+    });
+
+  /**
+   * Adds or removes the signed-in person's reaction. Shown at once; the
+   * server's answer (which includes everyone else's reactions) replaces it,
+   * and a failure puts the previous state back.
+   */
+  const toggleCommentReaction = (cardId: string, commentId: string, emoji: string) => {
+    const card = dataRef.current.cards[cardId];
+    const comment = card?.comments.find((c) => c.id === commentId);
+    const me = currentUser?.id;
+    if (!card || !comment || !me) return;
+
+    const previous = comment.reactions;
+    const entry = previous[emoji] ?? { count: 0, userIds: [] };
+    const mine = entry.userIds.includes(me);
+    const nextEntry = mine
+      ? { count: entry.count - 1, userIds: entry.userIds.filter((id) => id !== me) }
+      : { count: entry.count + 1, userIds: [...entry.userIds, me] };
+    const next = { ...previous };
+    if (nextEntry.count > 0) next[emoji] = nextEntry;
+    else delete next[emoji];
+    setCommentReactions(cardId, commentId, next);
+
+    const board = dataRef.current.boards[card.boardId];
+    if (!isServerBoard(board)) return;
+    void writeThrough(
+      board.id,
+      () =>
+        toggleCommentReactionOnServer(board.id, cardId, commentId, emoji).then((res) => {
+          setCommentReactions(cardId, commentId, res.reactions);
+          return res.revision;
+        }),
+      "Could not update your reaction.",
+      { onError: () => setCommentReactions(cardId, commentId, previous) },
+    );
+  };
+
   const moveCard = (cardId: string, destListId: string, destIndex: number) => {
     const card = dataRef.current.cards[cardId];
     const dest = dataRef.current.lists[destListId];
@@ -3175,11 +3233,23 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         }
       }
 
-      // If server revision is newer than our board's, schedule a structure sync
+      // If the server's revision is newer than ours, catch up. Backed off per
+      // board: if the catch-up itself fails (e.g. rate-limited), our revision
+      // never moves, and re-trying on every 3.5s poll kept the limiter
+      // saturated indefinitely. Retry after 15s, 30s, 60s… (max 5 min), and
+      // reset as soon as we've caught up.
       const board = dataRef.current.boards[boardId];
       if (board && board.revision !== null && response.revision > board.revision) {
-        scheduleStructureSync(boardId);
-        void syncBoards();
+        const now = Date.now();
+        const last = catchUpRef.current.get(boardId);
+        const wait = last ? Math.min(5 * 60_000, 15_000 * 2 ** (last.attempts - 1)) : 0;
+        if (!last || now - last.at >= wait) {
+          catchUpRef.current.set(boardId, { at: now, attempts: (last?.attempts ?? 0) + 1 });
+          scheduleStructureSync(boardId);
+          void syncBoards();
+        }
+      } else {
+        catchUpRef.current.delete(boardId);
       }
 
       return "ok";
@@ -3659,6 +3729,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     setBoardVisibility,
     setBoardBackground,
     setBoardBackgroundImage,
+    toggleCommentReaction,
     setBoardDescription,
     addLabel,
     updateLabel,

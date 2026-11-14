@@ -81,6 +81,8 @@ export function getFriendlyErrorMessage(
         return "That person is no longer a collaborator on this board.";
       case "COLLABORATOR_EXISTS":
         return "That person is already a collaborator on this board.";
+      case "COMMENT_NOT_FOUND":
+        return "That comment was deleted. Refresh the card to see the latest comments.";
       case "CARD_NOT_FOUND":
         return "That card no longer exists. Refresh the board and try again.";
       case "FORBIDDEN":

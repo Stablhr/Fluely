@@ -114,6 +114,15 @@ Board invitations are always delivered. `DELETE /account/me` (`{password, confir
 removes the account and what it owns via `accountService.deleteAccount`; workspaces it owns that
 have other members pass to the longest-standing member instead of being deleted.
 
+## Comment Reactions
+
+Comments live inside the card. Reactions are written only by
+`POST /boards/:boardId/cards/:cardId/comments/:commentId/reactions` (`{emoji}`), which toggles the
+caller's own id with a conditional `$addToSet`/`$pull`; the card PATCH keeps stored reactions and
+ignores any the client sends. Storage per emoji is `{userIds, legacy}` (a bare number is a legacy
+anonymous count, see `Card.model.ts`); every card DTO serves `{count, userIds}`. Who may react follows
+the board's `settings.commentPermission`, checked in `card.service.ts` (`canComment`).
+
 ## Routes and Cron
 
 Mounted in `api/routes/index.ts`: `/auth`, `/account`, `/boards` (boards, lists, cards, collaborators,
@@ -124,7 +133,7 @@ in production: the endpoint then requires Vercel's `Authorization: Bearer <CRON_
 
 ## Testing
 
-- Jest suites live in `backend/tests/`: board access, board backgrounds, board children (lists/cards), board polling,
+- Jest suites live in `backend/tests/`: board access, board backgrounds, board children (lists/cards), comment reactions, board polling,
   media access, shared security state (blocklist + rate-limit store), and account settings
   (preferences, notification preferences, account deletion)
 - Tests that need a database use `mongodb-memory-server-core` (downloads a MongoDB binary on first

@@ -20,6 +20,35 @@ export type CardCoverSize = (typeof CardCoverSizes)[number];
  * board. Permission checks and "everything in this board" queries are the hot
  * path, and both would otherwise need a join through the list.
  */
+/**
+ * One emoji's reactions on a comment, as stored.
+ *
+ * `userIds` are the people who reacted, maintained only by
+ * `POST .../comments/:commentId/reactions` with `$addToSet`/`$pull`, so two
+ * people reacting at once never overwrite each other. `legacy` is the
+ * anonymous count carried over from before reactions were per-person.
+ *
+ * Older comments still hold a bare number (`{"👍": 1}`). There is no migration:
+ * a number reads as `{userIds: [], legacy: n}`, and the first toggle of that
+ * emoji rewrites it into this shape, keeping `n` as `legacy`. Removing a
+ * reaction never touches `legacy`. An emoji left with no people and no legacy
+ * count is unset.
+ */
+export type StoredEmojiReaction = {userIds: Types.ObjectId[]; legacy?: number};
+
+/** Keyed by emoji. A value is the current shape or a legacy bare count. */
+export type StoredCommentReactions = Record<string, StoredEmojiReaction | number>;
+
+export interface CardComment {
+  id: string;
+  authorId: Types.ObjectId | null;
+  parentId: string | null;
+  text: string;
+  /** See `StoredEmojiReaction`. Missing on comments saved without reactions. */
+  reactions?: StoredCommentReactions | null;
+  createdAt: Date;
+}
+
 export interface CardDocument extends mongoose.Document {
   boardId: Types.ObjectId;
   listId: Types.ObjectId;
@@ -42,7 +71,7 @@ export interface CardDocument extends mongoose.Document {
   location: string | null;
   watching: boolean;
   mediaIds: Types.ObjectId[];
-  comments: {id: string; authorId: Types.ObjectId | null; parentId: string | null; text: string; reactions: Record<string, number>; createdAt: Date}[];
+  comments: CardComment[];
   archived: boolean;
   done: boolean;
   /** When the card was marked done; drives the automatic cleanup. */
@@ -74,6 +103,7 @@ const CardSchema = new Schema<CardDocument>(
           authorId: {type: Schema.Types.ObjectId, default: null},
           parentId: {type: String, default: null},
           text: {type: String, default: ''},
+          // Shape: `StoredCommentReactions`.
           reactions: {type: Schema.Types.Mixed, default: {}},
           createdAt: {type: Date, default: Date.now}
         }

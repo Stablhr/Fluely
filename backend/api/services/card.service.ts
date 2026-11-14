@@ -3,7 +3,8 @@ import {cardRepository} from '../repositories/card.repository';
 import {listRepository} from '../repositories/list.repository';
 import {mediaRepository} from '../repositories/media.repository';
 import {BoardDocument} from '../models/Board.model';
-import {CardCoverSize, CardDocument} from '../models/Card.model';
+import {CardComment, CardCoverSize, CardDocument} from '../models/Card.model';
+import {canWrite} from './boardAccess.service';
 import {bumpBoardRevision} from './boardRevision';
 import {activityService} from './activity.service';
 import {
@@ -18,7 +19,7 @@ import {notificationService} from './notification.service';
 import {mentionRepository} from '../repositories/mention.repository';
 import {notificationRepository} from '../repositories/notification.repository';
 import {withProductTransaction, ProductSession} from '../utils/transaction';
-import {ActivityActionType} from '../constants/product';
+import {ActivityActionType, BoardAccessLevel, MAX_COMMENT_REACTION_EMOJIS} from '../constants/product';
 import {Actor} from '../utils/actor';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
@@ -31,7 +32,8 @@ type CardInput = {
     authorId?: string | null;
     parentId?: string | null;
     text: string;
-    reactions?: Record<string, number>;
+    /** Accepted from older clients and ignored; see the reactions endpoint. */
+    reactions?: unknown;
     createdAt?: string;
   }[];
   coverMediaId?: string | null;
@@ -126,6 +128,60 @@ function isBoardOwner(actor: Actor, board: BoardDocument): boolean {
   return board.ownerId.equals(actor.actorId);
 }
 
+export type CommentReactionsDto = Record<string, {count: number; userIds: string[]}>;
+
+/** Reads one stored emoji value, whichever shape it was saved in. */
+function readEmojiReaction(value: unknown): {userIds: string[]; legacy: number} {
+  if (typeof value === 'number') {
+    return {userIds: [], legacy: Number.isFinite(value) && value > 0 ? Math.floor(value) : 0};
+  }
+  if (value && typeof value === 'object') {
+    const record = value as {userIds?: unknown; legacy?: unknown};
+    const userIds = Array.isArray(record.userIds)
+      ? [...new Set(record.userIds.map(id => String(id)))]
+      : [];
+    const legacy =
+      typeof record.legacy === 'number' && Number.isFinite(record.legacy) && record.legacy > 0
+        ? Math.floor(record.legacy)
+        : 0;
+    return {userIds, legacy};
+  }
+  return {userIds: [], legacy: 0};
+}
+
+/**
+ * The client's view of a comment's reactions: who reacted, and a count that
+ * also includes anonymous legacy counts. Emojis nobody holds are omitted.
+ */
+export function serializeReactions(stored: CardComment['reactions']): CommentReactionsDto {
+  const out: CommentReactionsDto = {};
+  if (!stored || typeof stored !== 'object') return out;
+  for (const [emoji, value] of Object.entries(stored)) {
+    const {userIds, legacy} = readEmojiReaction(value);
+    const count = userIds.length + legacy;
+    if (count > 0) out[emoji] = {count, userIds};
+  }
+  return out;
+}
+
+/** The stored reactions to keep for each comment of a whole-array write. */
+function reactionsById(comments: CardComment[] | undefined) {
+  return new Map((comments ?? []).map(c => [c.id, c.reactions ?? {}]));
+}
+
+/**
+ * Who may comment, and so react, on a board. Read access is already proven by
+ * the route; `members` narrows it to the owner and accepted collaborators
+ * (viewers included), `editors` to write access.
+ */
+function canComment(board: BoardDocument, level: BoardAccessLevel | undefined): boolean {
+  if (!level || level === 'none') return false;
+  const rule = board.settings?.commentPermission ?? 'members';
+  if (rule === 'everyone') return true;
+  if (rule === 'editors') return canWrite(level);
+  return level === 'owner' || level === 'editor' || level === 'viewer';
+}
+
 async function serializeCard(card: CardDocument) {
   const ids = [
     ...(card.coverMediaId ? [card.coverMediaId.toString()] : []),
@@ -162,9 +218,9 @@ async function serializeCard(card: CardDocument) {
       authorId: c.authorId ? c.authorId.toString() : null,
       parentId: c.parentId ?? null,
       text: c.text,
-      reactions: c.reactions ?? {},
+      reactions: serializeReactions(c.reactions),
       createdAt: c.createdAt
-    })) as any,
+    })),
     archived: card.archived,
     done: card.done,
     doneAt: card.doneAt ?? null,
@@ -313,7 +369,8 @@ export const cardService = {
             authorId: c.authorId ? new Types.ObjectId(c.authorId) : null,
             parentId: c.parentId ?? null,
             text: c.text,
-            reactions: c.reactions ?? {},
+            // Reactions are only ever written by the reactions endpoint.
+            reactions: {},
             createdAt: c.createdAt ? new Date(c.createdAt) : new Date()
           }))
         },
@@ -391,12 +448,17 @@ export const cardService = {
       }
       if (input.location !== undefined) patch.location = input.location;
       if (input.comments !== undefined) {
+        // Whatever `reactions` the client sends is ignored: a comment that
+        // already exists keeps what is stored (read in this transaction, so a
+        // concurrent toggle conflicts and retries rather than being lost), and
+        // a new comment starts with none.
+        const storedReactions = reactionsById(before.comments);
         patch.comments = input.comments.map(c => ({
           id: c.id,
           authorId: c.authorId ? new Types.ObjectId(c.authorId) : null,
           parentId: c.parentId ?? null,
           text: c.text,
-          reactions: c.reactions ?? {},
+          reactions: storedReactions.get(c.id) ?? {},
           createdAt: c.createdAt ? new Date(c.createdAt) : new Date()
         }));
       }
@@ -525,6 +587,103 @@ export const cardService = {
 
     const body = {card: await serializeCard(result.updated), revision: result.revision};
     return body;
+  },
+
+  /**
+   * Toggles the caller's reaction on one comment: adds them to the emoji if
+   * they are not on it, removes them if they are.
+   *
+   * Every write is a single conditional update that touches only the caller's
+   * own id (`$addToSet` / `$pull`), so different people reacting at once never
+   * overwrite each other. If a condition no longer holds by the time the write
+   * lands (the state moved under us), the comment is re-read and the decision
+   * made again.
+   *
+   * No activity entry: a reaction is not something the feed shows. The board
+   * revision still advances, which is what makes collaborators' polls resync.
+   */
+  async toggleCommentReaction(
+    actor: Actor,
+    board: BoardDocument,
+    access: BoardAccessLevel | undefined,
+    cardId: string,
+    commentId: string,
+    emoji: string
+  ) {
+    if (!canComment(board, access)) {
+      throw new ApiError(
+        403,
+        ErrorCodes.FORBIDDEN,
+        'You do not have permission to react to comments on this board'
+      );
+    }
+
+    const userId = actor.actorId;
+    const result = await withProductTransaction(async session => {
+      let toggled = false;
+      for (let attempt = 0; attempt < 4 && !toggled; attempt += 1) {
+        const card = await requireCardForBoard(cardId, board._id, session);
+        const comment = (card.comments ?? []).find(c => c.id === commentId);
+        if (!comment) {
+          throw new ApiError(404, ErrorCodes.COMMENT_NOT_FOUND, 'Comment not found');
+        }
+
+        const stored = comment.reactions;
+        const isObject = Boolean(stored) && typeof stored === 'object' && !Array.isArray(stored);
+        const reactions = isObject ? (stored as Record<string, unknown>) : {};
+        const current = reactions[emoji];
+        const hasReacted = readEmojiReaction(current).userIds.includes(userId.toString());
+
+        if (hasReacted) {
+          const res = await cardRepository.removeReaction(
+            cardId, board._id, commentId, emoji, userId, session
+          );
+          if (res.modifiedCount > 0) {
+            await cardRepository.unsetEmptyReaction(cardId, board._id, commentId, emoji, session);
+            toggled = true;
+          }
+          continue;
+        }
+
+        if (current === undefined && Object.keys(reactions).length >= MAX_COMMENT_REACTION_EMOJIS) {
+          throw new ApiError(
+            400,
+            ErrorCodes.VALIDATION_ERROR,
+            `A comment can hold at most ${MAX_COMMENT_REACTION_EMOJIS} different reactions`
+          );
+        }
+        if (!isObject) {
+          await cardRepository.resetMalformedReactions(cardId, board._id, commentId, session);
+        }
+        if (typeof current === 'number') {
+          await cardRepository.convertLegacyReaction(
+            cardId, board._id, commentId, emoji, current, session
+          );
+        }
+        const res = await cardRepository.addReaction(
+          cardId, board._id, commentId, emoji, userId, MAX_COMMENT_REACTION_EMOJIS, session
+        );
+        toggled = res.modifiedCount > 0;
+      }
+
+      if (!toggled) {
+        throw new ApiError(
+          409,
+          ErrorCodes.REVISION_CONFLICT,
+          'That comment is changing too quickly. Try again.'
+        );
+      }
+
+      const revision = await bumpBoardRevision(board._id, undefined, session);
+      const updated = await requireCardForBoard(cardId, board._id, session);
+      const comment = (updated.comments ?? []).find(c => c.id === commentId);
+      return {revision, reactions: serializeReactions(comment?.reactions)};
+    });
+
+    return {
+      comment: {id: commentId, reactions: result.reactions},
+      revision: result.revision
+    };
   },
 
   /**

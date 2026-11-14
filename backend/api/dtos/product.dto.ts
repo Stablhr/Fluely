@@ -204,7 +204,9 @@ export const cardPatchSchema = z.object({
     authorId: objectId.nullable().optional(),
     parentId: requiredText(80).nullable().optional(),
     text: text(10000),
-    reactions: z.record(z.number()).optional(),
+    // Reactions are written only through the reactions endpoint. Still accepted
+    // so older clients that echo them back do not get a 400, but ignored.
+    reactions: z.unknown().optional(),
     createdAt: z.string().datetime({offset: true}).optional()
   })).optional(),
   expectedRevision: z.number().int().positive().optional()
@@ -258,8 +260,27 @@ export const commentPatchSchema = z.object({
   body: requiredText(5000)
 });
 
+/**
+ * An emoji key. It doubles as a MongoDB field name, so beyond looking like an
+ * emoji it must never contain `.` or `$`: rejecting every ASCII character
+ * (letters, digits, punctuation, whitespace, control characters) and any
+ * Unicode whitespace covers that.
+ */
+export const reactionEmoji = z
+  .string()
+  .trim()
+  .min(1)
+  .max(16)
+  .refine(value => !/[\u0000-\u007f]|\s/.test(value), 'Must be an emoji');
+
+export const commentIdParamsSchema = z.object({
+  boardId: objectId,
+  cardId: objectId,
+  commentId: requiredText(80)
+});
+
 export const reactionSchema = z.object({
-  emoji: requiredText(20)
+  emoji: reactionEmoji
 });
 
 export const memberCreateSchema = z.object({

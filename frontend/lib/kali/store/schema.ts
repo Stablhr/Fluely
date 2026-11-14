@@ -104,7 +104,17 @@ export interface ActivityItem {
   createdAt: string;
 }
 
-export type Reactions = Record<string, number>;
+/**
+ * One emoji's reactions on a comment. `userIds` are the server ids of the
+ * people who reacted; `count` can be higher when older, anonymous reactions
+ * (stored before reactions were per person) are included.
+ */
+export interface ReactionEntry {
+  count: number;
+  userIds: string[];
+}
+
+export type Reactions = Record<string, ReactionEntry>;
 
 /**
  * A card's cover.

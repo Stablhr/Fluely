@@ -1,6 +1,7 @@
 import { httpClient } from "@/lib/api/httpClient";
-import type { Card, List } from "@/lib/kali/store/schema";
+import type { Card, List, Reactions } from "@/lib/kali/store/schema";
 import { YOU_ID } from "@/lib/kali/store/schema";
+import { normalizeReactions } from "@/lib/kali/utils/reactions";
 
 /**
  * Board children: lists and cards.
@@ -93,10 +94,17 @@ export interface CardDto {
     authorId: string | null;
     parentId: string | null;
     text: string;
-    reactions: Record<string, number>;
+    /** Per-person since the reactions endpoint; a bare number is legacy data. */
+    reactions: Record<string, ReactionEntryDto | number>;
     createdAt: string;
   }[];
 }
+
+export interface ReactionEntryDto {
+  count: number;
+  userIds: string[];
+}
+
 
 /**
  * The whole board in one call, ordered the way the board should render.
@@ -259,7 +267,7 @@ export function toCard(dto: CardDto, existing?: Card): Card {
             authorId: c.authorId ?? YOU_ID,
             parentId: c.parentId ?? null,
             text: c.text,
-            reactions: c.reactions ?? {},
+            reactions: normalizeReactions(c.reactions),
             createdAt: c.createdAt ?? new Date().toISOString(),
           }))
         : existing?.comments ?? [],
@@ -378,7 +386,6 @@ export interface CreateCardInput {
     authorId?: string | null;
     parentId?: string | null;
     text: string;
-    reactions?: Record<string, number>;
     createdAt?: string;
   }[];
   position?: number;
@@ -417,6 +424,24 @@ export async function updateCardOnServer(
     startDate: toServerInstant(patch.startDate),
   });
   return { ...data.card, revision: data.revision };
+}
+
+/**
+ * Toggles the signed-in person's reaction on a comment. The server decides who
+ * is reacting from the session and applies it atomically, so two people
+ * reacting at once never overwrite each other.
+ */
+export async function toggleCommentReactionOnServer(
+  boardId: string,
+  cardId: string,
+  commentId: string,
+  emoji: string,
+): Promise<{ reactions: Reactions; revision?: number }> {
+  const { data } = await httpClient.post<{
+    comment: { id: string; reactions: unknown };
+    revision?: number;
+  }>(`/boards/${boardId}/cards/${cardId}/comments/${commentId}/reactions`, { emoji });
+  return { reactions: normalizeReactions(data.comment.reactions), revision: data.revision };
 }
 
 /** Owner-only. The server validates the target is an accepted board member. */
