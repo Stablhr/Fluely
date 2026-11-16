@@ -10,6 +10,7 @@ import {requestLogger} from './api/middleware/requestLogger';
 import {csrfProtection} from './api/middleware/csrf';
 import {httpsRedirect} from './api/middleware/httpsRedirect';
 import {notFoundHandler} from './api/middleware/notFound';
+import {socialPublishRoutes} from './api/routes/social.routes';
 
 const app = express();
 
@@ -36,6 +37,12 @@ app.use(
   })
 );
 
+// QStash deliveries are verified by signature over the raw body, so they are
+// routed before JSON parsing and CSRF (a server-to-server call has no cookie).
+app.use('/api/social-publish', socialPublishRoutes);
+// Social posts carry captions and media metadata, and the one-time import
+// sends a browser's whole post list; everything else stays at 10kb.
+app.use('/api/social-posts', express.json({limit: '2mb'}));
 app.use(express.json({limit: '10kb'}));
 app.use(cookieParser());
 app.use(sanitize);

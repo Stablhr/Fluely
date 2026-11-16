@@ -87,7 +87,7 @@ export function statusLabel(status: SocialPostStatus): string {
 
 /* ── Platforms ───────────────────────────────────────────────── */
 
-export const ALL_PLATFORMS: Platform[] = ['instagram', 'facebook', 'tiktok', 'youtube']
+export const ALL_PLATFORMS: Platform[] = ['instagram', 'facebook', 'linkedin', 'tiktok', 'youtube']
 
 /**
  * Header strip for the overview cards. One neutral treatment for every card —
@@ -96,8 +96,16 @@ export const ALL_PLATFORMS: Platform[] = ['instagram', 'facebook', 'tiktok', 'yo
  */
 export const OVERVIEW_HEADER = 'bg-surface-alt text-text-primary'
 
+const PLATFORM_NAMES: Record<Platform, string> = {
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  linkedin: 'LinkedIn',
+  tiktok: 'TikTok',
+  youtube: 'YouTube',
+}
+
 export function platformLabel(platform: Platform): string {
-  return platform.charAt(0).toUpperCase() + platform.slice(1)
+  return PLATFORM_NAMES[platform] ?? platform
 }
 
 export function platformColor(platform: Platform): string {

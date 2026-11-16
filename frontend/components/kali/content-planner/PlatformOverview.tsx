@@ -29,6 +29,9 @@ interface Counts {
   activeDays: number
 }
 
+/** Post stages set by people rather than by publishing ("Posted" = published by hand). */
+const PLANNED_BY_HAND = new Set<SocialPost['status']>(['idea', 'draft', 'in_review', 'posted'])
+
 const EMPTY: Counts = { total: 0, scheduled: 0, posted: 0, draft: 0, activeDays: 0 }
 
 function countFor(posts: SocialPost[], platform: Platform | 'all'): Counts {
@@ -46,7 +49,18 @@ function countFor(posts: SocialPost[], platform: Platform | 'all'): Counts {
   let posted = 0
   let draft = 0
   for (const post of relevant) {
-    const stage = columnForStatus(post.status)
+    // A platform card reports that platform's own outcome once publishing has
+    // touched it (a post can go out on LinkedIn while Instagram was refused);
+    // until then it follows the post's planning stage.
+    const target = platform === 'all' ? undefined : post.platforms.find((t) => t.platform === platform)
+    const stage =
+      target?.status === 'posted'
+        ? 'posted'
+        : target?.status === 'scheduled' || target?.status === 'publishing'
+          ? 'scheduled'
+          : target && (target.status !== 'pending' || !PLANNED_BY_HAND.has(post.status))
+            ? 'draft'
+            : columnForStatus(post.status)
     if (stage === 'posted') posted += 1
     else if (stage === 'scheduled') scheduled += 1
     else draft += 1

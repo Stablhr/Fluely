@@ -3675,7 +3675,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       createdAt: now(),
       updatedAt: now(),
     };
-    social.addPost(input).catch(() => {});
+    social.addPost({ ...input, id: optimistic.id }).catch(() => {});
     return optimistic;
   };
 

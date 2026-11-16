@@ -225,7 +225,7 @@ export interface InboxItem {
 
 /* ── Social Media Scheduler types ────────────────────────────── */
 
-export type Platform = "youtube" | "facebook" | "tiktok" | "instagram";
+export type Platform = "youtube" | "facebook" | "tiktok" | "instagram" | "linkedin";
 
 /**
  * Planning stages come first (idea → draft → in_review) because the content
@@ -254,6 +254,10 @@ export type MediaType = "image" | "video" | "audio";
 export interface SocialPostPlatform {
   platform: Platform;
   enabled: boolean;
+  /** Connected account to post as; empty means the workspace's first one. */
+  accountId?: string | null;
+  /** Published in dry-run mode: simulated, nothing reached the platform. */
+  dryRun?: boolean;
   status: PlatformStatus;
   caption: string;
   hashtags: string[];
@@ -373,6 +377,7 @@ export const PLATFORM_DEFAULTS: Record<
   facebook: { caption: "", visibility: "public", hashtags: [] },
   tiktok: { caption: "", visibility: "public", hashtags: [] },
   instagram: { caption: "", visibility: "public", hashtags: [] },
+  linkedin: { caption: "", visibility: "public", hashtags: [] },
 };
 
 export const PLATFORM_LIMITS: Record<
@@ -399,6 +404,11 @@ export const PLATFORM_LIMITS: Record<
     maxHashtags: 30,
     supportedMedia: ["image", "video"],
   },
+  linkedin: {
+    maxCaption: 3000,
+    maxHashtags: 30,
+    supportedMedia: ["image"],
+  },
 };
 
 export const PLATFORM_COLORS: Record<Platform, string> = {
@@ -406,6 +416,7 @@ export const PLATFORM_COLORS: Record<Platform, string> = {
   facebook: "#1877F2",
   tiktok: "#000000",
   instagram: "#E4405F",
+  linkedin: "#0A66C2",
 };
 
 export interface TaskNotification {

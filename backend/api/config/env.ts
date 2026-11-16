@@ -41,7 +41,41 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().optional(),
   /** Root folder every asset is stored under. Defaults to `fluely`. */
   CLOUDINARY_FOLDER: z.string().optional(),
-  SOCIAL_SIMULATION_FAILURE_RATE: z.coerce.number().min(0).max(1).optional()
+  SOCIAL_SIMULATION_FAILURE_RATE: z.coerce.number().min(0).max(1).optional(),
+  /**
+   * Social scheduling; see docs/SOCIAL_SCHEDULING_SETUP.md. Every value is
+   * optional so the app boots without them: a platform with no credentials
+   * offers a demo connection, and without QStash the local server checks for
+   * due posts on a timer.
+   */
+  API_PUBLIC_URL: z.string().url().optional(),
+  /** 32 bytes, base64. Encrypts stored platform tokens (AES-256-GCM). */
+  SOCIAL_TOKEN_KEY: z.string().optional(),
+  INSTAGRAM_MODE: z.enum(['live', 'dryrun', 'disabled']).optional(),
+  FACEBOOK_MODE: z.enum(['live', 'dryrun', 'disabled']).optional(),
+  TIKTOK_MODE: z.enum(['live', 'dryrun', 'disabled']).optional(),
+  YOUTUBE_MODE: z.enum(['live', 'dryrun', 'disabled']).optional(),
+  LINKEDIN_MODE: z.enum(['live', 'dryrun', 'disabled']).optional(),
+  META_APP_ID: z.string().optional(),
+  META_APP_SECRET: z.string().optional(),
+  META_GRAPH_VERSION: z.string().optional(),
+  TIKTOK_CLIENT_KEY: z.string().optional(),
+  TIKTOK_CLIENT_SECRET: z.string().optional(),
+  TIKTOK_PRIVACY: z
+    .enum(['SELF_ONLY', 'PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR'])
+    .optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  LINKEDIN_CLIENT_ID: z.string().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  /** `true` once LinkedIn approves the Community Management API. */
+  LINKEDIN_ORGANIZATIONS: z.string().optional(),
+  /** LinkedIn's versioned API (YYYYMM); each version lives about a year. */
+  LINKEDIN_API_VERSION: z.string().regex(/^\d{6}$/).optional(),
+  QSTASH_URL: z.string().url().optional(),
+  QSTASH_TOKEN: z.string().optional(),
+  QSTASH_CURRENT_SIGNING_KEY: z.string().optional(),
+  QSTASH_NEXT_SIGNING_KEY: z.string().optional()
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -73,5 +107,14 @@ export const env = {
     .map(value => value.trim().toLowerCase())
     .filter(Boolean),
   SOCIAL_SIMULATION_FAILURE_RATE:
-    parsed.data.SOCIAL_SIMULATION_FAILURE_RATE ?? 0
+    parsed.data.SOCIAL_SIMULATION_FAILURE_RATE ?? 0,
+  API_PUBLIC_URL: (parsed.data.API_PUBLIC_URL ?? `http://localhost:${parsed.data.PORT ?? 5000}`).replace(
+    /\/+$/,
+    ''
+  ),
+  META_GRAPH_VERSION: parsed.data.META_GRAPH_VERSION ?? 'v23.0',
+  TIKTOK_PRIVACY: parsed.data.TIKTOK_PRIVACY ?? 'SELF_ONLY',
+  LINKEDIN_ORGANIZATIONS: parsed.data.LINKEDIN_ORGANIZATIONS === 'true',
+  LINKEDIN_API_VERSION: parsed.data.LINKEDIN_API_VERSION ?? '202510',
+  QSTASH_URL: (parsed.data.QSTASH_URL ?? 'https://qstash.upstash.io').replace(/\/+$/, '')
 };

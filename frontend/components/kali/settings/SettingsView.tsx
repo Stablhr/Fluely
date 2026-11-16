@@ -1,13 +1,14 @@
 ﻿'use client'
 
 import { useRef, useState, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield } from 'lucide-react'
+import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield, Link2 } from 'lucide-react'
 import AvatarCropModal from './AvatarCropModal'
 import AccountSection from './AccountSection'
 import AppearanceSection from './AppearanceSection'
 import NotificationsSection from './NotificationsSection'
 import SharingSection from './SharingSection'
 import DangerZoneSection from './DangerZoneSection'
+import ConnectedAccountsSection from './ConnectedAccountsSection'
 import { useQueryClient } from '@tanstack/react-query'
 import { meQueryKey, useMeQuery } from '@/lib/hooks/auth/useMeQuery'
 import { getDisplayName } from '@/lib/api/authApi'
@@ -62,6 +63,7 @@ const SECTIONS = [
   { id: 'account', label: 'Account & Security', icon: Lock, description: 'Password, sessions, and account access.' },
   { id: 'appearance', label: 'Appearance', icon: Palette, description: 'Theme, density, and motion.' },
   { id: 'notifications', label: 'Notifications', icon: Bell, description: 'In-app and email alerts.' },
+  { id: 'accounts', label: 'Connected accounts', icon: Link2, description: 'Social accounts your workspace posts to.' },
   { id: 'sharing', label: 'Sharing & Privacy', icon: Shield, description: 'Default visibility and privacy.' },
   { id: 'danger', label: 'Danger Zone', icon: AlertTriangle, description: 'Destructive actions.' },
 ] as const
@@ -813,6 +815,8 @@ export default function SettingsView() {
             {tab === 'appearance' && <AppearanceSection />}
 
             {tab === 'notifications' && <NotificationsSection />}
+
+            {tab === 'accounts' && <ConnectedAccountsSection />}
 
             {tab === 'sharing' && <SharingSection onOpenProfile={() => setTab('profile')} />}
 

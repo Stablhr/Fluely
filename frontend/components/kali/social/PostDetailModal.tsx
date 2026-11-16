@@ -16,6 +16,7 @@ import {
   Globe,
   Camera,
   Music,
+  Briefcase,
 } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import type { SocialPost, Platform, PlatformStatus } from '@/lib/kali/store/schema'
@@ -29,6 +30,7 @@ const PLATFORM_ICONS: Record<Platform, typeof Play> = {
   facebook: Globe,
   instagram: Camera,
   tiktok: Music,
+  linkedin: Briefcase,
 }
 
 const STATUS_META: Record<PlatformStatus, { label: string; icon: typeof Clock; className: string }> = {
