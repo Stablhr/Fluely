@@ -15,4 +15,9 @@ module.exports = {
   // parallel (the default, and what CI does) startup can exceed the 5s
   // default, which showed up as intermittent timeouts rather than failures.
   testTimeout: 30000,
+  // Each database suite boots its own in-memory MongoDB. Booting all of them
+  // at once (Jest's default is one worker per core) overloaded the machine:
+  // instances failed to start and runs took minutes. Two at a time keeps runs
+  // short and reliable, locally and on CI's two-core runners.
+  maxWorkers: 2,
 };

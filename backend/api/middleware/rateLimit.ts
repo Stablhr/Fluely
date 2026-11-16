@@ -59,12 +59,48 @@ function accountOrIp(req: Request): string {
 }
 
 /**
- * Sensitive pre-auth writes (register, verify, login, password reset). Keyed by
- * address because no account exists yet, and left strict for brute-force.
+ * The strictest budget, for rare destructive account actions (deleting the
+ * account). Keyed by address.
  */
 export const authLimiter = makeSharedLimiter('auth', {
   windowMs: 15 * 60 * 1000,
   max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler
+});
+
+/*
+ * Pre-auth flows each get their own budget. They used to share `authLimiter`
+ * (5 per 15 minutes for sign-up, verification, sign-in and every step of a
+ * password reset together), so a couple of mistyped passwords locked a person
+ * out of the very reset that would fix it, and successful sign-ins used it up
+ * too. All are keyed by address because no account is known yet.
+ */
+
+/** Sign-in: only *failed* attempts count, which is what brute force produces. */
+export const loginLimiter = makeSharedLimiter('login', {
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler
+});
+
+/** Password reset: request a code, verify it, resend it, set the new password. */
+export const passwordResetLimiter = makeSharedLimiter('reset', {
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitHandler
+});
+
+/** Sign-up and email verification. */
+export const signupLimiter = makeSharedLimiter('signup', {
+  windowMs: 15 * 60 * 1000,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitHandler

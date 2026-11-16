@@ -18,6 +18,12 @@ const envSchema = z.object({
   SMTP_FROM: z.string().optional(),
   COOKIE_SECURE: z.string().optional(),
   COOKIE_SAMESITE: z.enum(['strict', 'lax', 'none']).optional(),
+  /**
+   * Prefix for the auth cookie names (default "dc"). Cookies are shared by
+   * every port on a host, so two apps on localhost that use the same names
+   * sign each other out; give each local app its own prefix.
+   */
+  COOKIE_PREFIX: z.string().regex(/^[a-z][a-z0-9_]{0,19}$/i, 'letters, digits and _ only').optional(),
   CORS_ORIGINS: z.string().optional(),
   FRONTEND_URL: z.string().url().optional(),
   MEDIA_MAX_FILE_SIZE_MB: z.coerce.number().positive().max(2000).optional(),
