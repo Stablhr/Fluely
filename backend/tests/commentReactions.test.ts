@@ -375,3 +375,80 @@ describe('reactions in the board structure', () => {
     });
   });
 });
+
+function claim(userId: Types.ObjectId, boardId: Types.ObjectId, claims: object[]) {
+  const session = sessionFor(userId);
+  return request(app)
+    .post(`/api/boards/${boardId.toString()}/reactions/claim`)
+    .set('Cookie', session.cookie)
+    .set('X-CSRF-Token', session.csrf)
+    .send({claims});
+}
+
+describe('claiming old anonymous reactions', () => {
+  it('turns one anonymous reaction into a named one without changing the count', async () => {
+    const {owner, board, card} = await setup({reactions: {[THUMBS]: 1}});
+
+    const res = await claim(owner._id, board._id, [
+      {cardId: card._id.toString(), commentId: 'comment-1', emoji: THUMBS}
+    ]);
+    expect(res.status).toBe(200);
+    expect(res.body.claimed).toBe(1);
+    expect(typeof res.body.revision).toBe('number');
+
+    const stored = await CardModel.findById(card._id).lean();
+    expect(stored?.comments[0].reactions).toEqual({
+      [THUMBS]: {userIds: [owner._id], legacy: 0}
+    });
+  });
+
+  it('is idempotent: a second claim by the same person changes nothing', async () => {
+    const {owner, board, card} = await setup({reactions: {[THUMBS]: 2}});
+    const body = [{cardId: card._id.toString(), commentId: 'comment-1', emoji: THUMBS}];
+
+    expect((await claim(owner._id, board._id, body)).body.claimed).toBe(1);
+    const again = await claim(owner._id, board._id, body);
+    expect(again.body.claimed).toBe(0);
+    expect(again.body.revision).toBeUndefined();
+
+    const stored = await CardModel.findById(card._id).lean();
+    expect(stored?.comments[0].reactions).toEqual({
+      [THUMBS]: {userIds: [owner._id], legacy: 1}
+    });
+  });
+
+  it('skips claims that no longer apply instead of failing the batch', async () => {
+    const {owner, board, card} = await setup({reactions: {[THUMBS]: 1}});
+    const res = await claim(owner._id, board._id, [
+      {cardId: card._id.toString(), commentId: 'comment-1', emoji: HEART},
+      {cardId: card._id.toString(), commentId: 'missing', emoji: THUMBS},
+      {cardId: new Types.ObjectId().toString(), commentId: 'comment-1', emoji: THUMBS},
+      {cardId: card._id.toString(), commentId: 'comment-1', emoji: THUMBS}
+    ]);
+    expect(res.status).toBe(200);
+    expect(res.body.claimed).toBe(1);
+  });
+
+  it('never claims more than the anonymous reactions that exist', async () => {
+    const {owner, board, card} = await setup({reactions: {[THUMBS]: 1}});
+    const other = await createUser();
+    await addCollaborator(board._id, other._id, owner._id, 'editor');
+    const body = [{cardId: card._id.toString(), commentId: 'comment-1', emoji: THUMBS}];
+
+    expect((await claim(owner._id, board._id, body)).body.claimed).toBe(1);
+    expect((await claim(other._id, board._id, body)).body.claimed).toBe(0);
+  });
+
+  it('follows the comment permission', async () => {
+    const {owner, board, card} = await setup({
+      reactions: {[THUMBS]: 1},
+      commentPermission: 'editors'
+    });
+    const viewer = await createUser();
+    await addCollaborator(board._id, viewer._id, owner._id, 'viewer');
+    const res = await claim(viewer._id, board._id, [
+      {cardId: card._id.toString(), commentId: 'comment-1', emoji: THUMBS}
+    ]);
+    expectError(res, 403, 'FORBIDDEN');
+  });
+});

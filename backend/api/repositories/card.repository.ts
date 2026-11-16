@@ -248,6 +248,38 @@ export const cardRepository = {
       {session, arrayFilters: [{'c.id': commentId}]}
     ).exec(),
 
+  /**
+   * Turns one anonymous legacy reaction into this person's named reaction:
+   * legacy - 1 and their id added, so the total is unchanged. Matches only
+   * while a legacy unit is left and they are not already listed.
+   */
+  claimLegacyReaction: (
+    id: string,
+    boardId: Types.ObjectId,
+    commentId: string,
+    emoji: string,
+    userId: Types.ObjectId,
+    session?: ProductSession
+  ) =>
+    CardModel.updateOne(
+      {
+        _id: id,
+        boardId,
+        comments: {
+          $elemMatch: {
+            id: commentId,
+            [`reactions.${emoji}.legacy`]: {$gte: 1},
+            [`reactions.${emoji}.userIds`]: {$ne: userId}
+          }
+        }
+      },
+      {
+        $inc: {[`comments.$[c].reactions.${emoji}.legacy`]: -1},
+        $addToSet: {[`comments.$[c].reactions.${emoji}.userIds`]: userId}
+      },
+      {session, arrayFilters: [{'c.id': commentId}]}
+    ).exec(),
+
   /** Drops an emoji that has no people and no legacy count left. */
   unsetEmptyReaction: (
     id: string,

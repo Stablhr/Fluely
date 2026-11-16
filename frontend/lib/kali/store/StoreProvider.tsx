@@ -66,6 +66,7 @@ import {
   reorderListsOnServer,
   setCardMemberOnServer,
   toggleCommentReactionOnServer,
+  claimLegacyReactionsOnServer,
   toCard,
   toList,
   updateCardOnServer,
@@ -102,6 +103,9 @@ const now = () => new Date().toISOString();
  * revision, so it keeps working entirely on local mutations. Everything else
  * goes to the server and is reconciled with what comes back.
  */
+/** Where browsers kept their own reactions before reactions were per person. */
+const LEGACY_REACTIONS_KEY = "kali_user_comment_reactions";
+
 function isServerBoard(board: Board | undefined): board is Board {
   return Boolean(board?.ownerId && board.revision !== null);
 }
@@ -2908,6 +2912,71 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }
     void load();
   }, [syncBoards]);
+  // One-time claim of old anonymous reactions. Before reactions were stored per
+  // person, each browser kept its own list (cardId → commentId → emojis) under
+  // LEGACY_REACTIONS_KEY. Sending it lets the server put this person's name on
+  // the reactions they really made; the list is removed once every board's
+  // claims went through, so this runs at most until it succeeds.
+  useEffect(() => {
+    if (typeof window === "undefined" || !boardsLoaded || !currentUser?.id) return;
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(LEGACY_REACTIONS_KEY);
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    let record: Record<string, Record<string, string[]>>;
+    try {
+      record = JSON.parse(raw);
+    } catch {
+      window.localStorage.removeItem(LEGACY_REACTIONS_KEY);
+      return;
+    }
+    const me = currentUser.id;
+    const byBoard = new Map<string, { cardId: string; commentId: string; emoji: string }[]>();
+    for (const [cardId, comments] of Object.entries(record ?? {})) {
+      const card = dataRef.current.cards[cardId];
+      if (!card || !isServerBoard(dataRef.current.boards[card.boardId])) continue;
+      for (const [commentId, emojis] of Object.entries(comments ?? {})) {
+        const comment = card.comments.find((c) => c.id === commentId);
+        if (!comment || !Array.isArray(emojis)) continue;
+        for (const emoji of emojis) {
+          const entry = comment.reactions[emoji];
+          // Only anonymous reactions can be claimed, and only once.
+          if (!entry || entry.userIds.includes(me) || entry.count <= entry.userIds.length) continue;
+          const list = byBoard.get(card.boardId) ?? [];
+          list.push({ cardId, commentId, emoji });
+          byBoard.set(card.boardId, list);
+        }
+      }
+    }
+    if (byBoard.size === 0) {
+      window.localStorage.removeItem(LEGACY_REACTIONS_KEY);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      let allOk = true;
+      for (const [boardId, claims] of byBoard) {
+        try {
+          const res = await claimLegacyReactionsOnServer(boardId, claims.slice(0, 200));
+          if (cancelled) return;
+          if (res.claimed > 0) {
+            applyRevision(boardId, res.revision);
+            void syncBoardStructure(boardId);
+          }
+        } catch {
+          allOk = false;
+        }
+      }
+      if (allOk && !cancelled) window.localStorage.removeItem(LEGACY_REACTIONS_KEY);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [boardsLoaded, currentUser?.id, applyRevision, syncBoardStructure]);
+
   // One-time migration of the removed Inbox into a board. Runs per user and is
   // guarded by a localStorage flag so it never duplicates.
   useEffect(() => {

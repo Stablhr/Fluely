@@ -444,6 +444,22 @@ export async function toggleCommentReactionOnServer(
   return { reactions: normalizeReactions(data.comment.reactions), revision: data.revision };
 }
 
+/**
+ * Attributes old anonymous reactions to the signed-in person, from what their
+ * browser remembers reacting. Claims that no longer apply are skipped by the
+ * server, so a stale list is harmless.
+ */
+export async function claimLegacyReactionsOnServer(
+  boardId: string,
+  claims: { cardId: string; commentId: string; emoji: string }[],
+): Promise<{ claimed: number; revision?: number }> {
+  const { data } = await httpClient.post<{ claimed: number; revision?: number }>(
+    `/boards/${boardId}/reactions/claim`,
+    { claims },
+  );
+  return data;
+}
+
 /** Owner-only. The server validates the target is an accepted board member. */
 export async function setCardMemberOnServer(
   boardId: string,

@@ -279,6 +279,19 @@ export const commentIdParamsSchema = z.object({
   commentId: requiredText(80)
 });
 
+export const reactionClaimSchema = z.object({
+  claims: z
+    .array(
+      z.object({
+        cardId: objectId,
+        commentId: requiredText(80),
+        emoji: reactionEmoji
+      })
+    )
+    .min(1)
+    .max(200)
+});
+
 export const reactionSchema = z.object({
   emoji: reactionEmoji
 });

@@ -687,6 +687,59 @@ export const cardService = {
   },
 
   /**
+   * Attributes old anonymous reactions to the person who made them.
+   *
+   * Before reactions were stored per person, the server kept only counts and
+   * each browser remembered its own reactions. The browser sends what it
+   * remembers; each claim turns one anonymous unit on that emoji into this
+   * person's named reaction (the total is unchanged). Claims that no longer
+   * apply -- no anonymous unit left, already reacted, card or comment gone --
+   * are skipped rather than failing the batch. The server cannot verify a
+   * claim, which is acceptable because it never changes a count and only
+   * ever applies to reactions that are anonymous anyway.
+   */
+  async claimLegacyReactions(
+    actor: Actor,
+    board: BoardDocument,
+    access: BoardAccessLevel | undefined,
+    claims: {cardId: string; commentId: string; emoji: string}[]
+  ) {
+    if (!canComment(board, access)) {
+      throw new ApiError(
+        403,
+        ErrorCodes.FORBIDDEN,
+        'You do not have permission to react to comments on this board'
+      );
+    }
+    const userId = actor.actorId;
+    return withProductTransaction(async session => {
+      let claimed = 0;
+      for (const claim of claims) {
+        const card = await cardRepository.findByIdForBoard(claim.cardId, board._id, session);
+        const comment = card?.comments?.find(c => c.id === claim.commentId);
+        if (!card || !comment) continue;
+        const reactions =
+          comment.reactions && typeof comment.reactions === 'object' && !Array.isArray(comment.reactions)
+            ? (comment.reactions as Record<string, unknown>)
+            : {};
+        const current = reactions[claim.emoji];
+        if (typeof current === 'number') {
+          if (current < 1) continue;
+          await cardRepository.convertLegacyReaction(
+            claim.cardId, board._id, claim.commentId, claim.emoji, current, session
+          );
+        }
+        const res = await cardRepository.claimLegacyReaction(
+          claim.cardId, board._id, claim.commentId, claim.emoji, userId, session
+        );
+        claimed += res.modifiedCount;
+      }
+      const revision = claimed > 0 ? await bumpBoardRevision(board._id, undefined, session) : undefined;
+      return {claimed, revision};
+    });
+  },
+
+  /**
    * Assigns or unassigns one board member. The route already requires the
    * owner; the check here keeps the rule with the data write too. The target
    * must be the owner or an accepted collaborator, never a pending invite or

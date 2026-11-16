@@ -258,14 +258,22 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
         id === me ? 'You' : boardMembers.find((m) => m.id === id)?.name ?? 'Someone',
       )
     const shown = names.slice(0, 8)
-    const others = entry.count - shown.length
-    if (shown.length === 0) return `${others} ${others === 1 ? 'person' : 'people'}`
-    if (others <= 0) {
-      return shown.length === 1
-        ? shown[0]
-        : `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}`
+    // Named people beyond the first 8, and reactions from before names were
+    // recorded (nobody has claimed them yet), are counted separately.
+    const hiddenNamed = names.length - shown.length
+    const anonymous = Math.max(0, entry.count - names.length)
+    const parts = [...shown]
+    if (hiddenNamed > 0) parts.push(`${hiddenNamed} other${hiddenNamed === 1 ? '' : 's'}`)
+    if (anonymous > 0) {
+      parts.push(
+        shown.length === 0
+          ? `${anonymous} reaction${anonymous === 1 ? '' : 's'} from before names were recorded`
+          : `${anonymous} earlier reaction${anonymous === 1 ? '' : 's'}`,
+      )
     }
-    return `${shown.join(', ')} and ${others} other${others === 1 ? '' : 's'}`
+    return parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
   }
 
   const canDeleteComment = (comment: { authorId: string }) =>

@@ -34,7 +34,8 @@ import {
   listPatchSchema,
   listReorderSchema,
   pollQuerySchema,
-  reactionSchema
+  reactionSchema,
+  reactionClaimSchema
 } from '../dtos/product.dto';
 
 const router = Router();
@@ -253,6 +254,16 @@ router.post(
   validateRequest({params: commentIdParamsSchema, body: reactionSchema}),
   requireBoardAccess('read'),
   cardController.toggleCommentReaction
+);
+
+// Attributes old anonymous reactions to the person whose browser remembers
+// making them (see cardService.claimLegacyReactions).
+router.post(
+  '/:boardId/reactions/claim',
+  authActionLimiter,
+  validateRequest({params: boardIdParamsSchema, body: reactionClaimSchema}),
+  requireBoardAccess('read'),
+  cardController.claimLegacyReactions
 );
 
 router.delete(

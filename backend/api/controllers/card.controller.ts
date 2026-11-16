@@ -65,6 +65,21 @@ export const cardController = {
 
   /** Read access is proven by the route; the service applies the board's
    *  comment permission, which may be narrower. */
+  async claimLegacyReactions(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json(
+        await cardService.claimLegacyReactions(
+          actorFromRequest(req),
+          requireBoard(req),
+          req.boardAccess,
+          req.body.claims
+        )
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async toggleCommentReaction(req: Request, res: Response, next: NextFunction) {
     try {
       res.status(200).json(
