@@ -106,6 +106,9 @@ const now = () => new Date().toISOString();
 /** Where browsers kept their own reactions before reactions were per person. */
 const LEGACY_REACTIONS_KEY = "kali_user_comment_reactions";
 
+/** How often the board list is re-read while the app is open and visible. */
+const BOARD_LIST_REFRESH_MS = 30_000;
+
 function isServerBoard(board: Board | undefined): board is Board {
   return Boolean(board?.ownerId && board.revision !== null);
 }
@@ -2836,7 +2839,9 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
       setPendingInvitations(invitations as PendingInvitation[]);
 
-      if (dtos.length === 0) return;
+      // No early return when the list is empty: that is exactly the case where
+      // a member's last shared board was deleted, and the reconcile below is
+      // what removes it from this device.
 
       mutate((prev) => {
         const boards: Record<string, Board> = { ...prev.boards };
@@ -2912,6 +2917,26 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }
     void load();
   }, [syncBoards]);
+
+  // Keep the board list current while the app is open, so a board its owner
+  // deleted (or access that was revoked) disappears for everyone else without
+  // a reload. Board pages already poll their own board; this covers the board
+  // list and every other page. Paused while the tab is hidden, and refreshed
+  // as soon as it is shown again.
+  useEffect(() => {
+    if (!boardsLoaded) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void syncBoards();
+    };
+    const timer = window.setInterval(refresh, BOARD_LIST_REFRESH_MS);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [boardsLoaded, syncBoards]);
   // One-time claim of old anonymous reactions. Before reactions were stored per
   // person, each browser kept its own list (cardId → commentId → emojis) under
   // LEGACY_REACTIONS_KEY. Sending it lets the server put this person's name on
