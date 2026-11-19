@@ -173,7 +173,7 @@ export function sortPosts(posts: SocialPost[], key: SortKey, dir: SortDir): Soci
 
 /* ── Publishing moment ───────────────────────────────────────── */
 
-export type PostMomentKind = 'scheduled' | 'publishing' | 'posted' | 'partial' | 'failed'
+export type PostMomentKind = 'scheduled' | 'publishing' | 'posted' | 'partial' | 'failed' | 'reminder'
 
 export interface PostMoment {
   kind: PostMomentKind
@@ -203,6 +203,11 @@ export function postMoment(post: SocialPost): PostMoment | null {
     .filter((d): d is Date => d !== null)
     .sort((a, b) => b.getTime() - a.getTime())[0] ?? null
 
+  // Its time came for a platform you post to yourself: that comes first.
+  if (enabled.some((p) => p.status === 'reminder')) {
+    return { kind: 'reminder', at: plannedAt(post), label: 'Your turn to post' }
+  }
+
   switch (post.status) {
     case 'scheduled':
       return { kind: 'scheduled', at: plannedAt(post), label: 'Scheduled' }
@@ -226,6 +231,26 @@ const MOMENT_FORMAT = new Intl.DateTimeFormat(undefined, {
   hour: 'numeric',
   minute: '2-digit',
 })
+
+/** Caption plus hashtags, as it should be pasted on a platform by hand. */
+export function postTextFor(post: SocialPost, platform: Platform): string {
+  const target = post.platforms.find((p) => p.platform === platform)
+  const caption = (target?.caption?.trim() ? target.caption : post.caption) ?? ''
+  const tags = (target?.hashtags ?? [])
+    .map((t) => t.trim().replace(/^#+/, ''))
+    .filter(Boolean)
+    .filter((t) => !new RegExp(`#${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(caption))
+  return [caption.trim(), tags.map((t) => `#${t}`).join(' ')].filter(Boolean).join('\n\n')
+}
+
+/** Where to post by hand on each platform. */
+export const MANUAL_POST_URL: Record<Platform, string> = {
+  facebook: 'https://www.facebook.com/',
+  instagram: 'https://www.instagram.com/',
+  linkedin: 'https://www.linkedin.com/feed/?shareActive=true',
+  tiktok: 'https://www.tiktok.com/upload',
+  youtube: 'https://studio.youtube.com/',
+}
 
 /** e.g. "Thu, 19 Nov, 10:20 PM" in the viewer's own time zone. */
 export function formatMoment(at: Date): string {

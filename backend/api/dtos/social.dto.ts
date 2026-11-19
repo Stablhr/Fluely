@@ -162,6 +162,15 @@ export const connectBodySchema = z.object({
   demo: z.boolean().default(false)
 });
 
+export const reminderAccountSchema = z.object({
+  name: z.string().trim().min(1).max(120)
+});
+
+export const markPostedSchema = z.object({
+  platform: z.enum(SchedulablePlatforms),
+  url: httpUrl
+});
+
 export const platformBodySchema = z.object({platform: z.enum(SchedulablePlatforms).optional()});
 
 export const jobListQuerySchema = z.object({

@@ -40,6 +40,7 @@ const STATUS_META: Record<PlatformStatus, { label: string; icon: typeof Clock; c
   posted: { label: 'Posted', icon: CheckCircle2, className: 'text-success-text' },
   failed: { label: 'Failed', icon: XCircle, className: 'text-danger-text' },
   cancelled: { label: 'Cancelled', icon: Ban, className: 'text-text-muted' },
+  reminder: { label: 'Your turn to post', icon: Clock, className: 'text-warning-text' },
 }
 
 function formatDateTime(iso?: string): string {

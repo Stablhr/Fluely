@@ -4,6 +4,7 @@ import {
   DEFAULT_MAX_RETRIES,
   PLATFORM_LABELS,
   PostStatus,
+  REMINDER_ACCOUNT_TYPE,
   SchedulablePlatform
 } from '../../constants/social';
 import {PublishingJobDocument, PublishingJobModel} from '../../models/PublishingJob.model';
@@ -307,7 +308,9 @@ export const socialPostService = {
       const account = await resolveAccount(workspaceId, target);
       if (!account) errors.push(`Connect ${/^[AEIOU]/i.test(label) ? 'an' : 'a'} ${label} account first`);
       else if (account.status !== 'active') errors.push(`Reconnect ${account.accountName} (${label})`);
-      errors.push(...validateContent(target.platform, contentFor(post, target)));
+      if (account?.accountType !== REMINDER_ACCOUNT_TYPE) {
+        errors.push(...validateContent(target.platform, contentFor(post, target)));
+      }
 
       validation.push({platform: target.platform, valid: errors.length === 0, errors});
       if (errors.length || !account) {
@@ -355,7 +358,7 @@ export const socialPostService = {
     const post = await findPost(workspaceId, id);
     await cancelJobs(workspaceId, id, platform);
     post.platforms = post.platforms.map(t =>
-      (!platform || t.platform === platform) && (t.status === 'scheduled' || t.status === 'pending')
+      (!platform || t.platform === platform) && (t.status === 'scheduled' || t.status === 'pending' || t.status === 'reminder')
         ? ({...t, status: 'cancelled'} as PlatformTarget)
         : t
     );
@@ -404,6 +407,36 @@ export const socialPostService = {
     await refreshPostStatus(post._id as Types.ObjectId);
     const fresh = await findPost(workspaceId, id);
     return {post: serializePost(fresh), retried, jobsCreated, jobsSkipped};
+  },
+
+  /**
+   * Records that the person posted a reminder target themselves, with an
+   * optional link to the live post.
+   */
+  async markPosted(actor: Actor, id: string, platform: SchedulablePlatform, url?: string) {
+    const {workspaceId} = await socialWorkspace(actor);
+    const post = await findPost(workspaceId, id);
+    const target = post.platforms.find(t => t.platform === platform && t.enabled);
+    if (!target) throw new ApiError(404, ErrorCodes.SOCIAL_POST_NOT_FOUND, 'That platform is not part of this post');
+    if (target.status !== 'reminder') {
+      throw new ApiError(409, ErrorCodes.VALIDATION_ERROR, 'Only a post waiting for you to post it can be marked as posted');
+    }
+    post.platforms = post.platforms.map(t =>
+      t.platform === platform
+        ? ({
+            ...t,
+            status: 'posted',
+            manual: true,
+            publishedAt: new Date().toISOString(),
+            publishedUrl: url,
+            error: undefined,
+            errorCode: undefined
+          } as PlatformTarget)
+        : t
+    );
+    post.status = aggregateStatus(post);
+    await post.save();
+    return {post: serializePost(post)};
   },
 
   async listJobs(actor: Actor, filter: {socialPostId?: string; status?: string}) {

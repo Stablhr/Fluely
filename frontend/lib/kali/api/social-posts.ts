@@ -62,6 +62,15 @@ export interface ScheduleResultEventDetail {
   scheduledAt?: string
 }
 
+/** Fired when a post's time comes for a platform you post to yourself (reminder account). */
+export const REMINDER_DUE_EVENT = 'cadence:social-reminder-due'
+export interface ReminderDueEventDetail {
+  postId: string
+  title: string
+  caption: string
+  platforms: Platform[]
+}
+
 /** Fired when a scheduled post finishes publishing (posted, partly, or failed). */
 export const POST_OUTCOME_EVENT = 'cadence:social-post-outcome'
 export interface PostOutcomeEventDetail {
@@ -133,6 +142,12 @@ export const socialPostsApi = {
     inOrder(id, async () => {
       const { data } = await httpClient.post<CancelResult>(`/social-posts/${encodeURIComponent(id)}/cancel`, input ?? {})
       return data
+    }),
+  /** Records that you posted a reminder target yourself, with an optional link to it. */
+  markPosted: (id: string, input: { platform: Platform; url?: string }) =>
+    inOrder(id, async () => {
+      const { data } = await httpClient.post<{ post: SocialPost }>(`/social-posts/${encodeURIComponent(id)}/mark-posted`, input)
+      return data.post
     }),
   retry: (id: string, input?: { platform?: Platform }) =>
     inOrder(id, async () => {

@@ -243,8 +243,9 @@ export type SocialPostStatus =
   | "failed"
   | "cancelled";
 
+/** `reminder`: its time came and the person posts it themselves (reminder account). */
 export type PlatformStatus =
-  "pending" | "scheduled" | "publishing" | "posted" | "failed" | "cancelled";
+  "pending" | "scheduled" | "publishing" | "posted" | "failed" | "cancelled" | "reminder";
 
 export type RepeatFrequency =
   "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
@@ -258,6 +259,8 @@ export interface SocialPostPlatform {
   accountId?: string | null;
   /** Published in dry-run mode: simulated, nothing reached the platform. */
   dryRun?: boolean;
+  /** Posted by the person themselves after a reminder. */
+  manual?: boolean;
   status: PlatformStatus;
   caption: string;
   hashtags: string[];

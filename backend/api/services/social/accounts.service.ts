@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import {Types} from 'mongoose';
 import {env} from '../../config/env';
 import {ErrorCodes} from '../../constants/errorCodes';
-import {PLATFORM_LABELS, SchedulablePlatform} from '../../constants/social';
+import {PLATFORM_LABELS, REMINDER_ACCOUNT_TYPE, SchedulablePlatform} from '../../constants/social';
 import {logger} from '../../logging/logger';
 import {SocialAccountDocument, SocialAccountModel} from '../../models/SocialAccount.model';
 import {Actor} from '../../utils/actor';
@@ -265,6 +265,31 @@ export const socialAccountService = {
           : `Could not connect ${PLATFORM_LABELS[platform]}`;
       return back({social: 'error', message});
     }
+  },
+
+  /**
+   * A reminder account ("My personal profile"): no sign-in, no token. Posts
+   * scheduled to it are handed back to the person at their time to post by
+   * hand. Used where a platform's API cannot post for them.
+   */
+  async addReminderAccount(actor: Actor, platform: SchedulablePlatform, name: string) {
+    assertEnabled(platform);
+    const {workspaceId} = await socialWorkspace(actor);
+    const [account] = await saveAccounts(
+      workspaceId,
+      platform,
+      actor.actorId,
+      [
+        {
+          platformAccountId: `reminder-${createSecureToken(9)}`,
+          accountType: REMINDER_ACCOUNT_TYPE,
+          accountName: name.trim().slice(0, 120) || 'My personal profile',
+          token: {accessToken: 'none', scopes: []}
+        }
+      ],
+      false
+    );
+    return serializeAccount(account);
   },
 
   /** The person who connected an account, or the workspace owner, can remove it. */

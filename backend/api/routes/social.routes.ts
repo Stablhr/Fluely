@@ -7,6 +7,8 @@ import {
 import {
   accountIdParamsSchema,
   connectBodySchema,
+  markPostedSchema,
+  reminderAccountSchema,
   jobListQuerySchema,
   oauthCallbackQuerySchema,
   platformBodySchema,
@@ -43,6 +45,12 @@ socialAccountRoutes.post(
   authActionLimiter,
   validateRequest({params: platformParamsSchema, body: connectBodySchema}),
   socialAccountController.connect
+);
+socialAccountRoutes.post(
+  '/reminder/:platform',
+  authActionLimiter,
+  validateRequest({params: platformParamsSchema, body: reminderAccountSchema}),
+  socialAccountController.addReminder
 );
 socialAccountRoutes.delete(
   '/:id',
@@ -103,6 +111,12 @@ socialPostRoutes.post(
   authActionLimiter,
   validateRequest({params: postIdParamsSchema, body: platformBodySchema}),
   socialPostController.cancel
+);
+socialPostRoutes.post(
+  '/:id/mark-posted',
+  authActionLimiter,
+  validateRequest({params: postIdParamsSchema, body: markPostedSchema}),
+  socialPostController.markPosted
 );
 socialPostRoutes.post(
   '/:id/retry',

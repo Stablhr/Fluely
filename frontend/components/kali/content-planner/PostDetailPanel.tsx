@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { X, Plus, Trash2, Link2, ImageIcon, ExternalLink, CalendarClock } from 'lucide-react'
+import { X, Plus, Trash2, Link2, ImageIcon, ExternalLink, CalendarClock, Copy, CheckCircle2 } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import type {
   MediaType,
@@ -13,6 +13,8 @@ import type {
 } from '@/lib/kali/store/schema'
 import { deleteMedia, uploadMediaFile } from '@/lib/api/mediaApi'
 import { getFriendlyErrorMessage } from '@/lib/api/getFriendlyErrorMessage'
+import { isReminderAccount, socialAccountsApi, type SocialAccount } from '@/lib/kali/api/social-accounts'
+import { socialPostsApi } from '@/lib/kali/api/social-posts'
 import Button from '../shared/Button'
 import { Input, Textarea } from '../shared/Input'
 import SectionLabel from '../shared/SectionLabel'
@@ -21,7 +23,9 @@ import {
   ALL_PLATFORMS,
   PLANNER_STAGES,
   formatMoment,
+  MANUAL_POST_URL,
   platformColor,
+  postTextFor,
   platformLabel,
   postMoment,
 } from './planner-model'
@@ -46,6 +50,8 @@ interface Draft {
   notes: string
   cardId: string
   media: SocialMediaAttachment[]
+  /** Chosen account per platform, when a platform has more than one connected. */
+  accounts: Partial<Record<Platform, string>>
 }
 
 export interface PostDetailPanelProps {
@@ -75,6 +81,9 @@ function draftFromPost(post: SocialPost): Draft {
     notes: post.notes ?? '',
     cardId: post.cardId ?? '',
     media: post.media,
+    accounts: Object.fromEntries(
+      post.platforms.filter((p) => p.enabled && p.accountId).map((p) => [p.platform, p.accountId as string]),
+    ),
   }
 }
 
@@ -90,24 +99,28 @@ function emptyDraft(defaultDate?: string, defaultTime?: string): Draft {
     notes: '',
     cardId: '',
     media: [],
+    accounts: {},
   }
 }
 
 /** Builds the platform entries, preserving per-platform overrides already on the post. */
-function buildPlatforms(draft: Draft, existing: SocialPostPlatform[]): SocialPostPlatform[] {
+function buildPlatforms(
+  draft: Draft,
+  existing: SocialPostPlatform[],
+  accountFor: (platform: Platform) => string | undefined,
+): SocialPostPlatform[] {
   return draft.platforms.map((platform) => {
     const override = existing.find((p) => p.platform === platform)
-    return (
-      override ?? {
-        platform,
-        enabled: true,
-        status: 'pending' as const,
-        caption: '',
-        hashtags: [],
-        mentions: [],
-        visibility: 'public' as const,
-      }
-    )
+    const base: SocialPostPlatform = override ?? {
+      platform,
+      enabled: true,
+      status: 'pending' as const,
+      caption: '',
+      hashtags: [],
+      mentions: [],
+      visibility: 'public' as const,
+    }
+    return { ...base, accountId: accountFor(platform) ?? base.accountId ?? null }
   })
 }
 
@@ -117,7 +130,7 @@ export default function PostDetailPanel({
   defaultTime,
   onClose,
 }: PostDetailPanelProps) {
-  const { boards, socialPosts, addSocialPost, updateSocialPost, deleteSocialPost } = useStore()
+  const { boards, socialPosts, addSocialPost, updateSocialPost, deleteSocialPost, refreshSocialPost } = useStore()
   const isCreate = postId == null
   const existing = useMemo(
     () => (postId ? socialPosts.find((p) => p.id === postId) ?? null : null),
@@ -132,6 +145,68 @@ export default function PostDetailPanel({
   )
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
+  // Connected accounts, for "Post to". null while loading or if it failed, in
+  // which case the server picks the account as before.
+  const [connected, setConnected] = useState<SocialAccount[] | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    socialAccountsApi
+      .list()
+      .then((rows) => {
+        if (!cancelled) setConnected(rows)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  const accountsFor = (platform: Platform) =>
+    (connected ?? []).filter((a) => a.platform === platform && a.status === 'active')
+  /** The account a platform will post to: the one picked, else the first connected. */
+  const accountFor = (platform: Platform): string | undefined => {
+    const options = accountsFor(platform)
+    const picked = draft.accounts[platform]
+    return options.find((a) => a.id === picked)?.id ?? options[0]?.id ?? undefined
+  }
+  const accountName = (id: string | null | undefined) => connected?.find((a) => a.id === id)?.accountName
+  const isReminder = (id: string | null | undefined) => {
+    const account = connected?.find((a) => a.id === id)
+    return account ? isReminderAccount(account) : false
+  }
+
+  // "Your turn to post": copy the caption, open the platform, mark it posted.
+  const [markingFor, setMarkingFor] = useState<Platform | null>(null)
+  const [postedUrl, setPostedUrl] = useState('')
+  const [copiedFor, setCopiedFor] = useState<Platform | null>(null)
+  const [markError, setMarkError] = useState<string | null>(null)
+
+  const copyCaption = async (platform: Platform) => {
+    if (!existing) return
+    try {
+      await navigator.clipboard.writeText(postTextFor(existing, platform))
+      setCopiedFor(platform)
+    } catch {
+      setMarkError('Could not copy. Select the caption below and copy it yourself.')
+    }
+  }
+
+  const markPosted = async (platform: Platform) => {
+    if (!existing) return
+    const url = postedUrl.trim()
+    if (url && !/^https?:\/\//.test(url)) {
+      setMarkError('That link should start with https://')
+      return
+    }
+    try {
+      await socialPostsApi.markPosted(existing.id, { platform, url: url || undefined })
+      await refreshSocialPost(existing.id)
+      setMarkingFor(null)
+      setPostedUrl('')
+      setMarkError(null)
+    } catch (error) {
+      setMarkError(getFriendlyErrorMessage(error, 'Could not mark it as posted.'))
+    }
+  }
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
@@ -211,7 +286,7 @@ export default function PostDetailPanel({
       title: draft.title.trim() || 'Untitled post',
       caption: draft.caption,
       status: draft.status,
-      platforms: buildPlatforms(draft, existing?.platforms ?? []),
+      platforms: buildPlatforms(draft, existing?.platforms ?? [], accountFor),
       media: draft.media,
       tags,
       notes: draft.notes.trim() || undefined,
@@ -248,6 +323,15 @@ export default function PostDetailPanel({
    */
   const handleSchedule = () => {
     if (draft.platforms.length === 0) return setScheduleError('Pick at least one platform.')
+    if (connected) {
+      const missing = draft.platforms.filter((p) => accountsFor(p).length === 0)
+      if (missing.length > 0) {
+        const names = missing.map(platformLabel).join(' and ')
+        return setScheduleError(
+          `Connect a ${names} account in Settings first (or add a reminder account to post it yourself), or turn ${names} off.`,
+        )
+      }
+    }
     if (!draft.date || !draft.time) return setScheduleError('Pick a date and time to schedule this post.')
     const at = new Date(`${draft.date}T${draft.time}`)
     if (Number.isNaN(at.getTime()) || at.getTime() < Date.now() - 60_000) {
@@ -305,12 +389,19 @@ export default function PostDetailPanel({
                       >
                         <PlatformIcon platform={p.platform} size={9} />
                       </span>
-                      <span className="font-medium text-text-primary">{platformLabel(p.platform)}</span>
+                      <span className="font-medium text-text-primary">
+                        {platformLabel(p.platform)}
+                        {accountName(p.accountId) ? ` · ${accountName(p.accountId)}` : ''}
+                      </span>
                       <span className="min-w-0 flex-1 truncate">
                         {p.status === 'posted'
-                          ? `Posted${p.publishedAt ? ` ${formatMoment(new Date(p.publishedAt))}` : ''}${p.dryRun ? ' (simulated)' : ''}`
-                          : p.status === 'scheduled'
-                            ? p.retryCount ? 'Retrying soon' : 'Waiting for its time'
+                          ? `Posted${p.publishedAt ? ` ${formatMoment(new Date(p.publishedAt))}` : ''}${p.dryRun ? ' (simulated)' : ''}${p.manual ? ' by you' : ''}`
+                          : p.status === 'reminder'
+                            ? 'Your turn to post'
+                            : p.status === 'scheduled'
+                            ? isReminder(p.accountId)
+                              ? "We'll remind you at its time"
+                              : p.retryCount ? 'Retrying soon' : 'Waiting for its time'
                             : p.status === 'publishing'
                               ? 'Publishing now'
                               : p.status === 'failed'
@@ -330,6 +421,52 @@ export default function PostDetailPanel({
                     </li>
                   ))}
               </ul>
+
+              {existing.platforms
+                .filter((p) => p.enabled && p.status === 'reminder')
+                .map((p) => (
+                  <div key={`turn-${p.platform}`} className="mt-3 space-y-2 border-t border-border pt-3">
+                    <p className="text-[12px] text-text-secondary">
+                      Post this on {platformLabel(p.platform)} yourself: copy the caption, paste it there, then mark it
+                      as posted.
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button size="sm" variant="secondary" onClick={() => copyCaption(p.platform)}>
+                        <Copy size={12} />
+                        {copiedFor === p.platform ? 'Copied' : 'Copy caption'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => window.open(MANUAL_POST_URL[p.platform], '_blank', 'noopener')}
+                      >
+                        <ExternalLink size={12} />
+                        Open {platformLabel(p.platform)}
+                      </Button>
+                      {markingFor !== p.platform && (
+                        <Button size="sm" variant="primary" onClick={() => { setMarkingFor(p.platform); setMarkError(null) }}>
+                          <CheckCircle2 size={12} />
+                          Mark as posted
+                        </Button>
+                      )}
+                    </div>
+                    {markingFor === p.platform && (
+                      <div className="flex gap-1.5">
+                        <input
+                          value={postedUrl}
+                          onChange={(e) => { setPostedUrl(e.target.value); setMarkError(null) }}
+                          placeholder="Link to your post (optional)"
+                          aria-label={`Link to your ${platformLabel(p.platform)} post`}
+                          className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-[12px] text-text-primary"
+                        />
+                        <Button size="sm" variant="primary" onClick={() => markPosted(p.platform)}>
+                          Done
+                        </Button>
+                      </div>
+                    )}
+                    {markError && <p role="alert" className="text-[12px] font-medium text-danger-text">{markError}</p>}
+                  </div>
+                ))}
             </section>
           )}
 
@@ -392,6 +529,56 @@ export default function PostDetailPanel({
             </div>
             {draft.platforms.length === 0 && (
               <p className="mt-1.5 text-[11px] text-text-muted">Pick at least one platform.</p>
+            )}
+            {connected && draft.platforms.length > 0 && (
+              <div className="mt-3 space-y-1.5" aria-label="Post to">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-text-muted">Post to</p>
+                {draft.platforms.map((platform) => {
+                  const options = accountsFor(platform)
+                  const label = platformLabel(platform)
+                  return (
+                    <div key={platform} className="flex items-center gap-2 text-[12px]">
+                      <span
+                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white"
+                        style={{ background: platformColor(platform) }}
+                      >
+                        <PlatformIcon platform={platform} size={9} />
+                      </span>
+                      {options.length === 0 ? (
+                        <span className="text-text-muted">
+                          No {label} account connected.{' '}
+                          <a href="/settings?tab=accounts" className="font-semibold text-primary hover:underline">
+                            Connect one
+                          </a>
+                        </span>
+                      ) : options.length === 1 ? (
+                        <span className="truncate text-text-secondary">
+                          {options[0].accountName}
+                          {options[0].demo ? ' (demo)' : ''}
+                          {isReminderAccount(options[0]) ? ' (reminder: you post it yourself)' : ''}
+                        </span>
+                      ) : (
+                        <select
+                          value={accountFor(platform)}
+                          onChange={(e) =>
+                            setDraft((d) => ({ ...d, accounts: { ...d.accounts, [platform]: e.target.value } }))
+                          }
+                          aria-label={`${label} account to post to`}
+                          className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-[12px] text-text-primary"
+                        >
+                          {options.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.accountName}
+                              {a.demo ? ' (demo)' : ''}
+                              {isReminderAccount(a) ? ' (reminder: you post it yourself)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             )}
           </div>
 

@@ -49,6 +49,11 @@ export const socialAccountController = {
     res.redirect(302, target);
   }),
 
+  addReminder: wrap(async (req, res) => {
+    const account = await socialAccountService.addReminderAccount(actorFromRequest(req), platformOf(req), req.body.name);
+    res.status(201).json({account});
+  }),
+
   disconnect: wrap(async (req, res) => {
     await socialAccountService.disconnect(actorFromRequest(req), req.params.id);
     res.status(204).end();
@@ -91,6 +96,12 @@ export const socialPostController = {
 
   retry: wrap(async (req, res) => {
     res.status(200).json(await socialPostService.retry(actorFromRequest(req), req.params.id, req.body.platform));
+  }),
+
+  markPosted: wrap(async (req, res) => {
+    res.status(200).json(
+      await socialPostService.markPosted(actorFromRequest(req), req.params.id, req.body.platform, req.body.url)
+    );
   }),
 
   jobs: wrap(async (req, res) => {

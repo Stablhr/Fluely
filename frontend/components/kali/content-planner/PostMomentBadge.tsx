@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, CheckCircle2, Clock, Loader2 } from 'lucide-react'
+import { AlertTriangle, BellRing, CheckCircle2, Clock, Loader2 } from 'lucide-react'
 import type { SocialPost } from '@/lib/kali/store/schema'
 import { formatMoment, postMoment, type PostMomentKind } from './planner-model'
 
@@ -10,6 +10,7 @@ const TONE: Record<PostMomentKind, string> = {
   posted: 'bg-success-subtle text-success-text',
   partial: 'bg-warning-subtle text-warning-text',
   failed: 'bg-danger-subtle text-danger-text',
+  reminder: 'bg-warning-subtle text-warning-text',
 }
 
 const ICON: Record<PostMomentKind, typeof Clock> = {
@@ -18,6 +19,7 @@ const ICON: Record<PostMomentKind, typeof Clock> = {
   posted: CheckCircle2,
   partial: AlertTriangle,
   failed: AlertTriangle,
+  reminder: BellRing,
 }
 
 /**

@@ -33,7 +33,7 @@ jest.setTimeout(30_000);
 // not leak in -- it changes behaviour and could reach real platform APIs.
 const PLATFORM_SETTINGS = [
   'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_MODE', 'LINKEDIN_ORGANIZATIONS', 'LINKEDIN_API_VERSION',
-  'META_APP_ID', 'META_APP_SECRET', 'FACEBOOK_MODE', 'INSTAGRAM_MODE',
+  'META_APP_ID', 'META_APP_SECRET', 'META_LOGIN_CONFIG_ID', 'META_INSTAGRAM_CONFIG_ID', 'FACEBOOK_MODE', 'INSTAGRAM_MODE',
   'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_MODE',
   'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'YOUTUBE_MODE',
   'QSTASH_TOKEN', 'QSTASH_CURRENT_SIGNING_KEY', 'QSTASH_NEXT_SIGNING_KEY'
@@ -257,6 +257,30 @@ describe('connecting accounts', () => {
     }
   });
 
+  it('asks Facebook only for Page permissions, or uses a login configuration', async () => {
+    const owner = await member();
+    const saved = {id: env.META_APP_ID, secret: env.META_APP_SECRET, config: env.META_LOGIN_CONFIG_ID};
+    env.META_APP_ID = 'app-id';
+    env.META_APP_SECRET = 'app-secret';
+    try {
+      const res = await as(owner.userId).post('/api/social-accounts/connect/facebook');
+      const url = new URL(res.body.url);
+      expect(url.hostname).toBe('www.facebook.com');
+      const scope = url.searchParams.get('scope') ?? '';
+      expect(scope).toContain('pages_manage_posts');
+      expect(scope).not.toContain('instagram');
+
+      env.META_LOGIN_CONFIG_ID = 'cfg-123';
+      const withConfig = new URL((await as(owner.userId).post('/api/social-accounts/connect/facebook')).body.url);
+      expect(withConfig.searchParams.get('config_id')).toBe('cfg-123');
+      expect(withConfig.searchParams.get('scope')).toBeNull();
+    } finally {
+      env.META_APP_ID = saved.id;
+      env.META_APP_SECRET = saved.secret;
+      env.META_LOGIN_CONFIG_ID = saved.config;
+    }
+  });
+
   it('lets only the connector or the workspace owner disconnect', async () => {
     const owner = await member();
     const teammate = await member(owner.workspaceId);
@@ -289,6 +313,31 @@ describe('scheduling and publishing (dry run)', () => {
     expect(byPlatform.instagram.join(' ')).toMatch(/Connect a Instagram account|image or a video/);
     expect(byPlatform.tiktok.join(' ')).toMatch(/video/);
     expect(res.body.post.status).toBe('scheduled');
+  });
+
+  it('posts to the account picked for a platform when several are connected', async () => {
+    const owner = await member();
+    const api = as(owner.userId);
+    const [first, second] = await SocialAccountModel.create(
+      ['Page One', 'Page Two'].map((name, i) => ({
+        workspaceId: owner.workspaceId,
+        platform: 'facebook',
+        platformAccountId: `page-${i}`,
+        accountType: 'page',
+        accountName: name,
+        accessTokenEnc: 'unused',
+        demo: true,
+        connectedBy: owner.userId
+      }))
+    );
+    const post = draft('pick', ['facebook']);
+    post.platforms[0] = {...post.platforms[0], accountId: second._id.toString()} as typeof post.platforms[0];
+    await api.post('/api/social-posts', post);
+    await api.post('/api/social-posts/pick/schedule', {scheduledDate: '2030-01-01', scheduledTime: '10:00'});
+
+    const job = await PublishingJobModel.findOne({socialPostId: 'pick'});
+    expect(job?.accountId?.toString()).toBe(second._id.toString());
+    expect(job?.accountId?.toString()).not.toBe(first._id.toString());
   });
 
   it('publishes a due post through the sweep and records the simulated result', async () => {
@@ -348,6 +397,52 @@ describe('scheduling and publishing (dry run)', () => {
     expect(retried.body.retried).toEqual(['linkedin']);
     await publishDueJobs();
     expect((await api.get('/api/social-posts/p5')).body.post.status).toBe('posted');
+  });
+});
+
+describe('reminder accounts (post it yourself)', () => {
+  it('hands the post back at its time, then records it as posted by hand', async () => {
+    const owner = await member();
+    const api = as(owner.userId);
+    const added = await api.post('/api/social-accounts/reminder/facebook', {name: 'My personal profile'});
+    expect(added.status).toBe(201);
+    expect(added.body.account).toMatchObject({accountType: 'reminder', accountName: 'My personal profile', demo: false});
+
+    const post = draft('mine', ['facebook']);
+    post.platforms[0] = {...post.platforms[0], accountId: added.body.account.id} as typeof post.platforms[0];
+    await api.post('/api/social-posts', post);
+    const scheduled = await api.post('/api/social-posts/mine/schedule', {scheduledDate: '2020-01-01', scheduledTime: '09:00'});
+    expect(scheduled.body.jobsCreated).toHaveLength(1);
+
+    await publishDueJobs();
+    let saved = (await api.get('/api/social-posts/mine')).body.post;
+    expect(saved.platforms[0].status).toBe('reminder');
+    expect(saved.platforms[0].externalPostId).toBeUndefined();
+    expect(saved.status).toBe('scheduled');
+
+    const marked = await api.post('/api/social-posts/mine/mark-posted', {
+      platform: 'facebook',
+      url: 'https://www.facebook.com/me/posts/1'
+    });
+    expect(marked.status).toBe(200);
+    saved = marked.body.post;
+    expect(saved.status).toBe('posted');
+    expect(saved.platforms[0]).toMatchObject({status: 'posted', manual: true, publishedUrl: 'https://www.facebook.com/me/posts/1'});
+
+    // Marking twice is refused.
+    expect((await api.post('/api/social-posts/mine/mark-posted', {platform: 'facebook'})).status).toBe(409);
+  });
+
+  it('skips the platform API content rules for a hand-posted target', async () => {
+    const owner = await member();
+    const api = as(owner.userId);
+    const added = await api.post('/api/social-accounts/reminder/instagram', {name: 'My Instagram'});
+    const post = draft('text-only', ['instagram']);
+    post.platforms[0] = {...post.platforms[0], accountId: added.body.account.id} as typeof post.platforms[0];
+    await api.post('/api/social-posts', post);
+    // Instagram's API needs an image; posting by hand does not.
+    const res = await api.post('/api/social-posts/text-only/schedule', {scheduledDate: '2030-01-01'});
+    expect(res.body.validation[0]).toMatchObject({platform: 'instagram', valid: true});
   });
 });
 

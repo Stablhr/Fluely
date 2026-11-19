@@ -45,6 +45,8 @@ export interface PlatformTarget {
   idempotencyKey?: string;
   /** Set when the post was simulated because the platform is in dry-run mode. */
   dryRun?: boolean;
+  /** Posted by the person themselves after a reminder. */
+  manual?: boolean;
 }
 
 export interface PostMedia {
@@ -112,7 +114,8 @@ const PlatformTargetSchema = new Schema<PlatformTarget>(
     lastAttemptAt: String,
     nextRetryAt: String,
     idempotencyKey: String,
-    dryRun: Boolean
+    dryRun: Boolean,
+    manual: Boolean
   },
   {_id: false}
 );

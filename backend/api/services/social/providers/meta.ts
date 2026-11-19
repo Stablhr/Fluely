@@ -9,27 +9,33 @@ import {ConnectedAccount, ProviderError, PublishInput, SocialProvider} from './t
  * Instagram accounts are reached through the Page they are linked to.
  */
 
-const SCOPES = [
-  'pages_show_list',
-  'pages_read_engagement',
-  'pages_manage_posts',
-  'instagram_basic',
-  'instagram_content_publish',
-  'business_management'
-];
+/**
+ * Each platform asks only for what it needs. A Facebook-only Meta app has no
+ * Instagram permissions, and Meta rejects a sign-in that asks for permissions
+ * the app does not have ("Invalid Scopes").
+ */
+const FACEBOOK_SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'business_management'];
+const INSTAGRAM_SCOPES = [...FACEBOOK_SCOPES, 'instagram_basic', 'instagram_content_publish'];
 
 const graph = (path: string) => `https://graph.facebook.com/${env.META_GRAPH_VERSION}${path}`;
 
-function authorizeUrl(state: string, redirectUri: string) {
-  const params = new URLSearchParams({
-    client_id: env.META_APP_ID ?? '',
-    redirect_uri: redirectUri,
-    state,
-    response_type: 'code',
-    scope: SCOPES.join(',')
-  });
-  return `https://www.facebook.com/${env.META_GRAPH_VERSION}/dialog/oauth?${params}`;
-}
+/**
+ * Facebook Login for Business can use a saved "configuration" (config_id)
+ * instead of a list of permissions; when one is set it takes precedence.
+ */
+const authorizeUrlFor =
+  (scopes: string[], configId: () => string | undefined) => (state: string, redirectUri: string) => {
+    const params = new URLSearchParams({
+      client_id: env.META_APP_ID ?? '',
+      redirect_uri: redirectUri,
+      state,
+      response_type: 'code'
+    });
+    const config = configId();
+    if (config) params.set('config_id', config);
+    else params.set('scope', scopes.join(','));
+    return `https://www.facebook.com/${env.META_GRAPH_VERSION}/dialog/oauth?${params}`;
+  };
 
 type PageRow = {
   id: string;
@@ -40,7 +46,12 @@ type PageRow = {
 };
 
 /** Code → long-lived user token → the Pages (with Page tokens) it can manage. */
-async function listPages(code: string, redirectUri: string, label: string): Promise<{pages: PageRow[]; scopes: string[]}> {
+async function listPages(
+  code: string,
+  redirectUri: string,
+  label: string,
+  scopes: string[]
+): Promise<{pages: PageRow[]; scopes: string[]}> {
   const short = await json<{access_token: string}>(
     graph(
       `/oauth/access_token?${new URLSearchParams({
@@ -69,7 +80,7 @@ async function listPages(code: string, redirectUri: string, label: string): Prom
     graph(`/me/accounts?${new URLSearchParams({fields, limit: '100', access_token: long.access_token})}`),
     label
   );
-  return {pages: pages.data ?? [], scopes: SCOPES};
+  return {pages: pages.data ?? [], scopes};
 }
 
 async function post(path: string, label: string, values: Record<string, string | undefined>) {
@@ -83,10 +94,10 @@ async function post(path: string, label: string, values: Record<string, string |
 export const facebookProvider: SocialProvider = {
   platform: 'facebook',
   isConfigured: () => Boolean(env.META_APP_ID && env.META_APP_SECRET),
-  authorizeUrl,
+  authorizeUrl: authorizeUrlFor(FACEBOOK_SCOPES, () => env.META_LOGIN_CONFIG_ID),
 
   async exchangeCode(code, redirectUri) {
-    const {pages, scopes} = await listPages(code, redirectUri, 'Facebook');
+    const {pages, scopes} = await listPages(code, redirectUri, 'Facebook', FACEBOOK_SCOPES);
     if (pages.length === 0) {
       throw new ProviderError(
         'Facebook: no Pages were shared. Facebook only allows posting to Pages you manage.',
@@ -161,10 +172,10 @@ async function waitForContainer(id: string, token: string) {
 export const instagramProvider: SocialProvider = {
   platform: 'instagram',
   isConfigured: () => Boolean(env.META_APP_ID && env.META_APP_SECRET),
-  authorizeUrl,
+  authorizeUrl: authorizeUrlFor(INSTAGRAM_SCOPES, () => env.META_INSTAGRAM_CONFIG_ID),
 
   async exchangeCode(code, redirectUri) {
-    const {pages, scopes} = await listPages(code, redirectUri, 'Instagram');
+    const {pages, scopes} = await listPages(code, redirectUri, 'Instagram', INSTAGRAM_SCOPES);
     const linked = pages.filter(page => page.instagram_business_account);
     if (linked.length === 0) {
       throw new ProviderError(

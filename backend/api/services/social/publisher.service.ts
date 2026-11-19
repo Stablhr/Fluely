@@ -1,7 +1,7 @@
 import {randomBytes} from 'crypto';
 import {Types} from 'mongoose';
 import {env} from '../../config/env';
-import {PLATFORM_LABELS, PostStatus, SchedulablePlatform} from '../../constants/social';
+import {PLATFORM_LABELS, PostStatus, REMINDER_ACCOUNT_TYPE, SchedulablePlatform} from '../../constants/social';
 import {logger} from '../../logging/logger';
 import {PublishingJobDocument, PublishingJobModel} from '../../models/PublishingJob.model';
 import {SocialAccountModel} from '../../models/SocialAccount.model';
@@ -52,7 +52,8 @@ export function aggregateStatus(post: SocialPostDocument): PostStatus {
   const statuses = targets.map(t => t.status);
   if (statuses.length === 0) return post.status;
   if (statuses.some(s => s === 'publishing')) return 'publishing';
-  if (statuses.some(s => s === 'scheduled')) return 'scheduled';
+  // Waiting for its time, or for the person to post it themselves.
+  if (statuses.some(s => s === 'scheduled' || s === 'reminder')) return 'scheduled';
   const posted = statuses.filter(s => s === 'posted').length;
   const failed = statuses.filter(s => s === 'failed').length;
   if (posted === statuses.length) return 'posted';
@@ -161,6 +162,19 @@ export async function runPublishingJob(jobId: string): Promise<{status: string}>
 
   await setTarget(post, job.platform, {status: 'publishing', lastAttemptAt: now.toISOString()});
   await refreshPostStatus(post._id as Types.ObjectId);
+
+  // Reminder accounts: nothing to publish. Hand it to the person.
+  const account = job.accountId ? await SocialAccountModel.findById(job.accountId).lean() : null;
+  if (account?.accountType === REMINDER_ACCOUNT_TYPE) {
+    await PublishingJobModel.updateOne(
+      {_id: job._id},
+      {$set: {status: 'completed', completedAt: new Date(), dryRun: false, error: null, errorCode: null}}
+    ).exec();
+    await setTarget(post, job.platform, {status: 'reminder'}, ['error', 'errorCode', 'nextRetryAt']);
+    await refreshPostStatus(post._id as Types.ObjectId);
+    logger.info({jobId: job._id.toString(), platform: job.platform}, 'Reminder due for a hand-posted post');
+    return {status: 'reminder'};
+  }
 
   const content = contentFor(post, target);
   const mode = platformMode(job.platform);

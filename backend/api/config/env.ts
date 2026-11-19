@@ -59,6 +59,9 @@ const envSchema = z.object({
   META_APP_ID: z.string().optional(),
   META_APP_SECRET: z.string().optional(),
   META_GRAPH_VERSION: z.string().optional(),
+  /** Facebook Login for Business configuration ids (optional; used instead of a permission list). */
+  META_LOGIN_CONFIG_ID: z.string().optional(),
+  META_INSTAGRAM_CONFIG_ID: z.string().optional(),
   TIKTOK_CLIENT_KEY: z.string().optional(),
   TIKTOK_CLIENT_SECRET: z.string().optional(),
   TIKTOK_PRIVACY: z
@@ -115,7 +118,7 @@ export const env = {
     /\/+$/,
     ''
   ),
-  META_GRAPH_VERSION: parsed.data.META_GRAPH_VERSION ?? 'v23.0',
+  META_GRAPH_VERSION: parsed.data.META_GRAPH_VERSION ?? 'v25.0',
   TIKTOK_PRIVACY: parsed.data.TIKTOK_PRIVACY ?? 'SELF_ONLY',
   LINKEDIN_ORGANIZATIONS: parsed.data.LINKEDIN_ORGANIZATIONS === 'true',
   QSTASH_URL: (parsed.data.QSTASH_URL ?? 'https://qstash.upstash.io').replace(/\/+$/, '')

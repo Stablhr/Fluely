@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Link2, Unlink, Loader2, AlertTriangle, Info } from 'lucide-react'
+import { Link2, Unlink, Loader2, AlertTriangle, Info, BellRing, Plus } from 'lucide-react'
 import {
+  isReminderAccount,
   socialAccountsApi,
   type ConnectReturn,
   type PlatformSummary,
@@ -53,6 +54,9 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
   const [busy, setBusy] = useState<string | null>(null)
   /** Platform whose "not set up yet" note is open. */
   const [setupFor, setSetupFor] = useState<Platform | null>(null)
+  /** Platform whose "add a reminder account" form is open, and its name field. */
+  const [reminderFor, setReminderFor] = useState<Platform | null>(null)
+  const [reminderName, setReminderName] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -112,6 +116,28 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
       window.location.assign(result.url)
     } catch (error) {
       toast(getFriendlyErrorMessage(error, `Could not connect ${platform.label}`), 'error')
+      setBusy(null)
+    }
+  }
+
+  async function addReminder(platform: PlatformSummary) {
+    const name = reminderName.trim() || 'My personal profile'
+    setBusy(`reminder:${platform.platform}`)
+    try {
+      await socialAccountsApi.addReminder(platform.platform, name)
+      toast(`Added "${name}". At each post's time, Fluely reminds you to post it yourself.`, 'success', {
+        duration: 6000,
+      })
+      setReminderFor(null)
+      setReminderName('')
+      await load()
+      // Desktop notifications make reminders reach you in another tab.
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        void Notification.requestPermission().catch(() => {})
+      }
+    } catch (error) {
+      toast(getFriendlyErrorMessage(error, 'Could not add the reminder account'), 'error')
+    } finally {
       setBusy(null)
     }
   }
@@ -225,6 +251,15 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
                           Demo
                         </span>
                       )}
+                      {isReminderAccount(account) && (
+                        <span
+                          title="Fluely reminds you at the post's time; you post it yourself"
+                          className="inline-flex items-center gap-0.5 rounded-full bg-warning-subtle px-1.5 py-0.5 text-[10px] font-semibold text-warning-text"
+                        >
+                          <BellRing size={10} />
+                          Reminder
+                        </span>
+                      )}
                       {account.status !== 'active' && (
                         <span
                           title={account.lastError}
@@ -248,6 +283,52 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
                   </li>
                 ))}
               </ul>
+            )}
+
+            {reminderFor === platform.platform ? (
+              <form
+                className="mt-2 space-y-2 rounded-md border border-border bg-surface-alt px-3 py-2.5"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void addReminder(platform)
+                }}
+              >
+                <p className="text-[12px] leading-relaxed text-text-secondary">
+                  For an account Fluely can&apos;t post to for you
+                  {platform.platform === 'facebook' ? ', like your personal profile (Facebook only lets apps post to Pages)' : ''}.
+                  At the post&apos;s time you get a reminder with the caption ready to copy.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    value={reminderName}
+                    onChange={(e) => setReminderName(e.target.value)}
+                    placeholder="My personal profile"
+                    aria-label={`Name for the ${platform.label} reminder account`}
+                    maxLength={120}
+                    autoFocus
+                    className="h-8 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 text-[12px] text-text-primary"
+                  />
+                  <Button size="sm" variant="primary" type="submit" disabled={busy !== null}>
+                    {busy === `reminder:${platform.platform}` ? <Loader2 size={12} className="animate-spin" /> : null}
+                    Add
+                  </Button>
+                  <Button size="sm" variant="ghost" type="button" onClick={() => setReminderFor(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setReminderFor(platform.platform)
+                  setReminderName('')
+                }}
+                className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-text-muted hover:text-primary"
+              >
+                <Plus size={11} />
+                Add a reminder account (you post it yourself)
+              </button>
             )}
           </section>
         )

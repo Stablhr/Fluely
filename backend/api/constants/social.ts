@@ -10,6 +10,13 @@ export type SchedulablePlatform = (typeof SchedulablePlatforms)[number];
 export const PlatformModes = ['live', 'dryrun', 'disabled'] as const;
 export type PlatformMode = (typeof PlatformModes)[number];
 
+/**
+ * `accountType` of a reminder account: no sign-in and no API. At the post's
+ * time Fluely reminds the person instead of publishing, e.g. for a personal
+ * Facebook profile, which Facebook's API does not allow apps to post to.
+ */
+export const REMINDER_ACCOUNT_TYPE = 'reminder';
+
 export const SocialAccountStatuses = ['active', 'expired', 'revoked', 'error'] as const;
 export type SocialAccountStatus = (typeof SocialAccountStatuses)[number];
 
@@ -34,7 +41,9 @@ export const PlatformTargetStatuses = [
   'publishing',
   'posted',
   'failed',
-  'cancelled'
+  'cancelled',
+  /** A reminder account's time came: the person posts it themselves. */
+  'reminder'
 ] as const;
 export type PlatformTargetStatus = (typeof PlatformTargetStatuses)[number];
 

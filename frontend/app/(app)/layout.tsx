@@ -11,6 +11,7 @@ import { useStore } from "@/lib/kali/store/useStore";
 import AppShell from "@/components/kali/layout/AppShell";
 import ErrorBoundary from "@/components/kali/shared/ErrorBoundary";
 import ToastProvider from "@/components/kali/shared/Toast";
+import SocialReminderListener from "@/components/kali/social/SocialReminderListener";
 import Loading from "../loading";
 
 function ErrorToast() {
@@ -95,6 +96,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           }}
         >
           <ToastProvider>
+            <SocialReminderListener />
             <AppFrame>{children}</AppFrame>
           </ToastProvider>
         </StoreProvider>

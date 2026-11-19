@@ -26,6 +26,9 @@ export interface SocialAccount {
   updatedAt: string
 }
 
+/** No sign-in, no API: at the post's time you're reminded to post it yourself. */
+export const isReminderAccount = (account: Pick<SocialAccount, 'accountType'>) => account.accountType === 'reminder'
+
 export interface PlatformSummary {
   platform: Platform
   label: string
@@ -57,6 +60,11 @@ export const socialAccountsApi = {
       demo: options.demo === true,
     })
     return data
+  },
+  /** A reminder account (e.g. "My personal profile"): you post by hand when it's time. */
+  addReminder: async (platform: Platform, name: string) => {
+    const { data } = await httpClient.post<{ account: SocialAccount }>(`/social-accounts/reminder/${platform}`, { name })
+    return data.account
   },
   delete: async (id: string) => {
     await httpClient.delete(`/social-accounts/${id}`)

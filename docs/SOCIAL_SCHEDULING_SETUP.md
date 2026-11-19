@@ -85,31 +85,41 @@ posts to LinkedIn are not built yet.
 
 ## 2. Facebook Pages and Instagram (one Meta app for both)
 
-1. Go to <https://developers.facebook.com/apps> → **Create app** → use case
-   **"Other"** → type **Business**.
-2. Add the products **Facebook Login for Business** and **Instagram** (Instagram API with
-   Facebook Login).
-3. Facebook Login → Settings → add the redirect URIs for `facebook` **and** `instagram`.
-4. App settings → Basic: copy the **App ID** and **App Secret**, add the privacy policy,
-   terms, icon and your domain.
-5. **Business verification** (Business Settings → Security Center). Needed for live posting.
-6. **App Review** → request these permissions, each with a screencast showing how Fluely uses it:
-   `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`,
-   `instagram_basic`, `instagram_content_publish`, `business_management`.
-7. Until review passes, only people with a role on the app (Admin/Developer/Tester) can
-   connect. Add yourself and teammates under **App roles**.
+Meta's setup changed in 2025: apps are built around **use cases**.
+
+1. Go to <https://developers.facebook.com/apps> → **Create app**.
+   - **App name:** Fluely. Pick the **use case "Manage everything on your Page"**.
+   - Connect it to your **business portfolio** (create one if asked).
+2. **Use cases → Manage everything on your Page → Customize → Permissions:** add
+   `pages_manage_posts` and `pages_read_engagement` (keep `pages_show_list` and
+   `business_management`).
+3. **Use cases → … → Settings (Facebook Login for Business):** add the redirect URI for
+   `facebook` (and later `instagram`), click **Check URI**, save.
+   - Optional: create a **configuration** with a *User access token* and those permissions,
+     and put its id in `META_LOGIN_CONFIG_ID`. Without one, Fluely asks for the permissions directly.
+4. **App settings → Basic:** copy the **App ID** and **App secret**; add the privacy policy
+   (`/privacy`), data deletion URL (`/privacy#data-deletion`), terms (`/terms`), icon and domain.
+5. While the app is unpublished, only people with a role on it (**App roles**) can connect, and
+   posts are visible only to them. That's enough for testing with your own Page.
+6. To go public: **business verification**, then **App Review** for `pages_manage_posts`,
+   `pages_read_engagement` (and the Instagram permissions), each with a screencast, then **Publish**.
+7. **Instagram:** add the use case **"Manage messaging & content on Instagram"** to the same app
+   (permissions `instagram_basic`, `instagram_content_publish`). The Instagram account must be a
+   **Business or Creator** account **linked to a Facebook Page**.
 
 Rules the platforms enforce (not Fluely):
 
-- Facebook: only **Pages** can be posted to. Personal profiles cannot be posted to through the API.
-- Instagram: the account must be a **Business or Creator** account **linked to a Facebook Page**.
-  Every Instagram post needs an image or a video (no text-only posts).
+- Facebook: only **Pages** can be posted to, not personal profiles.
+- Instagram: every post needs an image or a video (no text-only posts).
 
 ```env
 META_APP_ID=
 META_APP_SECRET=
+META_LOGIN_CONFIG_ID=          # optional
+META_INSTAGRAM_CONFIG_ID=      # optional
 FACEBOOK_MODE=dryrun
 INSTAGRAM_MODE=dryrun
+META_GRAPH_VERSION=v25.0
 ```
 
 ## 3. TikTok
