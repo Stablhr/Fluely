@@ -1,8 +1,8 @@
-# Cadence — Projects and Social Content Planner
+# Fluely — Projects and Social Content Planner
 
 ## 📖 Project Overview
 
-Cadence (formerly Fluely) is a social media content planning and scheduling app. Plan posts across platforms on a
+Fluely is a social media content planning and scheduling app. Plan posts across platforms on a
 calendar, board, or table; run collaborative boards with multiple views; and get an at-a-glance
 dashboard of what's coming up.
 

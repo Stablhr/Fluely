@@ -1,6 +1,6 @@
 # Social scheduling: what you need to set up
 
-Cadence can schedule posts to **Instagram, Facebook, TikTok, YouTube and LinkedIn**.
+Fluely can schedule posts to **Instagram, Facebook, TikTok, YouTube and LinkedIn**.
 The code for every platform is in place. Each platform has its own mode:
 
 | Mode | What happens |
@@ -24,7 +24,14 @@ that a teammate connected.
 ## 0. Things every platform asks for (do these first)
 
 1. **A public privacy policy URL and terms of service URL** on your own domain.
-   Every platform's review rejects apps without them.
+   Every platform's review rejects apps without them. Fluely has them built in; once the
+   frontend is deployed, use:
+   - Privacy policy: `https://<your-frontend-domain>/privacy`
+   - Terms of service: `https://<your-frontend-domain>/terms`
+   - Data deletion instructions (Meta asks for this): `https://<your-frontend-domain>/privacy#data-deletion`
+
+   Have someone review the wording before you submit: add your company's legal name and
+   address if the platform asks for them.
 2. **An app icon** (1024×1024 PNG). Use your chosen logo once it is final.
 3. **A domain you own** for production (Vercel's `*.vercel.app` works for testing, but
    Meta and TikTok want a domain you can verify).
@@ -57,7 +64,7 @@ tunnel such as `ngrok` and set `API_PUBLIC_URL` to the tunnel URL.)
 ## 1. LinkedIn (personal profiles now, Company Pages later)
 
 1. Go to <https://www.linkedin.com/developers/apps> → **Create app**.
-   It must be linked to a LinkedIn **Company Page** (create one for Cadence if needed).
+   It must be linked to a LinkedIn **Company Page** (create one for Fluely if needed).
 2. **Products** tab → add **Share on LinkedIn** and **Sign In with LinkedIn using OpenID Connect**.
    Both are self-serve (approved instantly).
 3. **Auth** tab → add the two redirect URIs above, then copy the **Client ID** and **Client Secret**.
@@ -86,13 +93,13 @@ posts to LinkedIn are not built yet.
 4. App settings → Basic: copy the **App ID** and **App Secret**, add the privacy policy,
    terms, icon and your domain.
 5. **Business verification** (Business Settings → Security Center). Needed for live posting.
-6. **App Review** → request these permissions, each with a screencast showing how Cadence uses it:
+6. **App Review** → request these permissions, each with a screencast showing how Fluely uses it:
    `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`,
    `instagram_basic`, `instagram_content_publish`, `business_management`.
 7. Until review passes, only people with a role on the app (Admin/Developer/Tester) can
    connect. Add yourself and teammates under **App roles**.
 
-Rules the platforms enforce (not Cadence):
+Rules the platforms enforce (not Fluely):
 
 - Facebook: only **Pages** can be posted to. Personal profiles cannot be posted to through the API.
 - Instagram: the account must be a **Business or Creator** account **linked to a Facebook Page**.
@@ -169,7 +176,7 @@ by itself instead, which is what you will use while developing.
 
 ## Checklist
 
-- [ ] Privacy policy and terms pages are live
+- [x] Privacy policy and terms pages built (/privacy, /terms) — deploy them so they are live
 - [ ] `API_PUBLIC_URL` and `SOCIAL_TOKEN_KEY` set locally and in Vercel
 - [ ] LinkedIn app created, Share on LinkedIn + OpenID Connect added, keys in `.env`
 - [ ] LinkedIn Community Management API requested (for Company Pages)

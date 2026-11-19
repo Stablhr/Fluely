@@ -22,7 +22,7 @@ import {publishDueJobs} from '../api/services/social/publisher.service';
 import {composeText} from '../api/services/social/publisher.service';
 import {webhookUrl} from '../api/services/social/qstash';
 import {zonedToUtc} from '../api/services/social/time';
-import {toLittleText} from '../api/services/social/providers/linkedin';
+import {linkedinApiVersion, toLittleText} from '../api/services/social/providers/linkedin';
 import {decryptToken, encryptToken} from '../api/utils/tokenCrypto';
 import {hashToken} from '../api/utils/crypto';
 
@@ -150,9 +150,17 @@ describe('social posts', () => {
 });
 
 describe('connecting accounts', () => {
-  it('creates a demo account when the platform has no credentials', async () => {
+  it('refuses a real connection when the platform has no app keys', async () => {
     const owner = await member();
     const res = await as(owner.userId).post('/api/social-accounts/connect/linkedin');
+    expect(res.status).toBe(409);
+    expect(res.body.code).toBe('PLATFORM_NOT_CONFIGURED');
+    expect(await SocialAccountModel.countDocuments()).toBe(0);
+  });
+
+  it('creates a demo account only when asked', async () => {
+    const owner = await member();
+    const res = await as(owner.userId).post('/api/social-accounts/connect/linkedin', {demo: true});
     expect(res.status).toBe(201);
     expect(res.body.demo).toBe(true);
     expect(res.body.account.platform).toBe('linkedin');
@@ -188,6 +196,34 @@ describe('connecting accounts', () => {
     }
   });
 
+  it('returns to the allowed app address the sign-in started from', async () => {
+    const owner = await member();
+    const saved = {id: env.LINKEDIN_CLIENT_ID, secret: env.LINKEDIN_CLIENT_SECRET, cors: env.CORS_ORIGINS};
+    env.LINKEDIN_CLIENT_ID = 'client-id';
+    env.LINKEDIN_CLIENT_SECRET = 'client-secret';
+    env.CORS_ORIGINS = 'http://localhost:3001,http://localhost:3000';
+    try {
+      const start = (origin: string) =>
+        as(owner.userId).post('/api/social-accounts/connect/linkedin', {returnTo: 'settings'}).set('Origin', origin);
+      const finish = async (res: request.Response) => {
+        const state = new URL(res.body.url).searchParams.get('state')!;
+        const cb = await request(app).get(
+          `/api/social-accounts/oauth/linkedin/callback?error=user_cancelled&state=${encodeURIComponent(state)}`
+        );
+        return cb.headers.location as string;
+      };
+      expect(await finish(await start('http://localhost:3000'))).toMatch(/^http:\/\/localhost:3000\/settings\?/);
+      // An address outside the allow-list never becomes a redirect target.
+      expect(await finish(await start('https://evil.example'))).toMatch(
+        new RegExp(`^${env.FRONTEND_URL.replace(/\/+$/, '')}/settings\\?`)
+      );
+    } finally {
+      env.LINKEDIN_CLIENT_ID = saved.id;
+      env.LINKEDIN_CLIENT_SECRET = saved.secret;
+      env.CORS_ORIGINS = saved.cors;
+    }
+  });
+
   it('sends a sign-in started from Settings back to Settings', async () => {
     const owner = await member();
     const saved = {id: env.LINKEDIN_CLIENT_ID, secret: env.LINKEDIN_CLIENT_SECRET};
@@ -211,7 +247,7 @@ describe('connecting accounts', () => {
   it('lets only the connector or the workspace owner disconnect', async () => {
     const owner = await member();
     const teammate = await member(owner.workspaceId);
-    const connected = await as(owner.userId).post('/api/social-accounts/connect/facebook');
+    const connected = await as(owner.userId).post('/api/social-accounts/connect/facebook', {demo: true});
     const id = connected.body.account.id;
     expect((await as(teammate.userId).del(`/api/social-accounts/${id}`)).status).toBe(403);
     expect((await as(owner.userId).del(`/api/social-accounts/${id}`)).status).toBe(204);
@@ -222,7 +258,7 @@ describe('scheduling and publishing (dry run)', () => {
   it('reports platforms that cannot be scheduled and queues the rest', async () => {
     const owner = await member();
     const api = as(owner.userId);
-    await api.post('/api/social-accounts/connect/linkedin');
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
     await api.post('/api/social-posts', draft('p1', ['linkedin', 'instagram', 'tiktok']));
 
     const res = await api.post('/api/social-posts/p1/schedule', {
@@ -245,7 +281,7 @@ describe('scheduling and publishing (dry run)', () => {
   it('publishes a due post through the sweep and records the simulated result', async () => {
     const owner = await member();
     const api = as(owner.userId);
-    await api.post('/api/social-accounts/connect/linkedin');
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
     await api.post('/api/social-posts', draft('p2', ['linkedin']));
     // A time in the past publishes right away.
     await api.post('/api/social-posts/p2/schedule', {scheduledDate: '2020-01-01', scheduledTime: '08:00'});
@@ -268,7 +304,7 @@ describe('scheduling and publishing (dry run)', () => {
   it('cancels queued jobs, and moving a post back to drafts unschedules it', async () => {
     const owner = await member();
     const api = as(owner.userId);
-    await api.post('/api/social-accounts/connect/linkedin');
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
     await api.post('/api/social-posts', draft('p3', ['linkedin']));
     await api.post('/api/social-posts', draft('p4', ['linkedin']));
     await api.post('/api/social-posts/p3/schedule', {scheduledDate: '2030-05-01'});
@@ -286,7 +322,7 @@ describe('scheduling and publishing (dry run)', () => {
   it('retries a failed platform', async () => {
     const owner = await member();
     const api = as(owner.userId);
-    await api.post('/api/social-accounts/connect/linkedin');
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
     await api.post('/api/social-posts', draft('p5', ['linkedin']));
     await api.post('/api/social-posts/p5/schedule', {scheduledDate: '2020-01-01'});
     // Make the content invalid after scheduling, so publishing fails for good.
@@ -361,6 +397,12 @@ describe('helpers', () => {
 
   it('appends hashtags that are not already in the caption', () => {
     expect(composeText('Hello #launch', ['launch', '#news'])).toBe('Hello #launch\n\n#news');
+  });
+
+  it('picks a LinkedIn API version two months back, across the new year', () => {
+    expect(linkedinApiVersion(new Date('2026-11-19T12:00:00Z'))).toBe('202609');
+    expect(linkedinApiVersion(new Date('2027-01-05T12:00:00Z'))).toBe('202611');
+    expect(linkedinApiVersion(new Date('2027-02-28T12:00:00Z'))).toBe('202612');
   });
 
   it('escapes LinkedIn reserved characters and keeps hashtags clickable', () => {

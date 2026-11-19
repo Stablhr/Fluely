@@ -17,10 +17,22 @@ function scopes() {
   return env.LINKEDIN_ORGANIZATIONS ? [...MEMBER_SCOPES, ...ORG_SCOPES] : MEMBER_SCOPES;
 }
 
+/**
+ * The `LinkedIn-Version` header (YYYYMM). LinkedIn retires versions in under a
+ * year (202510-202512 were gone by November 2026), so a fixed default goes
+ * stale. Unless pinned with LINKEDIN_API_VERSION, use the version from two
+ * months ago: always released, and months away from retirement.
+ */
+export function linkedinApiVersion(now = new Date()): string {
+  if (env.LINKEDIN_API_VERSION) return env.LINKEDIN_API_VERSION;
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1));
+  return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 function restHeaders(token: string): Record<string, string> {
   return {
     Authorization: `Bearer ${token}`,
-    'LinkedIn-Version': env.LINKEDIN_API_VERSION,
+    'LinkedIn-Version': linkedinApiVersion(),
     'X-Restli-Protocol-Version': '2.0.0',
     'Content-Type': 'application/json'
   };

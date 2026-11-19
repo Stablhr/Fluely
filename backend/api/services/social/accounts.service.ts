@@ -30,11 +30,40 @@ const STATE_AUDIENCE = 'social-oauth';
 const STATE_TTL_SECONDS = 10 * 60;
 
 export type ConnectReturn = 'planner' | 'settings';
-type StateClaims = {u: string; w: string; p: SchedulablePlatform; n: string; r?: ConnectReturn};
+type StateClaims = {
+  u: string;
+  w: string;
+  p: SchedulablePlatform;
+  n: string;
+  r?: ConnectReturn;
+  /** The app address the sign-in started from (one of CORS_ORIGINS). */
+  o?: string;
+};
+
+/** The same allow-list `app.ts` gives CORS. */
+function allowedOrigins(): string[] {
+  return env.CORS_ORIGINS
+    ? env.CORS_ORIGINS.split(',').map(o => o.trim().replace(/\/+$/, ''))
+    : ['http://localhost:3000', 'https://fluely.vercel.app'];
+}
+
+/**
+ * The address to send the browser back to: the one the sign-in started from
+ * when it is an allowed app address (so a frontend on another port or a
+ * preview deployment gets its own page back), else FRONTEND_URL.
+ */
+export function frontendOrigin(origin: string | undefined): string | undefined {
+  const clean = origin?.replace(/\/+$/, '');
+  return clean && allowedOrigins().includes(clean) ? clean : undefined;
+}
 
 /** Where the browser lands after a sign-in, with the outcome in the query. */
-function returnUrl(to: ConnectReturn | undefined, params: Record<string, string>): string {
-  const base = env.FRONTEND_URL.replace(/\/+$/, '');
+function returnUrl(
+  to: ConnectReturn | undefined,
+  origin: string | undefined,
+  params: Record<string, string>
+): string {
+  const base = frontendOrigin(origin) ?? env.FRONTEND_URL.replace(/\/+$/, '');
   const path = to === 'settings' ? '/settings?tab=accounts&' : '/content-planner?';
   return `${base}${path}${new URLSearchParams(params)}`;
 }
@@ -127,16 +156,33 @@ export const socialAccountService = {
   },
 
   /**
-   * Starts connecting. Returns the platform's sign-in URL, or -- when the
-   * platform has no credentials configured yet -- creates a demo account so
-   * the scheduling flow can be tried end to end.
+   * Starts connecting a real account: returns the platform's sign-in URL.
+   * Refuses when the platform's app keys are not set. With `demo`, creates a
+   * demo account instead, so scheduling can be tried end to end.
    */
-  async startConnect(actor: Actor, platform: SchedulablePlatform, returnTo: ConnectReturn = 'planner') {
+  async startConnect(
+    actor: Actor,
+    platform: SchedulablePlatform,
+    returnTo: ConnectReturn = 'planner',
+    demo = false,
+    origin?: string
+  ) {
     assertEnabled(platform);
     const {workspaceId} = await socialWorkspace(actor);
     const provider = getProvider(platform);
 
-    if (!provider.isConfigured()) {
+    // A real account needs the platform's app keys on the server. Without
+    // them, say so: silently creating a demo account looked like a successful
+    // connection to a real one.
+    if (!demo && !provider.isConfigured()) {
+      throw new ApiError(
+        409,
+        ErrorCodes.PLATFORM_NOT_CONFIGURED,
+        `${PLATFORM_LABELS[platform]} is not set up yet. Add its app keys to the server to connect a real account.`
+      );
+    }
+
+    if (demo) {
       const [account] = await saveAccounts(
         workspaceId,
         platform,
@@ -160,7 +206,8 @@ export const socialAccountService = {
       w: workspaceId.toString(),
       p: platform,
       n: nonce,
-      r: returnTo
+      r: returnTo,
+      o: frontendOrigin(origin)
     };
     const state = jwt.sign(claims, env.JWT_SECRET, {audience: STATE_AUDIENCE, expiresIn: STATE_TTL_SECONDS});
     return {
@@ -187,7 +234,7 @@ export const socialAccountService = {
     } catch {
       claims = null;
     }
-    const back = (params: Record<string, string>) => returnUrl(claims?.r, {platform, ...params});
+    const back = (params: Record<string, string>) => returnUrl(claims?.r, claims?.o, {platform, ...params});
 
     if (query.error) {
       return back({social: 'error', message: query.error_description || 'The sign-in was cancelled'});

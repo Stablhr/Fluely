@@ -51,8 +51,11 @@ export const socialAccountsApi = {
     return data.accounts
   },
   /** `returnTo` picks where the platform's sign-in sends the browser back to. */
-  connect: async (platform: Platform, returnTo: ConnectReturn = 'planner') => {
-    const { data } = await httpClient.post<ConnectResult>(`/social-accounts/connect/${platform}`, { returnTo })
+  connect: async (platform: Platform, returnTo: ConnectReturn = 'planner', options: { demo?: boolean } = {}) => {
+    const { data } = await httpClient.post<ConnectResult>(`/social-accounts/connect/${platform}`, {
+      returnTo,
+      demo: options.demo === true,
+    })
     return data
   },
   delete: async (id: string) => {

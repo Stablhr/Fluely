@@ -198,6 +198,12 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
           <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} {BRAND.name}</p>
           <div className="flex gap-6">
+            <Link href="/privacy" className="text-sm text-muted-foreground hover:text-foreground">
+              Privacy
+            </Link>
+            <Link href="/terms" className="text-sm text-muted-foreground hover:text-foreground">
+              Terms
+            </Link>
             <Link href="/docs" className="text-sm text-muted-foreground hover:text-foreground">
               Developer docs
             </Link>

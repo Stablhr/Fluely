@@ -70,7 +70,10 @@ const envSchema = z.object({
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
   /** `true` once LinkedIn approves the Community Management API. */
   LINKEDIN_ORGANIZATIONS: z.string().optional(),
-  /** LinkedIn's versioned API (YYYYMM); each version lives about a year. */
+  /**
+   * Pins LinkedIn's versioned API (YYYYMM). Leave unset: versions retire in
+   * under a year, so by default a recent one is chosen per request.
+   */
   LINKEDIN_API_VERSION: z.string().regex(/^\d{6}$/).optional(),
   QSTASH_URL: z.string().url().optional(),
   QSTASH_TOKEN: z.string().optional(),
@@ -115,6 +118,5 @@ export const env = {
   META_GRAPH_VERSION: parsed.data.META_GRAPH_VERSION ?? 'v23.0',
   TIKTOK_PRIVACY: parsed.data.TIKTOK_PRIVACY ?? 'SELF_ONLY',
   LINKEDIN_ORGANIZATIONS: parsed.data.LINKEDIN_ORGANIZATIONS === 'true',
-  LINKEDIN_API_VERSION: parsed.data.LINKEDIN_API_VERSION ?? '202510',
   QSTASH_URL: (parsed.data.QSTASH_URL ?? 'https://qstash.upstash.io').replace(/\/+$/, '')
 };

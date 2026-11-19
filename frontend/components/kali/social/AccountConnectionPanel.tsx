@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Link2, Unlink, Loader2, AlertTriangle } from 'lucide-react'
+import { Link2, Unlink, Loader2, AlertTriangle, Info } from 'lucide-react'
 import {
   socialAccountsApi,
   type ConnectReturn,
@@ -51,6 +51,8 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  /** Platform whose "not set up yet" note is open. */
+  const [setupFor, setSetupFor] = useState<Platform | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -89,11 +91,18 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
     window.history.replaceState({}, '', url.pathname + url.search)
   }, [platforms, toast])
 
-  async function connect(platform: PlatformSummary) {
+  async function connect(platform: PlatformSummary, demo = false) {
+    // A real account needs the platform's app keys on the server; until then
+    // explain that instead of starting a sign-in that cannot work.
+    if (!demo && !platform.configured) {
+      setSetupFor((open) => (open === platform.platform ? null : platform.platform))
+      return
+    }
     setBusy(platform.platform)
     try {
-      const result = await socialAccountsApi.connect(platform.platform, returnTo)
+      const result = await socialAccountsApi.connect(platform.platform, returnTo, { demo })
       if (result.demo) {
+        setSetupFor(null)
         toast(`Connected a demo ${platform.label} account`, 'success')
         await load()
         setBusy(null)
@@ -158,6 +167,11 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
                     {badge.label}
                   </span>
                 )}
+                {!platform.configured && (
+                  <span className="whitespace-nowrap rounded-full bg-surface-alt px-1.5 py-0.5 text-[10px] font-semibold text-text-muted">
+                    Not set up
+                  </span>
+                )}
               </div>
               <Button
                 size="sm"
@@ -165,12 +179,34 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
                 onClick={() => connect(platform)}
                 disabled={busy !== null}
                 aria-label={`${rows.length > 0 ? 'Add' : 'Connect'} ${platform.label} account`}
-                title={platform.configured ? undefined : 'App keys are not set yet, so this connects a demo account'}
+                aria-expanded={platform.configured ? undefined : setupFor === platform.platform}
               >
                 {busy === platform.platform ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
                 {rows.length > 0 ? 'Add' : 'Connect'}
               </Button>
             </div>
+
+            {setupFor === platform.platform && (
+              <div className="mt-2 flex gap-2 rounded-md border border-border bg-surface-alt px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
+                <Info size={14} className="mt-0.5 shrink-0 text-text-muted" />
+                <div className="min-w-0 space-y-2">
+                  <p>
+                    Connecting a real {platform.label} account needs Fluely&apos;s {platform.label} app keys on the
+                    server, which haven&apos;t been added yet. Whoever runs this workspace sets them up once
+                    (see <code className="text-[11px]">docs/SOCIAL_SCHEDULING_SETUP.md</code>); after that, this
+                    button opens {platform.label}&apos;s own sign-in.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => connect(platform, true)}
+                    disabled={busy !== null}
+                    className="font-semibold text-primary hover:underline disabled:opacity-50"
+                  >
+                    Use a demo account for now
+                  </button>
+                </div>
+              </div>
+            )}
 
             {rows.length > 0 && (
               <ul className="mt-2 space-y-1.5">

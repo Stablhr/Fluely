@@ -157,7 +157,9 @@ export const scheduleSchema = z.object({
 });
 
 export const connectBodySchema = z.object({
-  returnTo: z.enum(['planner', 'settings']).default('planner')
+  returnTo: z.enum(['planner', 'settings']).default('planner'),
+  /** Ask for a demo account explicitly; never implied by missing app keys. */
+  demo: z.boolean().default(false)
 });
 
 export const platformBodySchema = z.object({platform: z.enum(SchedulablePlatforms).optional()});
