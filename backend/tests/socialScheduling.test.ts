@@ -28,6 +28,19 @@ import {hashToken} from '../api/utils/crypto';
 
 jest.setTimeout(30_000);
 
+// These tests describe a fresh setup: no platform app keys, every platform in
+// dry-run. A developer's own backend/.env (real keys, LINKEDIN_MODE=live) must
+// not leak in -- it changes behaviour and could reach real platform APIs.
+const PLATFORM_SETTINGS = [
+  'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_MODE', 'LINKEDIN_ORGANIZATIONS', 'LINKEDIN_API_VERSION',
+  'META_APP_ID', 'META_APP_SECRET', 'FACEBOOK_MODE', 'INSTAGRAM_MODE',
+  'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_MODE',
+  'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'YOUTUBE_MODE',
+  'QSTASH_TOKEN', 'QSTASH_CURRENT_SIGNING_KEY', 'QSTASH_NEXT_SIGNING_KEY'
+] as const;
+for (const key of PLATFORM_SETTINGS) (env as Record<string, unknown>)[key] = undefined;
+(env as Record<string, unknown>).LINKEDIN_ORGANIZATIONS = false;
+
 let mongo: MongoMemoryServer;
 
 beforeAll(async () => {
