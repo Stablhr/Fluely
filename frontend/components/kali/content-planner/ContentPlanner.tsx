@@ -7,7 +7,12 @@ import type { Platform, SocialPostStatus } from '@/lib/kali/store/schema'
 import Button from '../shared/Button'
 import { useToast } from '../shared/useToastState'
 import AccountConnectionPanel from '../social/AccountConnectionPanel'
-import { SCHEDULE_RESULT_EVENT, type ScheduleResultEventDetail } from '@/lib/kali/api/social-posts'
+import {
+  POST_OUTCOME_EVENT,
+  SCHEDULE_RESULT_EVENT,
+  type PostOutcomeEventDetail,
+  type ScheduleResultEventDetail,
+} from '@/lib/kali/api/social-posts'
 import PlatformOverview from './PlatformOverview'
 import PostDetailPanel from './PostDetailPanel'
 import ContentPlannerCalendar from './ContentPlannerCalendar'
@@ -16,7 +21,7 @@ import ContentPlannerTable from './ContentPlannerTable'
 import EngagementInsightsPanel from './EngagementInsightsPanel'
 import TipsGoalsSidebar from './TipsGoalsSidebar'
 import PlatformFilterBar from './PlatformFilterBar'
-import { enabledPlatforms } from './planner-model'
+import { enabledPlatforms, formatMoment, platformLabel } from './planner-model'
 import type { PlatformFilter, SidebarTab } from './types'
 
 type ViewId = 'calendar' | 'board' | 'table'
@@ -114,8 +119,17 @@ export default function ContentPlanner() {
   // Saving a post as Scheduled queues it on the server; say whether it worked.
   useEffect(() => {
     const onResult = (event: Event) => {
-      const { ok, errors } = (event as CustomEvent<ScheduleResultEventDetail>).detail
-      if (ok) toast('Post scheduled', 'success')
+      const { ok, errors, scheduledAt } = (event as CustomEvent<ScheduleResultEventDetail>).detail
+      if (ok) {
+        toast(scheduledAt ? `Scheduled for ${formatMoment(new Date(scheduledAt))}` : 'Post scheduled', 'success', {
+          duration: 5000,
+        })
+      } else if (scheduledAt && errors.length) {
+        // Some platforms were queued, others could not be.
+        toast(`Scheduled for ${formatMoment(new Date(scheduledAt))}, except: ${errors.join(' · ')}`, 'error', {
+          duration: 9000,
+        })
+      }
       else if (errors.length) {
         toast(errors.join(' · '), 'error', {
           duration: 9000,
@@ -127,6 +141,29 @@ export default function ContentPlanner() {
     }
     window.addEventListener(SCHEDULE_RESULT_EVENT, onResult)
     return () => window.removeEventListener(SCHEDULE_RESULT_EVENT, onResult)
+  }, [toast])
+
+  // A scheduled post went out (or could not): say so, with a link to it.
+  useEffect(() => {
+    const onOutcome = (event: Event) => {
+      const { title, posted, failed } = (event as CustomEvent<PostOutcomeEventDetail>).detail
+      const name = title?.trim() ? `\u201c${title.trim()}\u201d` : 'Your post'
+      if (posted.length > 0) {
+        const where = posted.map((p) => platformLabel(p.platform)).join(', ')
+        const simulated = posted.every((p) => p.simulated)
+        const link = posted.find((p) => p.url)?.url
+        toast(`${name} was posted to ${where}${simulated ? ' (simulated)' : ''}`, 'success', {
+          duration: 8000,
+          action: link ? { label: 'View', onClick: () => window.open(link, '_blank', 'noopener') } : undefined,
+        })
+      }
+      if (failed.length > 0) {
+        const detail = failed.map((f) => `${platformLabel(f.platform)}: ${f.error ?? 'failed'}`).join(' · ')
+        toast(`${name} could not be posted. ${detail}`, 'error', { duration: 10000 })
+      }
+    }
+    window.addEventListener(POST_OUTCOME_EVENT, onOutcome)
+    return () => window.removeEventListener(POST_OUTCOME_EVENT, onOutcome)
   }, [toast])
 
   return (

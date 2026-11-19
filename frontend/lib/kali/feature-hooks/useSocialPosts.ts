@@ -5,6 +5,8 @@ import {
   socialPostsApi,
   publishingJobsApi,
   SCHEDULE_RESULT_EVENT,
+  POST_OUTCOME_EVENT,
+  type PostOutcomeEventDetail,
   type ScheduleResultEventDetail,
 } from '@/lib/kali/api/social-posts'
 import { loadSocialPosts, saveSocialPosts } from '@/lib/kali/store/storage'
@@ -144,7 +146,12 @@ export function useSocialPosts() {
     })
     mutate((prev) => prev.map((p) => (p.id === post.id ? toSocialPost(result.post as unknown as AnyRecord) : p)))
     const errors = result.validation.filter((v) => !v.valid).flatMap((v) => v.errors)
-    report({ postId: post.id, ok: result.jobsCreated.length > 0 && errors.length === 0, errors })
+    report({
+      postId: post.id,
+      ok: result.jobsCreated.length > 0 && errors.length === 0,
+      errors,
+      scheduledAt: result.jobsCreated.length > 0 ? result.scheduledAt : undefined,
+    })
   }, [mutate])
 
   const addPost = useCallback(async (
@@ -373,23 +380,50 @@ export function useSocialPosts() {
     }
   }, [mutate])
 
-  // Real-time polling: while any post is publishing, refresh its status every 10s.
+  // Live status: a scheduled post turns into "Posted" (or "Failed") on its own.
+  // Posts that are due -- their time has come, or they are publishing or
+  // retrying -- are re-read from the server every 10s for the first 15
+  // minutes, then every minute, so a stuck post never polls hot forever.
+  // Nothing is fetched while no post is due.
   useEffect(() => {
-    const activePosts = postsRef.current.filter(
-      (p) => p.status === 'publishing' || p.platforms.some((pl) => pl.enabled && pl.status === 'publishing'),
-    )
-    if (activePosts.length === 0) return
-
+    const WAITING = ['scheduled', 'publishing']
+    let ticks = 0
     const timer = window.setInterval(() => {
-      activePosts.forEach((p) => {
-        refreshPost(p.id).then((fresh) => {
-          if (fresh) refreshJobs(fresh.id)
+      ticks += 1
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      const now = Date.now()
+      for (const p of postsRef.current) {
+        const waiting =
+          WAITING.includes(p.status) ||
+          p.platforms.some((pl) => pl.enabled && WAITING.includes(pl.status))
+        if (!waiting) continue
+        const due = p.scheduledAt ? Date.parse(p.scheduledAt) : now
+        if (due > now + 5_000) continue
+        const overdueMs = now - due
+        if (overdueMs > 15 * 60_000 && ticks % 6 !== 0) continue
+        const before = p
+        void refreshPost(p.id).then((fresh) => {
+          if (!fresh || WAITING.includes(fresh.status)) return
+          const after = fresh as SocialPost
+          if (after.status === before.status) return
+          const detail: PostOutcomeEventDetail = {
+            postId: after.id,
+            title: after.title,
+            status: after.status,
+            posted: after.platforms
+              .filter((pl) => pl.enabled && pl.status === 'posted')
+              .map((pl) => ({ platform: pl.platform, url: pl.publishedUrl, simulated: pl.dryRun })),
+            failed: after.platforms
+              .filter((pl) => pl.enabled && pl.status === 'failed')
+              .map((pl) => ({ platform: pl.platform, error: pl.error })),
+          }
+          window.dispatchEvent(new CustomEvent(POST_OUTCOME_EVENT, { detail }))
+          refreshJobs(after.id)
         })
-      })
-    }, 10000)
-
+      }
+    }, 10_000)
     return () => window.clearInterval(timer)
-  }, [posts, refreshPost, refreshJobs])
+  }, [refreshPost, refreshJobs])
 
   const schedulePost = useCallback(async (
     id: string,

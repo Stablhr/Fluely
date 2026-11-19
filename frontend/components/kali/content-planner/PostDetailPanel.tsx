@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { X, Plus, Trash2, Link2, ImageIcon } from 'lucide-react'
+import { X, Plus, Trash2, Link2, ImageIcon, ExternalLink, CalendarClock } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import type {
   MediaType,
@@ -20,9 +20,20 @@ import PlatformIcon from '../social/PlatformIcon'
 import {
   ALL_PLATFORMS,
   PLANNER_STAGES,
+  formatMoment,
   platformColor,
   platformLabel,
+  postMoment,
 } from './planner-model'
+import PostMomentBadge from './PostMomentBadge'
+
+/**
+ * Stages a person sets while planning. "Scheduled" and "Posted" are not
+ * choices here: Schedule post queues the post, and the publisher marks it
+ * posted (or failed) when it really goes out.
+ */
+const PLANNING_STAGES = PLANNER_STAGES.filter((s) => ['idea', 'draft', 'in_review'].includes(s.value))
+const isPlanning = (status: SocialPostStatus) => ['idea', 'draft', 'in_review'].includes(status)
 
 interface Draft {
   title: string
@@ -120,6 +131,7 @@ export default function PostDetailPanel({
     existing ? draftFromPost(existing) : emptyDraft(defaultDate, defaultTime),
   )
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [scheduleError, setScheduleError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
@@ -136,8 +148,10 @@ export default function PostDetailPanel({
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => {
+    setScheduleError(null)
     setDraft((d) => ({ ...d, [key]: value }))
+  }
 
   const togglePlatform = (platform: Platform) =>
     setDraft((d) => ({
@@ -184,7 +198,11 @@ export default function PostDetailPanel({
     }
   }
 
-  const handleSave = () => {
+  const moment = existing ? postMoment(existing) : null
+  const alreadyOut = moment?.kind === 'posted' || moment?.kind === 'partial' || moment?.kind === 'publishing'
+  const isScheduled = moment?.kind === 'scheduled'
+
+  const buildShared = () => {
     const tags = draft.tags.split(',').map((t) => t.trim()).filter(Boolean)
     // scheduledAt is left undefined whenever an explicit date is set — the two
     // are alternative ways to express the same thing and having both set makes
@@ -201,14 +219,42 @@ export default function PostDetailPanel({
       scheduledDate: draft.date || undefined,
       scheduledTime: draft.time || undefined,
       scheduledAt: undefined,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }
+    return shared
+  }
 
+  const save = (status?: SocialPostStatus) => {
+    const { status: _ignored, ...rest } = buildShared()
+    void _ignored
+    const patch = status ? { ...rest, status } : rest
     if (existing) {
-      updateSocialPost(existing.id, shared)
+      updateSocialPost(existing.id, patch)
     } else {
-      addSocialPost({ ...shared, repeat: 'none' })
+      addSocialPost({ ...rest, status: status ?? 'draft', repeat: 'none' })
     }
     onClose()
+  }
+
+  /** Planning save: keeps the chosen stage (moving a scheduled post back unschedules it). */
+  const handleSaveDraft = () => save(isPlanning(draft.status) ? draft.status : 'draft')
+
+  /** Edits to a post that already went out: content only, never its status. */
+  const handleSaveChanges = () => save()
+
+  /**
+   * Queues the post for its date and time. The server checks each platform
+   * (connected account, content rules) and the planner shows the outcome.
+   */
+  const handleSchedule = () => {
+    if (draft.platforms.length === 0) return setScheduleError('Pick at least one platform.')
+    if (!draft.date || !draft.time) return setScheduleError('Pick a date and time to schedule this post.')
+    const at = new Date(`${draft.date}T${draft.time}`)
+    if (Number.isNaN(at.getTime()) || at.getTime() < Date.now() - 60_000) {
+      return setScheduleError('That time has passed. Pick a time in the future.')
+    }
+    setScheduleError(null)
+    save('scheduled')
   }
 
   const handleDelete = () => {
@@ -242,6 +288,51 @@ export default function PostDetailPanel({
         </header>
 
         <div className="scroll-slim min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+          {existing && moment && (
+            <section
+              aria-label="Publishing status"
+              className="rounded-lg border border-border bg-surface-alt px-3 py-2.5"
+            >
+              <PostMomentBadge post={existing} />
+              <ul className="mt-2 space-y-1.5">
+                {existing.platforms
+                  .filter((p) => p.enabled)
+                  .map((p) => (
+                    <li key={p.platform} className="flex items-center gap-2 text-[12px] text-text-secondary">
+                      <span
+                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white"
+                        style={{ background: platformColor(p.platform) }}
+                      >
+                        <PlatformIcon platform={p.platform} size={9} />
+                      </span>
+                      <span className="font-medium text-text-primary">{platformLabel(p.platform)}</span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {p.status === 'posted'
+                          ? `Posted${p.publishedAt ? ` ${formatMoment(new Date(p.publishedAt))}` : ''}${p.dryRun ? ' (simulated)' : ''}`
+                          : p.status === 'scheduled'
+                            ? p.retryCount ? 'Retrying soon' : 'Waiting for its time'
+                            : p.status === 'publishing'
+                              ? 'Publishing now'
+                              : p.status === 'failed'
+                                ? p.error || 'Failed'
+                                : p.error || 'Not scheduled'}
+                      </span>
+                      {p.publishedUrl && (
+                        <a
+                          href={p.publishedUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary hover:underline"
+                        >
+                          View <ExternalLink size={11} />
+                        </a>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            </section>
+          )}
+
           <Input
             ref={titleRef}
             value={draft.title}
@@ -252,9 +343,9 @@ export default function PostDetailPanel({
           />
 
           <div>
-            <SectionLabel>Status</SectionLabel>
+            <SectionLabel>Stage</SectionLabel>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {PLANNER_STAGES.map(({ value, label, dot }) => {
+              {PLANNING_STAGES.map(({ value, label, dot }) => {
                 const active = draft.status === value
                 return (
                   <button
@@ -436,6 +527,11 @@ export default function PostDetailPanel({
           </div>
         </div>
 
+        {scheduleError && (
+          <p role="alert" className="shrink-0 border-t border-border bg-danger-subtle px-4 py-2 text-[12px] font-medium text-danger-text">
+            {scheduleError}
+          </p>
+        )}
         <footer className="flex shrink-0 items-center gap-2 border-t border-border px-4 py-3">
           {!isCreate &&
             (confirmDelete ? (
@@ -454,9 +550,21 @@ export default function PostDetailPanel({
             <Button variant="ghost" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            <Button variant="primary" size="sm" onClick={handleSave} disabled={draft.platforms.length === 0}>
-              {isCreate ? 'Create post' : 'Save changes'}
-            </Button>
+            {alreadyOut ? (
+              <Button variant="primary" size="sm" onClick={handleSaveChanges}>
+                Save changes
+              </Button>
+            ) : (
+              <>
+                <Button variant="secondary" size="sm" onClick={handleSaveDraft} disabled={draft.platforms.length === 0}>
+                  {isScheduled ? 'Unschedule' : 'Save draft'}
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleSchedule}>
+                  <CalendarClock size={13} />
+                  {isScheduled ? 'Update schedule' : 'Schedule post'}
+                </Button>
+              </>
+            )}
           </div>
         </footer>
       </aside>

@@ -1088,7 +1088,10 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         } catch (err) {
           failed = true;
           failure = err;
-          if (options?.surfaceGlobalError !== false) {
+          // A clash with a collaborator's edit that survived the retries needs
+          // no banner: the board is re-read below, so the view already shows
+          // their changes and nothing is lost.
+          if (options?.surfaceGlobalError !== false && !isRevisionConflict(err)) {
             setError(getFriendlyErrorMessage(err, failureMessage));
           }
           options?.onError?.(err);
@@ -2230,10 +2233,9 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       });
       return {
         ok: false,
-        error: getFriendlyErrorMessage(
-          result.error,
-          "That list no longer exists.",
-        ),
+        error: isRevisionConflict(result.error)
+          ? "Could not move that card. Try again."
+          : getFriendlyErrorMessage(result.error, "That list no longer exists."),
       };
     }
 
@@ -2515,7 +2517,16 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     if (!isServerBoard(board)) return;
     void (async () => {
       try {
-        adoptServerBoard(id, await updateBoardOnServer(id, { background }, board.revision));
+        try {
+          adoptServerBoard(id, await updateBoardOnServer(id, { background }, board.revision));
+        } catch (err) {
+          // A collaborator saved the board in the meantime: take its current
+          // revision and try once more, instead of reporting a clash.
+          if (!isRevisionConflict(err)) throw err;
+          const structure = await fetchStructure(id);
+          applyRevision(id, structure.revision);
+          adoptServerBoard(id, await updateBoardOnServer(id, { background }, structure.revision));
+        }
       } catch (err) {
         writeBoardBackground(id, previous);
         setError(getFriendlyErrorMessage(err, "Could not change the board background."));

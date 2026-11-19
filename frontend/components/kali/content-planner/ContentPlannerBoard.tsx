@@ -9,8 +9,10 @@ import type { SocialPost } from '@/lib/kali/store/schema'
 import { formatDate } from '@/lib/kali/utils/dates'
 import PlatformIcon from '../social/PlatformIcon'
 import { beginDragCursor, endDragCursor } from '@/lib/kali/utils/dragCursor'
+import PostMomentBadge from './PostMomentBadge'
 import {
   POST_COLUMNS,
+  postMoment,
   columnForStatus,
   enabledPlatforms,
   platformColor,
@@ -204,7 +206,9 @@ function BoardCard({ post, index, onOpen }: { post: SocialPost; index: number; o
                   </span>
                 ))}
               </p>
-              {date && (
+              {postMoment(post) ? (
+                <PostMomentBadge post={post} size="xs" className="min-w-0" />
+              ) : date && (
                 <p className="truncate font-mono text-[10px] text-text-muted">
                   {post.scheduledTime ? `${formatDate(date)} ${post.scheduledTime}` : formatDate(date)}
                 </p>

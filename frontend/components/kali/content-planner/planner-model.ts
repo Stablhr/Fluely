@@ -170,3 +170,64 @@ export function sortPosts(posts: SocialPost[], key: SortKey, dir: SortDir): Soci
     }
   })
 }
+
+/* ── Publishing moment ───────────────────────────────────────── */
+
+export type PostMomentKind = 'scheduled' | 'publishing' | 'posted' | 'partial' | 'failed'
+
+export interface PostMoment {
+  kind: PostMomentKind
+  /** When it goes out (scheduled) or went out (posted); null when unknown. */
+  at: Date | null
+  label: string
+}
+
+/** The local wall-clock time a post is set for, from its date and time fields. */
+function plannedAt(post: SocialPost): Date | null {
+  if (post.scheduledAt) return new Date(post.scheduledAt)
+  if (!post.scheduledDate) return null
+  const d = new Date(`${post.scheduledDate}T${post.scheduledTime || '00:00'}`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+/**
+ * Where a post is in publishing, for the badges on the board, table and
+ * editor. Only the server moves a post into these states (scheduling queues
+ * it; the publisher marks it posted or failed), so this reads them rather
+ * than offering them as choices.
+ */
+export function postMoment(post: SocialPost): PostMoment | null {
+  const enabled = post.platforms.filter((p) => p.enabled)
+  const latestPublished = enabled
+    .map((p) => (p.status === 'posted' && p.publishedAt ? new Date(p.publishedAt) : null))
+    .filter((d): d is Date => d !== null)
+    .sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+
+  switch (post.status) {
+    case 'scheduled':
+      return { kind: 'scheduled', at: plannedAt(post), label: 'Scheduled' }
+    case 'publishing':
+      return { kind: 'publishing', at: plannedAt(post), label: 'Publishing' }
+    case 'posted':
+      return { kind: 'posted', at: latestPublished ?? plannedAt(post), label: 'Posted' }
+    case 'partially_published':
+      return { kind: 'partial', at: latestPublished, label: 'Partly posted' }
+    case 'failed':
+      return { kind: 'failed', at: null, label: 'Failed' }
+    default:
+      return null
+  }
+}
+
+const MOMENT_FORMAT = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
+/** e.g. "Thu, 19 Nov, 10:20 PM" in the viewer's own time zone. */
+export function formatMoment(at: Date): string {
+  return MOMENT_FORMAT.format(at)
+}

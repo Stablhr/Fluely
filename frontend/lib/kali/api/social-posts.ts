@@ -58,6 +58,18 @@ export interface ScheduleResultEventDetail {
   postId: string
   ok: boolean
   errors: string[]
+  /** UTC time it was queued for, when it was queued. */
+  scheduledAt?: string
+}
+
+/** Fired when a scheduled post finishes publishing (posted, partly, or failed). */
+export const POST_OUTCOME_EVENT = 'cadence:social-post-outcome'
+export interface PostOutcomeEventDetail {
+  postId: string
+  title: string
+  status: SocialPost['status']
+  posted: { platform: Platform; url?: string; simulated?: boolean }[]
+  failed: { platform: Platform; error?: string }[]
 }
 
 /** Drops what only the browser needs (inline previews) from a post payload. */
