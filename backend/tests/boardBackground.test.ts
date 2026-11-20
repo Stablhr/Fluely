@@ -47,7 +47,10 @@ afterAll(async () => {
   await mongo?.stop();
 });
 
-const CLOUD = env.CLOUDINARY_CLOUD_NAME ?? 'demo';
+// Only URLs on the configured Cloudinary account are accepted. CI has no .env,
+// so name an account here when the machine running the tests has none.
+(env as Record<string, unknown>).CLOUDINARY_CLOUD_NAME = env.CLOUDINARY_CLOUD_NAME ?? 'demo';
+const CLOUD = env.CLOUDINARY_CLOUD_NAME;
 const cloudinaryUrl = (name: string) =>
   `https://res.cloudinary.com/${CLOUD}/image/upload/v1/fluely/boards/${name}.jpg`;
 

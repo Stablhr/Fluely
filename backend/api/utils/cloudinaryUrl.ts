@@ -20,6 +20,9 @@ export function isOwnCloudinaryUrl(url: string | null | undefined): boolean {
   if (parsed.protocol !== 'https:' || parsed.hostname !== 'res.cloudinary.com') {
     return false;
   }
+  // Without a configured account there is no "ours": accept nothing rather
+  // than every Cloudinary account. (Uploads need the name too, so nothing
+  // legitimate is lost.)
   const cloudName = env.CLOUDINARY_CLOUD_NAME;
-  return !cloudName || parsed.pathname.startsWith(`/${cloudName}/`);
+  return Boolean(cloudName) && parsed.pathname.startsWith(`/${cloudName}/`);
 }

@@ -61,9 +61,13 @@ const STRANGER = new Types.ObjectId('aaaaaaaaaaaaaaaaaaaaaaa4');
 const BOARD = new Types.ObjectId('ccccccccccccccccccccccc1');
 const CARD = new Types.ObjectId('ddddddddddddddddddddddd1');
 
+// "Our Cloudinary" is the account named by CLOUDINARY_CLOUD_NAME. CI has no
+// .env, and without a name every Cloudinary account is accepted, so give the
+// tests one whether or not the machine running them is configured.
+(env as Record<string, unknown>).CLOUDINARY_CLOUD_NAME = env.CLOUDINARY_CLOUD_NAME ?? 'demo';
+
 /** A delivery URL on this account's Cloudinary (what the Admin API returns). */
-const OWN_URL = (path: string) =>
-  `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME ?? 'demo'}/${path}`;
+const OWN_URL = (path: string) => `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/${path}`;
 
 const mockedMedia = mediaRepository as jest.Mocked<typeof mediaRepository>;
 const mockedBoards = boardRepository as jest.Mocked<typeof boardRepository>;
