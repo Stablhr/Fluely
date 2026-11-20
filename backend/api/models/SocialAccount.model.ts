@@ -8,7 +8,7 @@ import {
 
 /**
  * A connected social account (a LinkedIn profile or Company Page, a Facebook
- * Page, an Instagram business account, a TikTok creator, a YouTube channel).
+ * Page, a TikTok creator, a YouTube channel, or a reminder account).
  *
  * Shared per workspace: anyone in the workspace can schedule to it. Tokens are
  * stored encrypted (`utils/tokenCrypto.ts`) and never leave the server.

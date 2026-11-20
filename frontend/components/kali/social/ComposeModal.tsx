@@ -19,7 +19,7 @@ import LinkEmbed from '../shared/LinkEmbed'
 import LinkCard from '../shared/LinkCard'
 import { findFirstPreview, parseLinkLine } from '@/lib/kali/utils/embed'
 
-const ALL_PLATFORMS: Platform[] = ['youtube', 'facebook', 'tiktok', 'instagram', 'linkedin']
+const ALL_PLATFORMS: Platform[] = ['youtube', 'facebook', 'tiktok', 'linkedin']
 
 function PlatformChip({ platform, enabled, onToggle }: {
   platform: Platform

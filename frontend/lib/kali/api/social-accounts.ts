@@ -36,8 +36,6 @@ export interface PlatformSummary {
   mode: 'live' | 'dryrun' | 'disabled'
   /** Whether the app keys for this platform are set on the server. */
   configured: boolean
-  /** Instagram only: whether "Connect with Instagram" (Instagram Login) is set up. */
-  instagramLoginConfigured?: boolean
 }
 
 export type ConnectReturn = 'planner' | 'settings'
@@ -59,12 +57,11 @@ export const socialAccountsApi = {
   connect: async (
     platform: Platform,
     returnTo: ConnectReturn = 'planner',
-    options: { demo?: boolean; via?: 'facebook' | 'instagram' } = {},
+    options: { demo?: boolean } = {},
   ) => {
     const { data } = await httpClient.post<ConnectResult>(`/social-accounts/connect/${platform}`, {
       returnTo,
       demo: options.demo === true,
-      ...(options.via ? { via: options.via } : {}),
     })
     return data
   },

@@ -32,8 +32,7 @@ export const socialAccountController = {
       platformOf(req),
       req.body?.returnTo,
       req.body?.demo === true,
-      req.headers.origin,
-      req.body?.via
+      req.headers.origin
     );
     if (result.demo) {
       res.status(201).json({demo: true, account: result.account});

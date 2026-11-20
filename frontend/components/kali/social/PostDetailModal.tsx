@@ -14,7 +14,6 @@ import {
   Hash,
   Play,
   Globe,
-  Camera,
   Music,
   Briefcase,
 } from 'lucide-react'
@@ -28,7 +27,6 @@ import { useToast } from '../shared/useToastState'
 const PLATFORM_ICONS: Record<Platform, typeof Play> = {
   youtube: Play,
   facebook: Globe,
-  instagram: Camera,
   tiktok: Music,
   linkedin: Briefcase,
 }

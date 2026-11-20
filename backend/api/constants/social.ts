@@ -3,7 +3,7 @@
  * `product.ts`, which also lists `x` for the older planning data; X is not
  * schedulable because its API no longer offers free posting.
  */
-export const SchedulablePlatforms = ['instagram', 'facebook', 'tiktok', 'youtube', 'linkedin'] as const;
+export const SchedulablePlatforms = ['facebook', 'tiktok', 'youtube', 'linkedin'] as const;
 export type SchedulablePlatform = (typeof SchedulablePlatforms)[number];
 
 /** Per-platform switch, from `<PLATFORM>_MODE`. */
@@ -59,7 +59,6 @@ export const PublishJobStatuses = [
 export type PublishJobStatus = (typeof PublishJobStatuses)[number];
 
 export const PLATFORM_LABELS: Record<SchedulablePlatform, string> = {
-  instagram: 'Instagram',
   facebook: 'Facebook',
   tiktok: 'TikTok',
   youtube: 'YouTube',

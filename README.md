@@ -24,7 +24,7 @@ connected social accounts don't have backend routes yet, so they are kept in bro
 - **Social Posting** — Platform overview plus calendar, board (Idea → Posted), and table views over
   one set of social posts, edited in a slide-over panel.
 - **Social** — Compose modal, bulk scheduling, analytics, media library, and account connection
-  (YouTube, Facebook, Instagram, TikTok).
+  (Facebook, LinkedIn, YouTube, TikTok).
 - **Notifications** — Bell for mentions and board invitations.
 - **Accounts** — Sign up, sign in, email verification, password reset, profile with avatar and
   visibility settings, and a role-based admin area.

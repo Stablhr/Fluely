@@ -87,7 +87,7 @@ export function statusLabel(status: SocialPostStatus): string {
 
 /* ── Platforms ───────────────────────────────────────────────── */
 
-export const ALL_PLATFORMS: Platform[] = ['instagram', 'facebook', 'linkedin', 'tiktok', 'youtube']
+export const ALL_PLATFORMS: Platform[] = ['facebook', 'linkedin', 'tiktok', 'youtube']
 
 /**
  * Header strip for the overview cards. One neutral treatment for every card —
@@ -97,7 +97,6 @@ export const ALL_PLATFORMS: Platform[] = ['instagram', 'facebook', 'linkedin', '
 export const OVERVIEW_HEADER = 'bg-surface-alt text-text-primary'
 
 const PLATFORM_NAMES: Record<Platform, string> = {
-  instagram: 'Instagram',
   facebook: 'Facebook',
   linkedin: 'LinkedIn',
   tiktok: 'TikTok',
@@ -246,7 +245,6 @@ export function postTextFor(post: SocialPost, platform: Platform): string {
 /** Where to post by hand on each platform. */
 export const MANUAL_POST_URL: Record<Platform, string> = {
   facebook: 'https://www.facebook.com/',
-  instagram: 'https://www.instagram.com/',
   linkedin: 'https://www.linkedin.com/feed/?shareActive=true',
   tiktok: 'https://www.tiktok.com/upload',
   youtube: 'https://studio.youtube.com/',

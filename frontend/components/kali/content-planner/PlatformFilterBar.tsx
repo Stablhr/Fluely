@@ -6,7 +6,7 @@ import PlatformIcon from '../social/PlatformIcon'
 import type { PlatformFilter } from './types'
 import { platformLabel } from './planner-model'
 
-const ALL_PLATFORMS: Platform[] = ['facebook', 'instagram', 'linkedin', 'youtube', 'tiktok']
+const ALL_PLATFORMS: Platform[] = ['facebook', 'linkedin', 'youtube', 'tiktok']
 
 interface PlatformFilterBarProps {
   active: PlatformFilter

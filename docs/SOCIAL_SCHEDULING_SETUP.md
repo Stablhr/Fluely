@@ -1,6 +1,6 @@
 # Social scheduling: what you need to set up
 
-Fluely can schedule posts to **Instagram, Facebook, TikTok, YouTube and LinkedIn**.
+Fluely can schedule posts to **Facebook, TikTok, YouTube and LinkedIn**.
 The code for every platform is in place. Each platform has its own mode:
 
 | Mode | What happens |
@@ -49,7 +49,7 @@ that a teammate connected.
 ### Redirect URIs to register
 
 Every platform asks for an "OAuth redirect URI". Register **both** of these for each one,
-replacing `<platform>` with `linkedin`, `facebook`, `instagram`, `tiktok` or `youtube`:
+replacing `<platform>` with `linkedin`, `facebook`, `tiktok` or `youtube`:
 
 ```
 http://localhost:5001/api/social-accounts/oauth/<platform>/callback
@@ -83,7 +83,7 @@ Limits: LinkedIn tokens last 60 days and cannot be refreshed for most apps, so p
 be asked to reconnect about every two months. Text and image posts are supported; video
 posts to LinkedIn are not built yet.
 
-## 2. Facebook Pages and Instagram (one Meta app for both)
+## 2. Facebook Pages
 
 Meta's setup changed in 2025: apps are built around **use cases**.
 
@@ -94,58 +94,28 @@ Meta's setup changed in 2025: apps are built around **use cases**.
    `pages_manage_posts` and `pages_read_engagement` (keep `pages_show_list` and
    `business_management`).
 3. **Use cases → … → Settings (Facebook Login for Business):** add the redirect URI for
-   `facebook` (and later `instagram`), click **Check URI**, save.
+   `facebook`, click **Check URI**, save. (While the app is unpublished, `http://localhost`
+   redirects are allowed automatically.)
    - Optional: create a **configuration** with a *User access token* and those permissions,
      and put its id in `META_LOGIN_CONFIG_ID`. Without one, Fluely asks for the permissions directly.
 4. **App settings → Basic:** copy the **App ID** and **App secret**; add the privacy policy
    (`/privacy`), data deletion URL (`/privacy#data-deletion`), terms (`/terms`), icon and domain.
 5. While the app is unpublished, only people with a role on it (**App roles**) can connect, and
    posts are visible only to them. That's enough for testing with your own Page.
-6. To go public: **business verification**, then **App Review** for `pages_manage_posts`,
-   `pages_read_engagement` (and the Instagram permissions), each with a screencast, then **Publish**.
-7. **Instagram:** add the use case **"Manage messaging & content on Instagram"** to the same app
-   (permissions `instagram_basic`, `instagram_content_publish`). The Instagram account must be a
-   **Business or Creator** account **linked to a Facebook Page**.
+6. To go public: **business verification**, then **App Review** for `pages_manage_posts` and
+   `pages_read_engagement`, each with a screencast, then **Publish**.
 
-8. **Newer Meta apps (Unified login) — "Connect with Instagram":** Meta no longer offers
-   "API setup with Instagram login" to new apps. Instead: Instagram use case → **API setup with
-   Unified login** → **Create new configuration** (System-user access token, never expires,
-   Instagram account as the business asset, permissions `instagram_basic` +
-   `instagram_content_publish`). Copy its **Configuration ID** into
-   `META_INSTAGRAM_UNIFIED_CONFIG_ID`, and add the redirect URL
-   `…/api/social-accounts/oauth/instagram/callback` there and under Facebook Login for Business
-   → Settings. If no Instagram account comes back after signing in, add `business_management`
-   (Facebook Login for Business → Configurations → Edit) and sign in again.
-   **Older apps** — "Connect with Instagram" via Instagram Login:
-   in the Instagram use case choose **"API setup with Instagram login"**. Copy the
-   **Instagram app ID** and **Instagram app secret** into `INSTAGRAM_APP_ID` /
-   `INSTAGRAM_APP_SECRET`, and under **Set up Instagram business login** add the redirect URL
-   `…/api/social-accounts/oauth/instagram/callback` (same as the Facebook route). While the app is
-   unpublished, add each Instagram account under **App roles → Instagram testers** and accept the
-   invite in Instagram (Settings → Apps and websites → Tester invites). Permissions:
-   `instagram_business_basic`, `instagram_business_content_publish`. Tokens last 60 days and
-   Fluely renews them automatically.
-9. To make connecting **Facebook** also connect the Instagram accounts linked to the shared
-   Pages, first add `instagram_basic` and `instagram_content_publish` (Instagram use case →
-   "API setup with Facebook login"), then set `META_FACEBOOK_INCLUDES_INSTAGRAM=true`. Leave it
-   `false` until then: Meta refuses the whole Facebook sign-in ("Invalid Scopes") otherwise.
+Rules the platform enforces (not Fluely):
 
-Rules the platforms enforce (not Fluely):
-
-- Facebook: only **Pages** can be posted to, not personal profiles.
-- Instagram: every post needs an image or a video (no text-only posts).
+- Only **Pages** can be posted to, not personal profiles. For a personal profile, add a
+  **reminder account** in Settings: Fluely reminds you at the post's time and you post it yourself.
 
 ```env
 META_APP_ID=
 META_APP_SECRET=
 META_LOGIN_CONFIG_ID=          # optional
-META_INSTAGRAM_CONFIG_ID=      # optional
 FACEBOOK_MODE=dryrun
-INSTAGRAM_MODE=dryrun
 META_GRAPH_VERSION=v25.0
-META_INSTAGRAM_UNIFIED_CONFIG_ID=   # Connect with Instagram (newer apps)
-INSTAGRAM_APP_ID=              # Connect with Instagram (older apps)
-INSTAGRAM_APP_SECRET=
 ```
 
 ## 3. TikTok

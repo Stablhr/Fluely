@@ -24,7 +24,7 @@ const FEATURES = [
   {
     icon: Send,
     title: 'Social planner',
-    description: 'Draft, review, and schedule posts for Instagram, Facebook, TikTok, and YouTube.'
+    description: 'Draft, review, and schedule posts for Facebook, LinkedIn, TikTok, and YouTube.'
   },
   {
     icon: Users,
@@ -46,7 +46,7 @@ const FEATURES = [
 const PREVIEW_LISTS = [
   {name: 'To do', cards: [{t: 'Q3 campaign brief', l: 'bg-violet-600'}, {t: 'Product photos', l: 'bg-orange-700'}]},
   {name: 'In progress', cards: [{t: 'Launch post copy', l: 'bg-primary'}, {t: 'Landing page review', l: 'bg-sky-700'}]},
-  {name: 'Scheduled', cards: [{t: 'Instagram carousel', l: 'bg-rose-700'}]}
+  {name: 'Scheduled', cards: [{t: 'LinkedIn carousel', l: 'bg-sky-700'}]}
 ];
 
 function ProductPreview() {

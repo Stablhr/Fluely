@@ -23,9 +23,7 @@ import {composeText} from '../api/services/social/publisher.service';
 import {webhookUrl} from '../api/services/social/qstash';
 import {zonedToUtc} from '../api/services/social/time';
 import {linkedinApiVersion, toLittleText} from '../api/services/social/providers/linkedin';
-import {accountsFromPages, asInstagramImageUrl, instagramApiBase} from '../api/services/social/providers/meta';
-import {socialAccountService} from '../api/services/social/accounts.service';
-import {encryptToken as encryptForTest} from '../api/utils/tokenCrypto';
+import {accountsFromPages} from '../api/services/social/providers/meta';
 import {decryptToken, encryptToken} from '../api/utils/tokenCrypto';
 import {hashToken} from '../api/utils/crypto';
 
@@ -36,8 +34,7 @@ jest.setTimeout(30_000);
 // not leak in -- it changes behaviour and could reach real platform APIs.
 const PLATFORM_SETTINGS = [
   'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_MODE', 'LINKEDIN_ORGANIZATIONS', 'LINKEDIN_API_VERSION',
-  'META_APP_ID', 'META_APP_SECRET', 'META_LOGIN_CONFIG_ID', 'META_INSTAGRAM_CONFIG_ID', 'FACEBOOK_MODE', 'INSTAGRAM_MODE',
-  'INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET', 'META_FACEBOOK_INCLUDES_INSTAGRAM', 'META_INSTAGRAM_UNIFIED_CONFIG_ID',
+  'META_APP_ID', 'META_APP_SECRET', 'META_LOGIN_CONFIG_ID', 'FACEBOOK_MODE',
   'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_MODE',
   'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'YOUTUBE_MODE',
   'QSTASH_TOKEN', 'QSTASH_CURRENT_SIGNING_KEY', 'QSTASH_NEXT_SIGNING_KEY'
@@ -112,7 +109,7 @@ const image = {
   storageUrl: 'https://res.cloudinary.com/demo/image/upload/photo.jpg',
   dataUrl: 'data:image/jpeg;base64,AAAA',
   size: 1000,
-  platformCompat: ['instagram', 'linkedin']
+  platformCompat: ['facebook', 'linkedin']
 };
 
 function draft(id: string, platforms: string[], media: object[] = []) {
@@ -151,7 +148,7 @@ describe('social posts', () => {
   it('imports browser posts once and turns never-queued "scheduled" posts into drafts', async () => {
     const owner = await member();
     const posts = [
-      {...draft('local-1', ['instagram']), status: 'scheduled'},
+      {...draft('local-1', ['facebook']), status: 'scheduled'},
       {...draft('local-2', ['x', 'linkedin']), status: 'idea'}
     ];
     const first = await as(owner.userId).post('/api/social-posts/import', {posts});
@@ -272,20 +269,7 @@ describe('connecting accounts', () => {
       expect(url.hostname).toBe('www.facebook.com');
       const scope = url.searchParams.get('scope') ?? '';
       expect(scope).toContain('pages_manage_posts');
-      // By default Facebook asks only for Page permissions: a Meta app without
-      // the Instagram ones would otherwise refuse the whole sign-in.
       expect(scope).not.toContain('instagram');
-
-      // Switched on, linked Instagram accounts come along with Facebook.
-      env.META_FACEBOOK_INCLUDES_INSTAGRAM = 'true';
-      const withIg = new URL((await as(owner.userId).post('/api/social-accounts/connect/facebook')).body.url);
-      expect(withIg.searchParams.get('scope')).toContain('instagram_content_publish');
-      // ...unless Instagram is turned off.
-      env.INSTAGRAM_MODE = 'disabled';
-      const off = new URL((await as(owner.userId).post('/api/social-accounts/connect/facebook')).body.url);
-      expect(off.searchParams.get('scope')).not.toContain('instagram');
-      env.INSTAGRAM_MODE = undefined;
-      env.META_FACEBOOK_INCLUDES_INSTAGRAM = undefined;
 
       env.META_LOGIN_CONFIG_ID = 'cfg-123';
       const withConfig = new URL((await as(owner.userId).post('/api/social-accounts/connect/facebook')).body.url);
@@ -313,7 +297,7 @@ describe('scheduling and publishing (dry run)', () => {
     const owner = await member();
     const api = as(owner.userId);
     await api.post('/api/social-accounts/connect/linkedin', {demo: true});
-    await api.post('/api/social-posts', draft('p1', ['linkedin', 'instagram', 'tiktok']));
+    await api.post('/api/social-posts', draft('p1', ['linkedin', 'facebook', 'tiktok']));
 
     const res = await api.post('/api/social-posts/p1/schedule', {
       scheduledDate: '2030-01-15',
@@ -327,7 +311,7 @@ describe('scheduling and publishing (dry run)', () => {
       res.body.validation.map((v: {platform: string; errors: string[]}) => [v.platform, v.errors])
     );
     expect(byPlatform.linkedin).toEqual([]);
-    expect(byPlatform.instagram.join(' ')).toMatch(/Connect a Instagram account|image or a video/);
+    expect(byPlatform.facebook.join(' ')).toMatch(/Connect a Facebook account/);
     expect(byPlatform.tiktok.join(' ')).toMatch(/video/);
     expect(res.body.post.status).toBe('scheduled');
   });
@@ -453,116 +437,13 @@ describe('reminder accounts (post it yourself)', () => {
   it('skips the platform API content rules for a hand-posted target', async () => {
     const owner = await member();
     const api = as(owner.userId);
-    const added = await api.post('/api/social-accounts/reminder/instagram', {name: 'My Instagram'});
-    const post = draft('text-only', ['instagram']);
+    const added = await api.post('/api/social-accounts/reminder/youtube', {name: 'My channel'});
+    const post = draft('text-only', ['youtube']);
     post.platforms[0] = {...post.platforms[0], accountId: added.body.account.id} as typeof post.platforms[0];
     await api.post('/api/social-posts', post);
-    // Instagram's API needs an image; posting by hand does not.
+    // YouTube's API needs a video; posting by hand does not.
     const res = await api.post('/api/social-posts/text-only/schedule', {scheduledDate: '2030-01-01'});
-    expect(res.body.validation[0]).toMatchObject({platform: 'instagram', valid: true});
-  });
-});
-
-describe('Instagram Login (accounts not linked to Facebook)', () => {
-  it('refuses until the Instagram app keys are set, then signs in with Instagram itself', async () => {
-    const owner = await member();
-    const refused = await as(owner.userId).post('/api/social-accounts/connect/instagram', {via: 'instagram'});
-    expect(refused.status).toBe(409);
-    expect(refused.body.code).toBe('PLATFORM_NOT_CONFIGURED');
-
-    env.INSTAGRAM_APP_ID = 'ig-app';
-    env.INSTAGRAM_APP_SECRET = 'ig-secret';
-    try {
-      const res = await as(owner.userId).post('/api/social-accounts/connect/instagram', {via: 'instagram'});
-      const url = new URL(res.body.url);
-      expect(url.hostname).toBe('www.instagram.com');
-      expect(url.pathname).toBe('/oauth/authorize');
-      expect(url.searchParams.get('client_id')).toBe('ig-app');
-      expect(url.searchParams.get('scope')).toBe('instagram_business_basic,instagram_business_content_publish');
-      expect(url.searchParams.get('enable_fb_login')).toBe('false');
-      expect(url.searchParams.get('redirect_uri')).toMatch(/\/api\/social-accounts\/oauth\/instagram\/callback$/);
-
-      // A cancelled Instagram sign-in comes back as an error message.
-      const cb = await request(app).get(
-        `/api/social-accounts/oauth/instagram/callback?error=access_denied&error_description=Cancelled&state=${encodeURIComponent(url.searchParams.get('state')!)}`
-      );
-      expect(cb.headers.location).toContain('social=error');
-    } finally {
-      env.INSTAGRAM_APP_ID = undefined;
-      env.INSTAGRAM_APP_SECRET = undefined;
-    }
-  });
-
-  it('uses Unified login (Facebook dialog with the Instagram configuration) on newer Meta apps', async () => {
-    const owner = await member();
-    env.META_APP_ID = 'meta-app';
-    env.META_APP_SECRET = 'meta-secret';
-    env.META_INSTAGRAM_UNIFIED_CONFIG_ID = 'cfg-ig';
-    try {
-      const res = await as(owner.userId).post('/api/social-accounts/connect/instagram', {via: 'instagram'});
-      expect(res.status).toBe(200);
-      const url = new URL(res.body.url);
-      expect(url.hostname).toBe('www.facebook.com');
-      expect(url.pathname).toMatch(/\/dialog\/oauth$/);
-      expect(url.searchParams.get('config_id')).toBe('cfg-ig');
-      expect(url.searchParams.get('override_default_response_type')).toBe('true');
-      expect(url.searchParams.get('scope')).toBeNull();
-      expect(url.searchParams.get('redirect_uri')).toMatch(/\/oauth\/instagram\/callback$/);
-
-      // Settings shows "With Instagram" as set up.
-      const platforms = await as(owner.userId).get('/api/social-accounts/platforms');
-      const ig = platforms.body.platforms.find((p: {platform: string}) => p.platform === 'instagram');
-      expect(ig.instagramLoginConfigured).toBe(true);
-    } finally {
-      env.META_APP_ID = undefined;
-      env.META_APP_SECRET = undefined;
-      env.META_INSTAGRAM_UNIFIED_CONFIG_ID = undefined;
-    }
-  });
-
-  it('posts Instagram Login accounts through graph.instagram.com, others through Facebook', () => {
-    expect(instagramApiBase('instagram_login')).toMatch(/^https:\/\/graph\.instagram\.com\/v\d/);
-    expect(instagramApiBase('business')).toMatch(/^https:\/\/graph\.facebook\.com\/v\d/);
-    // Unified login tokens work on graph.facebook.com (graph.instagram.com refuses them).
-    expect(instagramApiBase('instagram_unified')).toMatch(/^https:\/\/graph\.facebook\.com\/v\d/);
-  });
-
-  it('asks Cloudinary for JPEG, the only image format Instagram accepts', () => {
-    const base = 'https://res.cloudinary.com/demo/image/upload/v1/fluely/photo';
-    expect(asInstagramImageUrl(`${base}.png`)).toBe(`${base}.jpg`);
-    expect(asInstagramImageUrl(`${base}.webp?x=1`)).toBe(`${base}.jpg?x=1`);
-    expect(asInstagramImageUrl(`${base}.jpg`)).toBe(`${base}.jpg`);
-    expect(asInstagramImageUrl('https://example.com/a.png')).toBe('https://example.com/a.png');
-  });
-
-  it('renews an Instagram token a week before it expires, without a post needing it', async () => {
-    const owner = await member();
-    const expiring = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
-    const account = await SocialAccountModel.create({
-      workspaceId: owner.workspaceId,
-      platform: 'instagram',
-      platformAccountId: '17841400000000000',
-      accountType: 'instagram_login',
-      accountName: 'Studio',
-      accessTokenEnc: encryptForTest('old-token'),
-      refreshTokenEnc: encryptForTest('old-token'),
-      tokenExpiresAt: expiring,
-      connectedBy: owner.userId
-    });
-    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({access_token: 'new-token', token_type: 'bearer', expires_in: 5184000}), {status: 200})
-    );
-    try {
-      await socialAccountService.renewExpiringTokens();
-      const called = String(fetchSpy.mock.calls[0]?.[0]);
-      expect(called).toContain('graph.instagram.com/refresh_access_token');
-      expect(called).toContain('grant_type=ig_refresh_token');
-      const fresh = await SocialAccountModel.findById(account._id);
-      expect(fresh!.tokenExpiresAt!.getTime()).toBeGreaterThan(Date.now() + 59 * 24 * 60 * 60 * 1000);
-      expect(fresh!.status).toBe('active');
-    } finally {
-      fetchSpy.mockRestore();
-    }
+    expect(res.body.validation[0]).toMatchObject({platform: 'youtube', valid: true});
   });
 });
 
@@ -627,20 +508,16 @@ describe('helpers', () => {
     expect(composeText('Hello #launch', ['launch', '#news'])).toBe('Hello #launch\n\n#news');
   });
 
-  it('turns a Facebook sign-in into Pages plus the Instagram accounts linked to them', () => {
+  it('turns a Facebook sign-in into one account per shared Page, posting with its Page token', () => {
     const pages = [
-      {id: 'p1', name: 'Page One', access_token: 'tok1', instagram_business_account: {id: 'ig1', username: 'pageone'}},
+      {id: 'p1', name: 'Page One', access_token: 'tok1'},
       {id: 'p2', name: 'Page Two', access_token: 'tok2'}
     ];
-    const accounts = accountsFromPages(pages, ['pages_manage_posts'], true);
-    expect(accounts.map(a => [a.platform ?? 'facebook', a.platformAccountId, a.accountName])).toEqual([
-      ['facebook', 'p1', 'Page One'],
-      ['facebook', 'p2', 'Page Two'],
-      ['instagram', 'ig1', 'pageone']
+    const accounts = accountsFromPages(pages, ['pages_manage_posts']);
+    expect(accounts.map(a => [a.platformAccountId, a.accountName, a.accountType, a.token.accessToken])).toEqual([
+      ['p1', 'Page One', 'page', 'tok1'],
+      ['p2', 'Page Two', 'page', 'tok2']
     ]);
-    // The Instagram account posts with its Page's token.
-    expect(accounts[2].token.accessToken).toBe('tok1');
-    expect(accountsFromPages(pages, [], false)).toHaveLength(2);
   });
 
   it('picks a LinkedIn API version two months back, across the new year', () => {

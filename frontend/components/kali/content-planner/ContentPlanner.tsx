@@ -83,7 +83,7 @@ export default function ContentPlanner() {
         caption: '',
         platforms: [
           {
-            platform: 'instagram',
+            platform: 'facebook',
             enabled: true,
             status: 'pending',
             caption: '',

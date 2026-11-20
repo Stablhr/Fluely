@@ -43,7 +43,7 @@ const STATUS_CLASS: Record<SocialAccount['status'], string> = {
 }
 
 /** Query keys the platform's sign-in sends back (backend `accounts.service.ts`). */
-const CONNECT_OUTCOME_PARAMS = ['social', 'platform', 'count', 'message', 'also'] as const
+const CONNECT_OUTCOME_PARAMS = ['social', 'platform', 'count', 'message'] as const
 
 export default function AccountConnectionPanel({ returnTo = 'planner' }: { returnTo?: ConnectReturn }) {
   const { toast } = useToast()
@@ -54,8 +54,6 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
   const [busy, setBusy] = useState<string | null>(null)
   /** Platform whose "not set up yet" note is open. */
   const [setupFor, setSetupFor] = useState<Platform | null>(null)
-  /** "Connect with Instagram" is not set up yet: explain. */
-  const [igLoginSetupOpen, setIgLoginSetupOpen] = useState(false)
   /** Platform whose "add a reminder account" form is open, and its name field. */
   const [reminderFor, setReminderFor] = useState<Platform | null>(null)
   const [reminderName, setReminderName] = useState('')
@@ -89,15 +87,7 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
     const name = platforms.find((p) => p.platform === platform)?.label ?? 'the account'
     if (outcome === 'connected') {
       const count = Number(url.searchParams.get('count') ?? '1')
-      // e.g. "instagram:1": Instagram accounts linked to the Facebook Pages.
-      const [alsoPlatform, alsoCount] = (url.searchParams.get('also') ?? '').split(':')
-      const alsoName = platforms.find((p) => p.platform === alsoPlatform)?.label
-      const extra =
-        alsoName && Number(alsoCount) > 0
-          ? ` and ${alsoCount} ${alsoName} account${Number(alsoCount) === 1 ? '' : 's'} linked to them`
-          : ''
-      const main = count > 1 ? `Connected ${count} ${name} accounts` : `Connected ${name}`
-      toast(`${main}${extra}`, 'success', { duration: 6000 })
+      toast(count > 1 ? `Connected ${count} ${name} accounts` : `Connected ${name}`, 'success', { duration: 6000 })
     } else {
       toast(url.searchParams.get('message') || `Could not connect ${name}`, 'error', { duration: 8000 })
     }
@@ -105,20 +95,16 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
     window.history.replaceState({}, '', url.pathname + url.search)
   }, [platforms, toast])
 
-  async function connect(platform: PlatformSummary, demo = false, via?: 'instagram') {
+  async function connect(platform: PlatformSummary, demo = false) {
     // A real account needs the platform's app keys on the server; until then
     // explain that instead of starting a sign-in that cannot work.
-    if (via === 'instagram' && !demo && !platform.instagramLoginConfigured) {
-      setIgLoginSetupOpen((open) => !open)
-      return
-    }
-    if (!via && !demo && !platform.configured) {
+    if (!demo && !platform.configured) {
       setSetupFor((open) => (open === platform.platform ? null : platform.platform))
       return
     }
-    setBusy(via ? `${platform.platform}:${via}` : platform.platform)
+    setBusy(platform.platform)
     try {
-      const result = await socialAccountsApi.connect(platform.platform, returnTo, { demo, via })
+      const result = await socialAccountsApi.connect(platform.platform, returnTo, { demo })
       if (result.demo) {
         setSetupFor(null)
         toast(`Connected a demo ${platform.label} account`, 'success')
@@ -216,50 +202,18 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
                   </span>
                 )}
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {platform.platform === 'instagram' && (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => connect(platform, false, 'instagram')}
-                    disabled={busy !== null}
-                    title="For a professional Instagram account that isn't linked to a Facebook Page"
-                    aria-label="Connect an Instagram account by signing in with Instagram"
-                    aria-expanded={platform.instagramLoginConfigured ? undefined : igLoginSetupOpen}
-                  >
-                    {busy === 'instagram:instagram' ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
-                    With Instagram
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => connect(platform)}
-                  disabled={busy !== null}
-                  title={platform.platform === 'instagram' ? 'For an Instagram account linked to a Facebook Page' : undefined}
-                  aria-label={
-                    platform.platform === 'instagram'
-                      ? 'Connect an Instagram account through Facebook'
-                      : `${rows.length > 0 ? 'Add' : 'Connect'} ${platform.label} account`
-                  }
-                  aria-expanded={platform.configured ? undefined : setupFor === platform.platform}
-                >
-                  {busy === platform.platform ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
-                  {platform.platform === 'instagram' ? 'Via Facebook' : rows.length > 0 ? 'Add' : 'Connect'}
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => connect(platform)}
+                disabled={busy !== null}
+                aria-label={`${rows.length > 0 ? 'Add' : 'Connect'} ${platform.label} account`}
+                aria-expanded={platform.configured ? undefined : setupFor === platform.platform}
+              >
+                {busy === platform.platform ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
+                {rows.length > 0 ? 'Add' : 'Connect'}
+              </Button>
             </div>
-
-            {platform.platform === 'instagram' && igLoginSetupOpen && (
-              <div className="mt-2 flex gap-2 rounded-md border border-border bg-surface-alt px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">
-                <Info size={14} className="mt-0.5 shrink-0 text-text-muted" />
-                <p>
-                  Connecting with Instagram needs the Meta app&apos;s Instagram configuration ID on the server (Instagram
-                  use case → API setup with Unified login → configuration). Until then, use <strong>Via Facebook</strong>{' '}
-                  for accounts linked to a Page, or add a reminder account.
-                </p>
-              </div>
-            )}
 
             {setupFor === platform.platform && (
               <div className="mt-2 flex gap-2 rounded-md border border-border bg-surface-alt px-3 py-2.5 text-[12px] leading-relaxed text-text-secondary">

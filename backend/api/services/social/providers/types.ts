@@ -11,11 +11,6 @@ export interface TokenSet {
 
 /** One account a sign-in grants access to; a Meta sign-in can grant several Pages. */
 export interface ConnectedAccount {
-  /**
-   * Set when a sign-in also yields accounts on another platform: connecting
-   * Facebook returns the Instagram accounts linked to the shared Pages.
-   */
-  platform?: SchedulablePlatform;
   platformAccountId: string;
   accountType: string;
   accountName: string;

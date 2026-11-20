@@ -395,7 +395,7 @@ export const mediaRegisterSchema = z.object({
 });
 
 export const socialAccountCreateSchema = z.object({
-  platform: z.enum(['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube']),
+  platform: z.enum(['facebook', 'x', 'linkedin', 'tiktok', 'youtube']),
   handle: requiredText(100),
   displayName: requiredText(120).optional()
 });
@@ -416,7 +416,7 @@ const socialPostFields = {
   caption: text(2200).default(''),
   mediaIds: z.array(objectId).max(20).default([]),
   cardId: objectId.nullable().optional(),
-  platforms: z.array(z.enum(['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube'])).min(1).max(6),
+  platforms: z.array(z.enum(['facebook', 'x', 'linkedin', 'tiktok', 'youtube'])).min(1).max(5),
   tags: z.array(requiredText(50)).max(30).default([]),
   aiGeneration: z.boolean().default(false),
   schedule: z.object({
@@ -433,7 +433,7 @@ export const socialPostPatchSchema = z.object({
   caption: text(2200).optional(),
   mediaIds: z.array(objectId).max(20).optional(),
   cardId: objectId.nullable().optional(),
-  platforms: z.array(z.enum(['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube'])).min(1).max(6).optional(),
+  platforms: z.array(z.enum(['facebook', 'x', 'linkedin', 'tiktok', 'youtube'])).min(1).max(5).optional(),
   tags: z.array(requiredText(50)).max(30).optional(),
   aiGeneration: z.boolean().optional(),
   schedule: z.object({
@@ -462,7 +462,7 @@ export const captionSchema = z.object({
   title: requiredText(300),
   tone: z.enum(['neutral', 'friendly', 'professional', 'playful']).default('friendly'),
   keywords: z.array(requiredText(50)).max(20).default([]),
-  platform: z.enum(['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube']).optional()
+  platform: z.enum(['facebook', 'x', 'linkedin', 'tiktok', 'youtube']).optional()
 });
 
 export const activityQuerySchema = paginationQuerySchema.extend({

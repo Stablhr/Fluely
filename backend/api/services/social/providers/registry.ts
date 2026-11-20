@@ -1,16 +1,13 @@
 import {env} from '../../../config/env';
 import {PlatformMode, SchedulablePlatform, SchedulablePlatforms, PLATFORM_LABELS} from '../../../constants/social';
 import {PostMedia} from '../../../models/SocialPost.model';
-import {facebookProvider, instagramProvider} from './meta';
+import {facebookProvider} from './meta';
 import {linkedinProvider} from './linkedin';
 import {tiktokProvider} from './tiktok';
 import {youtubeProvider} from './youtube';
 import {SocialProvider} from './types';
-import {instagramLoginConfigured} from './instagramLogin';
-import {instagramUnifiedConfigured} from './instagramUnified';
 
 const providers: Record<SchedulablePlatform, SocialProvider> = {
-  instagram: instagramProvider,
   facebook: facebookProvider,
   tiktok: tiktokProvider,
   youtube: youtubeProvider,
@@ -22,7 +19,6 @@ export function getProvider(platform: SchedulablePlatform): SocialProvider {
 }
 
 const MODE_ENV: Record<SchedulablePlatform, keyof typeof env> = {
-  instagram: 'INSTAGRAM_MODE',
   facebook: 'FACEBOOK_MODE',
   tiktok: 'TIKTOK_MODE',
   youtube: 'YOUTUBE_MODE',
@@ -40,16 +36,11 @@ export function platformSummaries() {
     platform,
     label: PLATFORM_LABELS[platform],
     mode: platformMode(platform),
-    configured: providers[platform].isConfigured(),
-    // Instagram can also connect directly, for accounts not linked to Facebook.
-    ...(platform === 'instagram'
-      ? {instagramLoginConfigured: instagramLoginConfigured() || instagramUnifiedConfigured()}
-      : {})
+    configured: providers[platform].isConfigured()
   }));
 }
 
 const CAPTION_LIMITS: Record<SchedulablePlatform, number> = {
-  instagram: 2200,
   facebook: 63206,
   tiktok: 2200,
   youtube: 5000,
@@ -78,12 +69,6 @@ export function validateContent(
   }
 
   switch (platform) {
-    case 'instagram':
-      if (content.media.length === 0) errors.push('Instagram posts need an image or a video');
-      if (content.media.length > 10) errors.push('Instagram allows at most 10 media items per post');
-      if (content.media.some(m => m.type === 'audio')) errors.push('Instagram does not accept audio files');
-      if (content.hashtags.length > 30) errors.push('Instagram allows at most 30 hashtags');
-      break;
     case 'facebook':
       if (!content.text.trim() && content.media.length === 0) errors.push('Facebook posts need text or media');
       if (videos.length > 1 || (videos.length === 1 && images.length > 0)) {

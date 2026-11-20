@@ -17,7 +17,7 @@ const sections: LegalSection[] = [
       <>
         <p><strong>Account information.</strong> Your name, email address or phone number, password (stored only as a secure hash), profile photo and the profile details you choose to add.</p>
         <p><strong>Your content.</strong> The workspaces, boards, lists, cards, comments, reactions, files and social posts you and your teammates create in {n}.</p>
-        <p><strong>Connected social accounts.</strong> When you connect Instagram, Facebook, LinkedIn, TikTok or YouTube, we receive from that platform your account or page ID, display name, profile picture and an access token (and, where the platform provides one, a refresh token). We do not receive your password for those platforms.</p>
+        <p><strong>Connected social accounts.</strong> When you connect Facebook, LinkedIn, TikTok or YouTube, we receive from that platform your account or page ID, display name, profile picture and an access token (and, where the platform provides one, a refresh token). We do not receive your password for those platforms.</p>
         <p><strong>Technical information.</strong> Basic request logs (such as IP address, browser and time of request) used for security, rate limiting and troubleshooting.</p>
       </>
     )
@@ -42,7 +42,7 @@ const sections: LegalSection[] = [
         <p>{n} only asks each platform for the permissions needed to identify the account you connect and publish the posts you schedule. We use platform data only to provide those features to you; we do not sell it, use it for advertising or share it with anyone else.</p>
         <p>Connected accounts are shared within the workspace you connected them to, so your teammates can schedule posts to them. Anyone in the workspace can see the account name and picture, never its tokens.</p>
         <p><strong>YouTube and Google.</strong> {n} uses YouTube API Services. By connecting a YouTube channel you agree to the <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">YouTube Terms of Service</a>, and Google&apos;s handling of your data is described in the <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Google Privacy Policy</a>. {n}&apos;s use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noreferrer">Google API Services User Data Policy</a>, including the Limited Use requirements. You can revoke {n}&apos;s access at any time from your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noreferrer">Google security settings</a>.</p>
-        <p>You can also revoke access from each platform&apos;s own settings: Facebook and Instagram (Business Integrations), LinkedIn (Permitted services) and TikTok (Manage app permissions).</p>
+        <p>You can also revoke access from each platform&apos;s own settings: Facebook (Business Integrations), LinkedIn (Permitted services) and TikTok (Manage app permissions).</p>
       </>
     )
   },

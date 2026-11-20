@@ -92,7 +92,7 @@ function emptyDraft(defaultDate?: string, defaultTime?: string): Draft {
     title: '',
     caption: '',
     status: 'draft',
-    platforms: ['instagram'],
+    platforms: ['facebook'],
     date: defaultDate ?? '',
     time: defaultTime ?? '',
     tags: '',

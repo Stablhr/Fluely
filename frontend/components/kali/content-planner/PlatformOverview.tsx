@@ -50,7 +50,7 @@ function countFor(posts: SocialPost[], platform: Platform | 'all'): Counts {
   let draft = 0
   for (const post of relevant) {
     // A platform card reports that platform's own outcome once publishing has
-    // touched it (a post can go out on LinkedIn while Instagram was refused);
+    // touched it (a post can go out on LinkedIn while TikTok was refused);
     // until then it follows the post's planning stage.
     const target = platform === 'all' ? undefined : post.platforms.find((t) => t.platform === platform)
     const stage =

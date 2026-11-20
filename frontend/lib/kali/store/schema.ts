@@ -225,7 +225,7 @@ export interface InboxItem {
 
 /* ── Social Media Scheduler types ────────────────────────────── */
 
-export type Platform = "youtube" | "facebook" | "tiktok" | "instagram" | "linkedin";
+export type Platform = "youtube" | "facebook" | "tiktok" | "linkedin";
 
 /**
  * Planning stages come first (idea → draft → in_review) because the content
@@ -379,7 +379,6 @@ export const PLATFORM_DEFAULTS: Record<
   youtube: { caption: "", visibility: "public", hashtags: [] },
   facebook: { caption: "", visibility: "public", hashtags: [] },
   tiktok: { caption: "", visibility: "public", hashtags: [] },
-  instagram: { caption: "", visibility: "public", hashtags: [] },
   linkedin: { caption: "", visibility: "public", hashtags: [] },
 };
 
@@ -402,11 +401,6 @@ export const PLATFORM_LIMITS: Record<
     maxHashtags: 30,
     supportedMedia: ["video", "image"],
   },
-  instagram: {
-    maxCaption: 2200,
-    maxHashtags: 30,
-    supportedMedia: ["image", "video"],
-  },
   linkedin: {
     maxCaption: 3000,
     maxHashtags: 30,
@@ -418,7 +412,6 @@ export const PLATFORM_COLORS: Record<Platform, string> = {
   youtube: "#FF0000",
   facebook: "#1877F2",
   tiktok: "#000000",
-  instagram: "#E4405F",
   linkedin: "#0A66C2",
 };
 
@@ -518,7 +511,6 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
       "Done",
     ],
     labels: [
-      { name: "Instagram", color: "#BE3A5E" },
       { name: "Facebook", color: "#2554C7" },
       { name: "Blog", color: "#6D4FC4" },
       { name: "TikTok", color: "#334155" },

@@ -159,9 +159,7 @@ export const scheduleSchema = z.object({
 export const connectBodySchema = z.object({
   returnTo: z.enum(['planner', 'settings']).default('planner'),
   /** Ask for a demo account explicitly; never implied by missing app keys. */
-  demo: z.boolean().default(false),
-  /** Instagram only: sign in with Instagram itself instead of through Facebook. */
-  via: z.enum(['facebook', 'instagram']).optional()
+  demo: z.boolean().default(false)
 });
 
 export const reminderAccountSchema = z.object({
