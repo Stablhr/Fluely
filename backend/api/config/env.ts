@@ -62,6 +62,12 @@ const envSchema = z.object({
   META_LOGIN_CONFIG_ID: z.string().optional(),
   TIKTOK_CLIENT_KEY: z.string().optional(),
   TIKTOK_CLIENT_SECRET: z.string().optional(),
+  /**
+   * Public https base that forwards to this backend, used only as TikTok's
+   * redirect (TikTok refuses http://localhost). Leave empty when
+   * API_PUBLIC_URL is already https.
+   */
+  TIKTOK_REDIRECT_BASE: z.string().url().optional(),
   TIKTOK_PRIVACY: z
     .enum(['SELF_ONLY', 'PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR'])
     .optional(),
@@ -118,6 +124,7 @@ export const env = {
   ),
   META_GRAPH_VERSION: parsed.data.META_GRAPH_VERSION ?? 'v25.0',
   TIKTOK_PRIVACY: parsed.data.TIKTOK_PRIVACY ?? 'SELF_ONLY',
+  TIKTOK_REDIRECT_BASE: parsed.data.TIKTOK_REDIRECT_BASE?.replace(/\/+$/, ''),
   LINKEDIN_ORGANIZATIONS: parsed.data.LINKEDIN_ORGANIZATIONS === 'true',
   QSTASH_URL: (parsed.data.QSTASH_URL ?? 'https://qstash.upstash.io').replace(/\/+$/, '')
 };

@@ -82,7 +82,20 @@ export function oauthCookieOptions(): CookieOptions {
 }
 
 export function redirectUriFor(platform: SchedulablePlatform): string {
-  return `${env.API_PUBLIC_URL}/api/social-accounts/oauth/${platform}/callback`;
+  const base = platform === 'tiktok' && env.TIKTOK_REDIRECT_BASE ? env.TIKTOK_REDIRECT_BASE : env.API_PUBLIC_URL;
+  return `${base}/api/social-accounts/oauth/${platform}/callback`;
+}
+
+/**
+ * TikTok returns to the https tunnel (TIKTOK_REDIRECT_BASE), where the
+ * sign-in cookie set on API_PUBLIC_URL isn't sent. Send the browser on to the
+ * same path at API_PUBLIC_URL, where the cookie is. Only for that tunnel.
+ */
+export function callbackBounceUrl(host: string | undefined, originalUrl: string, hasCookie: boolean): string | null {
+  if (hasCookie || !host || !env.TIKTOK_REDIRECT_BASE) return null;
+  const tunnel = new URL(env.TIKTOK_REDIRECT_BASE).host.toLowerCase();
+  if (host.toLowerCase() !== tunnel || tunnel === new URL(env.API_PUBLIC_URL).host.toLowerCase()) return null;
+  return `${env.API_PUBLIC_URL}${originalUrl}`;
 }
 
 export function serializeAccount(account: SocialAccountDocument) {

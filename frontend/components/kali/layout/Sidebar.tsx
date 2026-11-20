@@ -60,9 +60,9 @@ const NAV = [
 function Logo({ collapsed }: { collapsed: boolean }) {
   return (
     <div className="flex items-center gap-2.5 px-2 py-3">
-      <BrandMark size={collapsed ? 28 : 30} />
+      <BrandMark size={collapsed ? 28 : 30} className="text-text-primary" />
       {!collapsed && (
-        <span className="text-[16px] font-semibold tracking-tight text-text-primary">
+        <span className="text-[16px] font-semibold lowercase tracking-tight text-text-primary">
           {BRAND.name}
         </span>
       )}

@@ -14,7 +14,9 @@ function describe(body: unknown): string {
   const error = record.error;
   if (error && typeof error === 'object') {
     const inner = error as Record<string, unknown>;
-    return String(inner.message ?? inner.error_user_msg ?? inner.code ?? JSON.stringify(inner)).slice(0, 300);
+    const message = String(inner.message ?? inner.error_user_msg ?? inner.code ?? JSON.stringify(inner));
+    const code = typeof inner.code === 'string' && inner.code !== 'ok' && !message.includes(inner.code) ? ` [${inner.code}]` : '';
+    return `${message}${code}`.slice(0, 300);
   }
   return String(
     record.message ?? record.error_description ?? record.error ?? JSON.stringify(record)

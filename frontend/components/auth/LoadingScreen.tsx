@@ -103,11 +103,11 @@ export default function LoadingScreen({mode = 'login', exiting = false}: Loading
             strokeDasharray={`${Math.PI * R * 0.6} ${Math.PI * R * 2}`}
           />
         </svg>
-        <BrandMark size={40} animated className="relative" />
+        <BrandMark size={40} animated className="relative text-text-primary" />
       </div>
 
       <p
-        className="animate-rise mt-6 text-[15px] font-semibold tracking-tight text-text-primary"
+        className="animate-rise mt-6 text-[15px] font-semibold lowercase tracking-tight text-text-primary"
         style={{animationDelay: '80ms'}}
       >
         {BRAND.name}

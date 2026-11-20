@@ -2,7 +2,12 @@ import {NextFunction, Request, Response} from 'express';
 import {env} from '../config/env';
 import {ErrorCodes} from '../constants/errorCodes';
 import {SchedulablePlatform} from '../constants/social';
-import {OAUTH_COOKIE, oauthCookieOptions, socialAccountService} from '../services/social/accounts.service';
+import {
+  callbackBounceUrl,
+  OAUTH_COOKIE,
+  oauthCookieOptions,
+  socialAccountService
+} from '../services/social/accounts.service';
 import {socialPostService} from '../services/social/posts.service';
 import {publishDueJobs, runPublishingJob} from '../services/social/publisher.service';
 import {verifyQstashSignature} from '../services/social/qstash';
@@ -44,6 +49,11 @@ export const socialAccountController = {
 
   callback: wrap(async (req, res) => {
     const nonce = req.cookies?.[OAUTH_COOKIE] as string | undefined;
+    const bounce = callbackBounceUrl(req.get('host'), req.originalUrl, Boolean(nonce));
+    if (bounce) {
+      res.redirect(302, bounce);
+      return;
+    }
     const target = await socialAccountService.finishConnect(platformOf(req), req.query, nonce);
     res.clearCookie(OAUTH_COOKIE, {...oauthCookieOptions(), maxAge: undefined});
     res.redirect(302, target);

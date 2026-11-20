@@ -467,14 +467,23 @@ body.kali-dragging .kali-app * {
   }
 }
 
-/* The brand mark's bars grow from the baseline (loading curtain). */
-@keyframes bar-rise {
+/* The brand mark draws its calendar outline, then the F slides in (loading curtain). */
+@keyframes mark-draw {
   from {
-    transform: scaleY(0);
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes mark-f-in {
+  from {
+    transform: translateX(-3px);
     opacity: 0;
   }
   to {
-    transform: scaleY(1);
+    transform: translateX(0);
     opacity: 1;
   }
 }

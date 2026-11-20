@@ -24,6 +24,8 @@ import {webhookUrl} from '../api/services/social/qstash';
 import {zonedToUtc} from '../api/services/social/time';
 import {linkedinApiVersion, toLittleText} from '../api/services/social/providers/linkedin';
 import {accountsFromPages} from '../api/services/social/providers/meta';
+import {explainTikTokError, pickTikTokPrivacy, tiktokProvider} from '../api/services/social/providers/tiktok';
+import {ProviderError} from '../api/services/social/providers/types';
 import {decryptToken, encryptToken} from '../api/utils/tokenCrypto';
 import {hashToken} from '../api/utils/crypto';
 
@@ -35,7 +37,7 @@ jest.setTimeout(30_000);
 const PLATFORM_SETTINGS = [
   'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_MODE', 'LINKEDIN_ORGANIZATIONS', 'LINKEDIN_API_VERSION',
   'META_APP_ID', 'META_APP_SECRET', 'META_LOGIN_CONFIG_ID', 'FACEBOOK_MODE',
-  'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_MODE',
+  'TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET', 'TIKTOK_MODE', 'TIKTOK_REDIRECT_BASE',
   'GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'YOUTUBE_MODE',
   'QSTASH_TOKEN', 'QSTASH_CURRENT_SIGNING_KEY', 'QSTASH_NEXT_SIGNING_KEY'
 ] as const;
@@ -444,6 +446,84 @@ describe('reminder accounts (post it yourself)', () => {
     // YouTube's API needs a video; posting by hand does not.
     const res = await api.post('/api/social-posts/text-only/schedule', {scheduledDate: '2030-01-01'});
     expect(res.body.validation[0]).toMatchObject({platform: 'youtube', valid: true});
+  });
+});
+
+describe('TikTok https redirect', () => {
+  afterEach(() => {
+    (env as Record<string, unknown>).TIKTOK_REDIRECT_BASE = undefined;
+  });
+
+  it('uses the tunnel address for TikTok only', async () => {
+    const {redirectUriFor} = await import('../api/services/social/accounts.service');
+    (env as Record<string, unknown>).TIKTOK_REDIRECT_BASE = 'https://fluely.example.app';
+    expect(redirectUriFor('tiktok')).toBe('https://fluely.example.app/api/social-accounts/oauth/tiktok/callback');
+    expect(redirectUriFor('linkedin')).toBe(`${env.API_PUBLIC_URL}/api/social-accounts/oauth/linkedin/callback`);
+  });
+
+  it('sends a callback without the sign-in cookie on to the backend address', async () => {
+    const {callbackBounceUrl} = await import('../api/services/social/accounts.service');
+    const path = '/api/social-accounts/oauth/tiktok/callback?code=abc&state=xyz';
+    const home = new URL(env.API_PUBLIC_URL).host;
+    expect(callbackBounceUrl('fluely.example.app', path, false)).toBeNull();
+    (env as Record<string, unknown>).TIKTOK_REDIRECT_BASE = 'https://fluely.example.app';
+    expect(callbackBounceUrl('fluely.example.app', path, false)).toBe(`${env.API_PUBLIC_URL}${path}`);
+    expect(callbackBounceUrl('fluely.example.app', path, true)).toBeNull();
+    expect(callbackBounceUrl(home, path, false)).toBeNull();
+    expect(callbackBounceUrl('other.example.com', path, false)).toBeNull();
+  });
+});
+
+describe('TikTok posting rules', () => {
+  it('posts privately when the wanted privacy is not allowed for this creator', () => {
+    expect(pickTikTokPrivacy('PUBLIC_TO_EVERYONE', ['SELF_ONLY'])).toBe('SELF_ONLY');
+    expect(pickTikTokPrivacy('PUBLIC_TO_EVERYONE', ['PUBLIC_TO_EVERYONE', 'SELF_ONLY'])).toBe('PUBLIC_TO_EVERYONE');
+    expect(pickTikTokPrivacy('SELF_ONLY', ['PUBLIC_TO_EVERYONE'])).toBeNull();
+  });
+
+  it('explains the unaudited-app refusal in plain language', () => {
+    const raw = new ProviderError('TikTok: Please review our integration guidelines [unaudited_client_can_only_post_to_private_accounts] (HTTP 403)', 'FORBIDDEN', false);
+    const explained = explainTikTokError(raw) as ProviderError;
+    expect(explained.message).toMatch(/Set the TikTok account to private/);
+    expect(explained.retryable).toBe(false);
+  });
+
+  it('asks for creator info, uploads the video and checks the result', async () => {
+    const calls: {url: string; body?: string}[] = [];
+    const reply = (body: object) => new Response(JSON.stringify(body), {status: 200});
+    const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      calls.push({url, body: typeof init?.body === 'string' ? init.body : undefined});
+      if (url.includes('creator_info')) {
+        return reply({data: {privacy_level_options: ['SELF_ONLY'], comment_disabled: true, max_video_post_duration_sec: 600}, error: {code: 'ok'}});
+      }
+      if (url.includes('cloudinary')) return new Response(new Uint8Array(1024), {status: 200, headers: {'content-type': 'video/mp4'}});
+      if (url.includes('/video/init/')) return reply({data: {publish_id: 'v_pub_1', upload_url: 'https://upload.tiktok.test/x'}, error: {code: 'ok'}});
+      if (url.includes('upload.tiktok.test')) return new Response(null, {status: 201});
+      if (url.includes('status/fetch')) return reply({data: {status: 'PUBLISH_COMPLETE'}, error: {code: 'ok'}});
+      throw new Error(`unexpected ${url}`);
+    });
+    try {
+      const result = await tiktokProvider.publish({
+        account: {platformAccountId: 'open-1', accountType: 'creator', accessToken: 'tok'},
+        content: {
+          title: 'Clip',
+          text: 'Caption',
+          hashtags: [],
+          visibility: 'public',
+          media: [{id: 'v', type: 'video', name: 'v.mp4', storageUrl: 'https://res.cloudinary.com/demo/video/upload/v.mp4', size: 1024, duration: 30, platformCompat: []}]
+        }
+      });
+      expect(result.externalPostId).toBe('v_pub_1');
+      expect(calls[0].url).toContain('/post/publish/creator_info/query/');
+      const init = JSON.parse(calls.find(c => c.url.includes('/video/init/'))!.body!);
+      // Only what this creator allows is used, and their own settings are respected.
+      expect(init.post_info.privacy_level).toBe('SELF_ONLY');
+      expect(init.post_info.disable_comment).toBe(true);
+      expect(init.source_info).toMatchObject({source: 'FILE_UPLOAD', video_size: 1024, chunk_size: 1024, total_chunk_count: 1});
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
 
