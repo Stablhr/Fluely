@@ -116,7 +116,7 @@ async function saveAccounts(
   const saved: SocialAccountDocument[] = [];
   for (const account of accounts) {
     const doc = await SocialAccountModel.findOneAndUpdate(
-      {workspaceId, platform, platformAccountId: account.platformAccountId},
+      {workspaceId, platform: account.platform ?? platform, platformAccountId: account.platformAccountId},
       {
         $set: {
           accountType: account.accountType,
@@ -256,7 +256,13 @@ export const socialAccountService = {
         accounts,
         false
       );
-      return back({social: 'connected', count: String(saved.length)});
+      // Accounts on other platforms that came with this sign-in (Instagram
+      // accounts linked to the Facebook Pages) are reported separately.
+      const own = saved.filter(a => a.platform === platform).length;
+      const extra = saved.filter(a => a.platform !== platform);
+      const params: Record<string, string> = {social: 'connected', count: String(own)};
+      if (extra.length > 0) params.also = `${extra[0].platform}:${extra.length}`;
+      return back(params);
     } catch (error) {
       logger.warn({err: error, platform}, 'Social account connection failed');
       const message =

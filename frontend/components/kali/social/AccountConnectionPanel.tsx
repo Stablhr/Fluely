@@ -43,7 +43,7 @@ const STATUS_CLASS: Record<SocialAccount['status'], string> = {
 }
 
 /** Query keys the platform's sign-in sends back (backend `accounts.service.ts`). */
-const CONNECT_OUTCOME_PARAMS = ['social', 'platform', 'count', 'message'] as const
+const CONNECT_OUTCOME_PARAMS = ['social', 'platform', 'count', 'message', 'also'] as const
 
 export default function AccountConnectionPanel({ returnTo = 'planner' }: { returnTo?: ConnectReturn }) {
   const { toast } = useToast()
@@ -87,7 +87,15 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
     const name = platforms.find((p) => p.platform === platform)?.label ?? 'the account'
     if (outcome === 'connected') {
       const count = Number(url.searchParams.get('count') ?? '1')
-      toast(count > 1 ? `Connected ${count} ${name} accounts` : `Connected ${name}`, 'success')
+      // e.g. "instagram:1": Instagram accounts linked to the Facebook Pages.
+      const [alsoPlatform, alsoCount] = (url.searchParams.get('also') ?? '').split(':')
+      const alsoName = platforms.find((p) => p.platform === alsoPlatform)?.label
+      const extra =
+        alsoName && Number(alsoCount) > 0
+          ? ` and ${alsoCount} ${alsoName} account${Number(alsoCount) === 1 ? '' : 's'} linked to them`
+          : ''
+      const main = count > 1 ? `Connected ${count} ${name} accounts` : `Connected ${name}`
+      toast(`${main}${extra}`, 'success', { duration: 6000 })
     } else {
       toast(url.searchParams.get('message') || `Could not connect ${name}`, 'error', { duration: 8000 })
     }

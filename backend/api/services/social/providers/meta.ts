@@ -15,7 +15,19 @@ import {ConnectedAccount, ProviderError, PublishInput, SocialProvider} from './t
  * the app does not have ("Invalid Scopes").
  */
 const FACEBOOK_SCOPES = ['pages_show_list', 'pages_read_engagement', 'pages_manage_posts', 'business_management'];
-const INSTAGRAM_SCOPES = [...FACEBOOK_SCOPES, 'instagram_basic', 'instagram_content_publish'];
+const INSTAGRAM_ONLY_SCOPES = ['instagram_basic', 'instagram_content_publish'];
+const INSTAGRAM_SCOPES = [...FACEBOOK_SCOPES, ...INSTAGRAM_ONLY_SCOPES];
+
+/**
+ * Connecting Facebook also connects the Instagram accounts linked to the
+ * shared Pages, so it asks for the Instagram permissions too -- unless
+ * Instagram is turned off (INSTAGRAM_MODE=disabled), e.g. for a Meta app
+ * without the Instagram use case, where asking would fail the sign-in.
+ */
+export function instagramWithFacebook(): boolean {
+  return env.INSTAGRAM_MODE !== 'disabled';
+}
+const facebookScopes = () => (instagramWithFacebook() ? INSTAGRAM_SCOPES : FACEBOOK_SCOPES);
 
 const graph = (path: string) => `https://graph.facebook.com/${env.META_GRAPH_VERSION}${path}`;
 
@@ -24,7 +36,7 @@ const graph = (path: string) => `https://graph.facebook.com/${env.META_GRAPH_VER
  * instead of a list of permissions; when one is set it takes precedence.
  */
 const authorizeUrlFor =
-  (scopes: string[], configId: () => string | undefined) => (state: string, redirectUri: string) => {
+  (scopes: () => string[], configId: () => string | undefined) => (state: string, redirectUri: string) => {
     const params = new URLSearchParams({
       client_id: env.META_APP_ID ?? '',
       redirect_uri: redirectUri,
@@ -33,11 +45,11 @@ const authorizeUrlFor =
     });
     const config = configId();
     if (config) params.set('config_id', config);
-    else params.set('scope', scopes.join(','));
+    else params.set('scope', scopes().join(','));
     return `https://www.facebook.com/${env.META_GRAPH_VERSION}/dialog/oauth?${params}`;
   };
 
-type PageRow = {
+export type PageRow = {
   id: string;
   name: string;
   access_token: string;
@@ -83,6 +95,37 @@ async function listPages(
   return {pages: pages.data ?? [], scopes};
 }
 
+/**
+ * The accounts a Facebook sign-in yields: each shared Page, plus -- when
+ * Instagram is on -- the Instagram professional account linked to a Page,
+ * which posts with that Page's token.
+ */
+export function accountsFromPages(pages: PageRow[], scopes: string[], withInstagram: boolean): ConnectedAccount[] {
+  const accounts: ConnectedAccount[] = pages.map(page => ({
+    platformAccountId: page.id,
+    accountType: 'page',
+    accountName: page.name,
+    profileImageUrl: page.picture?.data?.url,
+    token: {accessToken: page.access_token, expiresAt: null, scopes}
+  }));
+  if (withInstagram) {
+    for (const page of pages) {
+      const ig = page.instagram_business_account;
+      if (!ig?.id) continue;
+      accounts.push({
+        platform: 'instagram',
+        platformAccountId: ig.id,
+        accountType: 'business',
+        accountName: ig.name || ig.username || page.name,
+        accountUsername: ig.username,
+        profileImageUrl: ig.profile_picture_url,
+        token: {accessToken: page.access_token, expiresAt: null, scopes}
+      });
+    }
+  }
+  return accounts;
+}
+
 async function post(path: string, label: string, values: Record<string, string | undefined>) {
   return json<Record<string, string>>(graph(path), label, {
     method: 'POST',
@@ -94,10 +137,10 @@ async function post(path: string, label: string, values: Record<string, string |
 export const facebookProvider: SocialProvider = {
   platform: 'facebook',
   isConfigured: () => Boolean(env.META_APP_ID && env.META_APP_SECRET),
-  authorizeUrl: authorizeUrlFor(FACEBOOK_SCOPES, () => env.META_LOGIN_CONFIG_ID),
+  authorizeUrl: authorizeUrlFor(facebookScopes, () => env.META_LOGIN_CONFIG_ID),
 
   async exchangeCode(code, redirectUri) {
-    const {pages, scopes} = await listPages(code, redirectUri, 'Facebook', FACEBOOK_SCOPES);
+    const {pages, scopes} = await listPages(code, redirectUri, 'Facebook', facebookScopes());
     if (pages.length === 0) {
       throw new ProviderError(
         'Facebook: no Pages were shared. Facebook only allows posting to Pages you manage.',
@@ -105,13 +148,7 @@ export const facebookProvider: SocialProvider = {
         false
       );
     }
-    return pages.map<ConnectedAccount>(page => ({
-      platformAccountId: page.id,
-      accountType: 'page',
-      accountName: page.name,
-      profileImageUrl: page.picture?.data?.url,
-      token: {accessToken: page.access_token, expiresAt: null, scopes}
-    }));
+    return accountsFromPages(pages, scopes, instagramWithFacebook());
   },
 
   async publish({account, content}: PublishInput) {
@@ -172,7 +209,7 @@ async function waitForContainer(id: string, token: string) {
 export const instagramProvider: SocialProvider = {
   platform: 'instagram',
   isConfigured: () => Boolean(env.META_APP_ID && env.META_APP_SECRET),
-  authorizeUrl: authorizeUrlFor(INSTAGRAM_SCOPES, () => env.META_INSTAGRAM_CONFIG_ID),
+  authorizeUrl: authorizeUrlFor(() => INSTAGRAM_SCOPES, () => env.META_INSTAGRAM_CONFIG_ID),
 
   async exchangeCode(code, redirectUri) {
     const {pages, scopes} = await listPages(code, redirectUri, 'Instagram', INSTAGRAM_SCOPES);

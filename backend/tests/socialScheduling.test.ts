@@ -23,6 +23,7 @@ import {composeText} from '../api/services/social/publisher.service';
 import {webhookUrl} from '../api/services/social/qstash';
 import {zonedToUtc} from '../api/services/social/time';
 import {linkedinApiVersion, toLittleText} from '../api/services/social/providers/linkedin';
+import {accountsFromPages} from '../api/services/social/providers/meta';
 import {decryptToken, encryptToken} from '../api/utils/tokenCrypto';
 import {hashToken} from '../api/utils/crypto';
 
@@ -268,7 +269,13 @@ describe('connecting accounts', () => {
       expect(url.hostname).toBe('www.facebook.com');
       const scope = url.searchParams.get('scope') ?? '';
       expect(scope).toContain('pages_manage_posts');
-      expect(scope).not.toContain('instagram');
+      // Instagram is on, so the Facebook sign-in also asks for it (linked accounts come along).
+      expect(scope).toContain('instagram_content_publish');
+
+      env.INSTAGRAM_MODE = 'disabled';
+      const fbOnly = new URL((await as(owner.userId).post('/api/social-accounts/connect/facebook')).body.url);
+      expect(fbOnly.searchParams.get('scope')).not.toContain('instagram');
+      env.INSTAGRAM_MODE = undefined;
 
       env.META_LOGIN_CONFIG_ID = 'cfg-123';
       const withConfig = new URL((await as(owner.userId).post('/api/social-accounts/connect/facebook')).body.url);
@@ -505,6 +512,22 @@ describe('helpers', () => {
 
   it('appends hashtags that are not already in the caption', () => {
     expect(composeText('Hello #launch', ['launch', '#news'])).toBe('Hello #launch\n\n#news');
+  });
+
+  it('turns a Facebook sign-in into Pages plus the Instagram accounts linked to them', () => {
+    const pages = [
+      {id: 'p1', name: 'Page One', access_token: 'tok1', instagram_business_account: {id: 'ig1', username: 'pageone'}},
+      {id: 'p2', name: 'Page Two', access_token: 'tok2'}
+    ];
+    const accounts = accountsFromPages(pages, ['pages_manage_posts'], true);
+    expect(accounts.map(a => [a.platform ?? 'facebook', a.platformAccountId, a.accountName])).toEqual([
+      ['facebook', 'p1', 'Page One'],
+      ['facebook', 'p2', 'Page Two'],
+      ['instagram', 'ig1', 'pageone']
+    ]);
+    // The Instagram account posts with its Page's token.
+    expect(accounts[2].token.accessToken).toBe('tok1');
+    expect(accountsFromPages(pages, [], false)).toHaveLength(2);
   });
 
   it('picks a LinkedIn API version two months back, across the new year', () => {
