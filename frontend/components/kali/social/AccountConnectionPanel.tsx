@@ -174,7 +174,10 @@ export default function AccountConnectionPanel({ returnTo = 'planner' }: { retur
     <div className="space-y-2">
       {platforms.map((platform) => {
         const rows = accounts.filter((a) => a.platform === platform.platform)
-        const badge = MODE_BADGE[platform.mode]
+        // "Dry run" is shown only until a real account is connected; after
+        // that the row is about that account, not the platform's test mode.
+        const hasRealAccount = rows.some((a) => !a.demo && !isReminderAccount(a))
+        const badge = hasRealAccount ? null : MODE_BADGE[platform.mode]
         return (
           <section key={platform.platform} className="rounded-lg border border-border bg-surface p-3">
             <div className="flex items-center justify-between gap-2">
