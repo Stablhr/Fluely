@@ -296,5 +296,9 @@ export async function publishDueJobs(limit = 20): Promise<{processed: number}> {
       logger.error({err: error, jobId: job._id.toString()}, 'Publishing job crashed');
     }
   }
+  // Keep Instagram Login tokens alive even when nothing is being posted.
+  await socialAccountService.renewExpiringTokens().catch(error =>
+    logger.warn({err: error}, 'Instagram token renewal failed')
+  );
   return {processed: due.length};
 }

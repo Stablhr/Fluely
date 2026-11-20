@@ -12,6 +12,18 @@ import {ApiError} from '../../utils/error';
 import {decryptToken, encryptToken} from '../../utils/tokenCrypto';
 import {getProvider, platformMode, platformSummaries} from './providers/registry';
 import {ConnectedAccount, ProviderError} from './providers/types';
+import {INSTAGRAM_LOGIN_TYPE} from './providers/meta';
+import {
+  instagramLoginAuthorizeUrl,
+  instagramLoginConfigured,
+  instagramLoginExchangeCode,
+  instagramLoginRefresh
+} from './providers/instagramLogin';
+import {
+  instagramUnifiedAuthorizeUrl,
+  instagramUnifiedConfigured,
+  instagramUnifiedExchangeCode
+} from './providers/instagramUnified';
 import {socialWorkspace} from './workspace';
 
 /**
@@ -38,7 +50,15 @@ type StateClaims = {
   r?: ConnectReturn;
   /** The app address the sign-in started from (one of CORS_ORIGINS). */
   o?: string;
+  /**
+   * Instagram without a Facebook Page: `instagram` = Instagram Login (older
+   * apps, Instagram app id/secret); `unified` = Unified login (newer apps,
+   * Facebook Login for Business with the Instagram configuration).
+   */
+  v?: 'instagram' | 'unified';
 };
+
+export type ConnectVia = 'facebook' | 'instagram';
 
 /** The same allow-list `app.ts` gives CORS. */
 function allowedOrigins(): string[] {
@@ -165,16 +185,34 @@ export const socialAccountService = {
     platform: SchedulablePlatform,
     returnTo: ConnectReturn = 'planner',
     demo = false,
-    origin?: string
+    origin?: string,
+    via?: ConnectVia
   ) {
     assertEnabled(platform);
     const {workspaceId} = await socialWorkspace(actor);
     const provider = getProvider(platform);
+    const instagramLogin = platform === 'instagram' && via === 'instagram';
+    // Older apps have an Instagram app id/secret; newer ones use Unified login.
+    const directRoute: 'instagram' | 'unified' | null = !instagramLogin
+      ? null
+      : instagramLoginConfigured()
+        ? 'instagram'
+        : instagramUnifiedConfigured()
+          ? 'unified'
+          : null;
+
+    if (instagramLogin && !demo && !directRoute) {
+      throw new ApiError(
+        409,
+        ErrorCodes.PLATFORM_NOT_CONFIGURED,
+        'Connecting with Instagram is not set up yet. Add the Instagram configuration ID (newer Meta apps) or the Instagram app ID and secret to the server.'
+      );
+    }
 
     // A real account needs the platform's app keys on the server. Without
     // them, say so: silently creating a demo account looked like a successful
     // connection to a real one.
-    if (!demo && !provider.isConfigured()) {
+    if (!demo && !instagramLogin && !provider.isConfigured()) {
       throw new ApiError(
         409,
         ErrorCodes.PLATFORM_NOT_CONFIGURED,
@@ -207,13 +245,19 @@ export const socialAccountService = {
       p: platform,
       n: nonce,
       r: returnTo,
-      o: frontendOrigin(origin)
+      o: frontendOrigin(origin),
+      ...(directRoute ? {v: directRoute} : {})
     };
     const state = jwt.sign(claims, env.JWT_SECRET, {audience: STATE_AUDIENCE, expiresIn: STATE_TTL_SECONDS});
     return {
       demo: false as const,
       nonce,
-      url: provider.authorizeUrl(state, redirectUriFor(platform))
+      url:
+        directRoute === 'instagram'
+          ? instagramLoginAuthorizeUrl(state, redirectUriFor(platform))
+          : directRoute === 'unified'
+            ? instagramUnifiedAuthorizeUrl(state, redirectUriFor(platform))
+            : provider.authorizeUrl(state, redirectUriFor(platform))
     };
   },
 
@@ -248,7 +292,12 @@ export const socialAccountService = {
 
     try {
       assertEnabled(platform);
-      const accounts = await getProvider(platform).exchangeCode(query.code, redirectUriFor(platform));
+      const accounts =
+        claims.v === 'instagram'
+          ? await instagramLoginExchangeCode(query.code, redirectUriFor(platform))
+          : claims.v === 'unified'
+            ? await instagramUnifiedExchangeCode(query.code, redirectUriFor(platform))
+            : await getProvider(platform).exchangeCode(query.code, redirectUriFor(platform));
       const saved = await saveAccounts(
         new Types.ObjectId(claims.w),
         platform,
@@ -313,17 +362,51 @@ export const socialAccountService = {
   },
 
   /**
+   * Renews Instagram Login tokens that expire within a week, even if no post
+   * needs them yet: a token left unrefreshed for 60 days is gone for good.
+   * Run by the publishing sweep; failures mark the account for reconnecting.
+   */
+  async renewExpiringTokens() {
+    const soon = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const rows = await SocialAccountModel.find({
+      accountType: INSTAGRAM_LOGIN_TYPE,
+      status: 'active',
+      tokenExpiresAt: {$lte: soon, $gt: new Date()}
+    })
+      .limit(20)
+      .exec();
+    for (const account of rows) {
+      try {
+        await socialAccountService.accessToken(account);
+      } catch (error) {
+        logger.warn({err: error, accountId: account._id.toString()}, 'Could not renew an Instagram token');
+      }
+    }
+    return {checked: rows.length};
+  },
+
+  /**
    * A usable access token, refreshed when it is about to expire. Marks the
    * account `expired` when it cannot be refreshed, so the UI asks for a
    * reconnect.
    */
   async accessToken(account: SocialAccountDocument): Promise<string> {
-    const soon = Date.now() + 5 * 60 * 1000;
+    const igLogin = account.accountType === INSTAGRAM_LOGIN_TYPE;
+    // Instagram Login tokens are renewed a week early: one that lapses can
+    // never be refreshed. Others only when about to expire.
+    const soon = Date.now() + (igLogin ? 7 * 24 * 60 * 60 * 1000 : 5 * 60 * 1000);
     const expires = account.tokenExpiresAt?.getTime();
     if (expires === undefined || expires > soon) return decryptToken(account.accessTokenEnc);
 
     const provider = getProvider(account.platform);
-    if (!provider.refresh || !account.refreshTokenEnc) {
+    const refresh = igLogin ? instagramLoginRefresh : provider.refresh;
+    // Tokens are issued for 60 days, so the expiry tells the token's age.
+    const issuedAt = expires - 60 * 24 * 60 * 60 * 1000;
+    if (igLogin && expires > Date.now() && Date.now() - issuedAt < 24 * 60 * 60 * 1000) {
+      // Too new to refresh (Instagram needs 24 hours); still valid, so use it.
+      return decryptToken(account.accessTokenEnc);
+    }
+    if (!refresh || !account.refreshTokenEnc) {
       account.status = 'expired';
       account.lastError = 'The sign-in expired. Reconnect the account.';
       await account.save();
@@ -334,7 +417,7 @@ export const socialAccountService = {
         true
       );
     }
-    const fresh = await provider.refresh(decryptToken(account.refreshTokenEnc));
+    const fresh = await refresh(decryptToken(account.refreshTokenEnc));
     account.accessTokenEnc = encryptToken(fresh.accessToken);
     if (fresh.refreshToken) account.refreshTokenEnc = encryptToken(fresh.refreshToken);
     account.tokenExpiresAt = fresh.expiresAt ?? null;

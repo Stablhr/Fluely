@@ -19,13 +19,14 @@ const INSTAGRAM_ONLY_SCOPES = ['instagram_basic', 'instagram_content_publish'];
 const INSTAGRAM_SCOPES = [...FACEBOOK_SCOPES, ...INSTAGRAM_ONLY_SCOPES];
 
 /**
- * Connecting Facebook also connects the Instagram accounts linked to the
- * shared Pages, so it asks for the Instagram permissions too -- unless
- * Instagram is turned off (INSTAGRAM_MODE=disabled), e.g. for a Meta app
- * without the Instagram use case, where asking would fail the sign-in.
+ * When switched on (META_FACEBOOK_INCLUDES_INSTAGRAM=true), connecting
+ * Facebook also asks for the Instagram permissions and connects the
+ * Instagram accounts linked to the shared Pages. Off by default: Meta refuses
+ * the whole sign-in ("Invalid Scopes") if the app lacks instagram_basic and
+ * instagram_content_publish, which would stop Facebook from connecting at all.
  */
 export function instagramWithFacebook(): boolean {
-  return env.INSTAGRAM_MODE !== 'disabled';
+  return env.META_FACEBOOK_INCLUDES_INSTAGRAM === 'true' && env.INSTAGRAM_MODE !== 'disabled';
 }
 const facebookScopes = () => (instagramWithFacebook() ? INSTAGRAM_SCOPES : FACEBOOK_SCOPES);
 
@@ -190,11 +191,34 @@ export const facebookProvider: SocialProvider = {
   }
 };
 
-/** Instagram containers for video are processed asynchronously. */
-async function waitForContainer(id: string, token: string) {
+/** `accountType` of an Instagram account connected with Instagram Login (no Facebook Page). */
+export const INSTAGRAM_LOGIN_TYPE = 'instagram_login';
+
+/**
+ * Instagram is reached at two addresses: through Facebook (graph.facebook.com,
+ * with the linked Page's token) or directly (graph.instagram.com, with an
+ * Instagram Login token). The calls are otherwise the same.
+ */
+export function instagramApiBase(accountType: string): string {
+  return accountType === INSTAGRAM_LOGIN_TYPE
+    ? `https://graph.instagram.com/${env.META_GRAPH_VERSION}`
+    : `https://graph.facebook.com/${env.META_GRAPH_VERSION}`;
+}
+
+/**
+ * Instagram accepts only JPEG images. Cloudinary converts on delivery when
+ * the extension says so, so other formats are requested as .jpg.
+ */
+export function asInstagramImageUrl(url: string | undefined): string | undefined {
+  if (!url || !/res\.cloudinary\.com\/[^/]+\/image\/upload\//.test(url)) return url;
+  return /\.jpe?g(\?|$)/i.test(url) ? url : url.replace(/(\.[a-z0-9]+)?(\?.*)?$/i, '.jpg$2');
+}
+
+/** Instagram containers for video (and carousels) are processed asynchronously. */
+async function waitForContainer(base: string, id: string, token: string) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const status = await json<{status_code?: string; status?: string}>(
-      graph(`/${id}?${new URLSearchParams({fields: 'status_code,status', access_token: token})}`),
+      `${base}/${id}?${new URLSearchParams({fields: 'status_code,status', access_token: token})}`,
       'Instagram'
     );
     if (status.status_code === 'FINISHED') return;
@@ -204,6 +228,64 @@ async function waitForContainer(id: string, token: string) {
     await sleep(3000);
   }
   throw new ProviderError('Instagram is still processing the video; will try again', 'MEDIA_PROCESSING', true);
+}
+
+async function postTo(url: string, values: Record<string, string | undefined>) {
+  return json<Record<string, string>>(url, 'Instagram', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: form(values)
+  });
+}
+
+/** Create container(s) → wait until processed → publish → fetch the permalink. */
+export async function publishToInstagram({account, content}: PublishInput) {
+  const base = instagramApiBase(account.accountType);
+  const igId = account.platformAccountId;
+  const token = account.accessToken;
+  const media = content.media.filter(m => m.type === 'image' || m.type === 'video').slice(0, 10);
+
+  const containerFor = async (item: (typeof media)[number], carouselItem: boolean) => {
+    const values: Record<string, string | undefined> =
+      item.type === 'video'
+        ? {media_type: carouselItem ? 'VIDEO' : 'REELS', video_url: item.storageUrl}
+        : {image_url: asInstagramImageUrl(item.storageUrl), alt_text: content.altText};
+    if (carouselItem) values.is_carousel_item = 'true';
+    else values.caption = content.text;
+    values.access_token = token;
+    const res = await postTo(`${base}/${igId}/media`, values);
+    if (item.type === 'video') await waitForContainer(base, res.id, token);
+    return res.id;
+  };
+
+  let creationId: string;
+  if (media.length === 1) {
+    creationId = await containerFor(media[0], false);
+  } else {
+    const children: string[] = [];
+    for (const item of media) children.push(await containerFor(item, true));
+    const carousel = await postTo(`${base}/${igId}/media`, {
+      media_type: 'CAROUSEL',
+      children: children.join(','),
+      caption: content.text,
+      access_token: token
+    });
+    await waitForContainer(base, carousel.id, token);
+    creationId = carousel.id;
+  }
+
+  const published = await postTo(`${base}/${igId}/media_publish`, {creation_id: creationId, access_token: token});
+  let permalink: string | undefined;
+  try {
+    const meta = await json<{permalink?: string}>(
+      `${base}/${published.id}?${new URLSearchParams({fields: 'permalink', access_token: token})}`,
+      'Instagram'
+    );
+    permalink = meta.permalink;
+  } catch {
+    // The post is out; a missing link is not a failure.
+  }
+  return {externalPostId: published.id, publishedUrl: permalink};
 }
 
 export const instagramProvider: SocialProvider = {
@@ -216,7 +298,7 @@ export const instagramProvider: SocialProvider = {
     const linked = pages.filter(page => page.instagram_business_account);
     if (linked.length === 0) {
       throw new ProviderError(
-        'Instagram: no business or creator account linked to a Facebook Page was shared.',
+        'Instagram: no business or creator account linked to a Facebook Page was shared. Use "Connect with Instagram" instead.',
         'NO_INSTAGRAM_ACCOUNT',
         false
       );
@@ -234,54 +316,5 @@ export const instagramProvider: SocialProvider = {
     });
   },
 
-  async publish({account, content}: PublishInput) {
-    const igId = account.platformAccountId;
-    const token = account.accessToken;
-    const media = content.media.filter(m => m.type === 'image' || m.type === 'video').slice(0, 10);
-
-    const containerFor = async (item: (typeof media)[number], carouselItem: boolean) => {
-      const values: Record<string, string | undefined> =
-        item.type === 'video'
-          ? {media_type: carouselItem ? 'VIDEO' : 'REELS', video_url: item.storageUrl}
-          : {image_url: item.storageUrl, alt_text: content.altText};
-      if (carouselItem) values.is_carousel_item = 'true';
-      else values.caption = content.text;
-      values.access_token = token;
-      const res = await post(`/${igId}/media`, 'Instagram', values);
-      if (item.type === 'video') await waitForContainer(res.id, token);
-      return res.id;
-    };
-
-    let creationId: string;
-    if (media.length === 1) {
-      creationId = await containerFor(media[0], false);
-    } else {
-      const children: string[] = [];
-      for (const item of media) children.push(await containerFor(item, true));
-      const carousel = await post(`/${igId}/media`, 'Instagram', {
-        media_type: 'CAROUSEL',
-        children: children.join(','),
-        caption: content.text,
-        access_token: token
-      });
-      await waitForContainer(carousel.id, token);
-      creationId = carousel.id;
-    }
-
-    const published = await post(`/${igId}/media_publish`, 'Instagram', {
-      creation_id: creationId,
-      access_token: token
-    });
-    let permalink: string | undefined;
-    try {
-      const meta = await json<{permalink?: string}>(
-        graph(`/${published.id}?${new URLSearchParams({fields: 'permalink', access_token: token})}`),
-        'Instagram'
-      );
-      permalink = meta.permalink;
-    } catch {
-      // The post is out; a missing link is not a failure.
-    }
-    return {externalPostId: published.id, publishedUrl: permalink};
-  }
+  publish: publishToInstagram
 };

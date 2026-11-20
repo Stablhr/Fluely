@@ -6,6 +6,8 @@ import {linkedinProvider} from './linkedin';
 import {tiktokProvider} from './tiktok';
 import {youtubeProvider} from './youtube';
 import {SocialProvider} from './types';
+import {instagramLoginConfigured} from './instagramLogin';
+import {instagramUnifiedConfigured} from './instagramUnified';
 
 const providers: Record<SchedulablePlatform, SocialProvider> = {
   instagram: instagramProvider,
@@ -38,7 +40,11 @@ export function platformSummaries() {
     platform,
     label: PLATFORM_LABELS[platform],
     mode: platformMode(platform),
-    configured: providers[platform].isConfigured()
+    configured: providers[platform].isConfigured(),
+    // Instagram can also connect directly, for accounts not linked to Facebook.
+    ...(platform === 'instagram'
+      ? {instagramLoginConfigured: instagramLoginConfigured() || instagramUnifiedConfigured()}
+      : {})
   }));
 }
 

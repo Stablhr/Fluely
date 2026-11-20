@@ -62,6 +62,13 @@ const envSchema = z.object({
   /** Facebook Login for Business configuration ids (optional; used instead of a permission list). */
   META_LOGIN_CONFIG_ID: z.string().optional(),
   META_INSTAGRAM_CONFIG_ID: z.string().optional(),
+  /** `true` once the Meta app has instagram_basic + instagram_content_publish: Facebook sign-in then also connects linked Instagram accounts. */
+  META_FACEBOOK_INCLUDES_INSTAGRAM: z.string().optional(),
+  /** Instagram Login (accounts not linked to Facebook): the Instagram app id/secret from the Meta app. */
+  INSTAGRAM_APP_ID: z.string().optional(),
+  /** Newer Meta apps: the Instagram "Unified login" configuration id (replaces the Instagram app id/secret). */
+  META_INSTAGRAM_UNIFIED_CONFIG_ID: z.string().optional(),
+  INSTAGRAM_APP_SECRET: z.string().optional(),
   TIKTOK_CLIENT_KEY: z.string().optional(),
   TIKTOK_CLIENT_SECRET: z.string().optional(),
   TIKTOK_PRIVACY: z
