@@ -6,7 +6,7 @@ import type { List } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 
 const LIST_COLORS = [
-  '', '#FFFFFF', '#3971B8', '#33B27A', '#FF8B5E', '#E8A93D',
+  '', '#FFFFFF', '#2554C7', '#33B27A', '#FF8B5E', '#E8A93D',
   '#FF5E6C', '#7C5CFC', '#3B82F6', '#E879F9',
 ]
 
@@ -89,7 +89,7 @@ export default function ListMenu({ list }: { list: List }) {
                   className={`h-6 rounded-md ring-2 ring-surface transition-transform duration-150 active:scale-[0.98] ${
                     list.backgroundColor === color ? 'ring-offset-1 ring-primary' : ''
                   }`}
-                  style={{ background: color || '#FFFFFF' }}
+                  style={{ background: color || 'var(--color-list-default)' }}
                 />
               ))}
             </div>

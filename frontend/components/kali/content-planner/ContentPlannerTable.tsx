@@ -6,8 +6,10 @@ import { useStore } from '@/lib/kali/store/useStore'
 import type { SocialPost, SocialPostStatus } from '@/lib/kali/store/schema'
 import { formatDate } from '@/lib/kali/utils/dates'
 import PlatformIcon from '../social/PlatformIcon'
+import PostMomentBadge from './PostMomentBadge'
 import {
   columnForStatus,
+  postMoment,
   columnMeta,
   enabledPlatforms,
   platformColor,
@@ -246,7 +248,13 @@ export default function ContentPlannerTable({ posts, onOpenPost }: ContentPlanne
                   </td>
 
                   <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-text-secondary">
-                    {date ? `${formatDate(date)}${post.scheduledTime ? ` ${post.scheduledTime}` : ''}` : '—'}
+                    {postMoment(post) ? (
+                      <PostMomentBadge post={post} />
+                    ) : date ? (
+                      `${formatDate(date)}${post.scheduledTime ? ` ${post.scheduledTime}` : ''}`
+                    ) : (
+                      '—'
+                    )}
                   </td>
 
                   <td className="max-w-[160px] px-3 py-2">

@@ -87,30 +87,24 @@ export function statusLabel(status: SocialPostStatus): string {
 
 /* ── Platforms ───────────────────────────────────────────────── */
 
-export const ALL_PLATFORMS: Platform[] = ['instagram', 'facebook', 'tiktok', 'youtube']
+export const ALL_PLATFORMS: Platform[] = ['facebook', 'linkedin', 'tiktok', 'youtube']
 
 /**
- * Flat colour blocks for the overview cards, rotating through the brand palette
- * rather than each platform's own brand colour — the platform's real colour is
- * reserved for the icons and accents, so the cards read as one set.
+ * Header strip for the overview cards. One neutral treatment for every card —
+ * the platform's own colour is reserved for its icon, so the cards read as one
+ * set in both themes.
  */
-export const OVERVIEW_BLOCKS = [
-  'bg-brand-blue',
-  'bg-brand-green',
-  'bg-brand-vanilla',
-  'bg-blue-deep',
-] as const
+export const OVERVIEW_HEADER = 'bg-surface-alt text-text-primary'
 
-/** Text that stays legible on each block above. */
-export const OVERVIEW_BLOCK_INK: Record<(typeof OVERVIEW_BLOCKS)[number], string> = {
-  'bg-brand-blue': 'text-brand-ivory',
-  'bg-brand-green': 'text-brand-ink',
-  'bg-brand-vanilla': 'text-brand-ink',
-  'bg-blue-deep': 'text-brand-ivory',
+const PLATFORM_NAMES: Record<Platform, string> = {
+  facebook: 'Facebook',
+  linkedin: 'LinkedIn',
+  tiktok: 'TikTok',
+  youtube: 'YouTube',
 }
 
 export function platformLabel(platform: Platform): string {
-  return platform.charAt(0).toUpperCase() + platform.slice(1)
+  return PLATFORM_NAMES[platform] ?? platform
 }
 
 export function platformColor(platform: Platform): string {
@@ -174,4 +168,89 @@ export function sortPosts(posts: SocialPost[], key: SortKey, dir: SortDir): Soci
       }
     }
   })
+}
+
+/* ── Publishing moment ───────────────────────────────────────── */
+
+export type PostMomentKind = 'scheduled' | 'publishing' | 'posted' | 'partial' | 'failed' | 'reminder'
+
+export interface PostMoment {
+  kind: PostMomentKind
+  /** When it goes out (scheduled) or went out (posted); null when unknown. */
+  at: Date | null
+  label: string
+}
+
+/** The local wall-clock time a post is set for, from its date and time fields. */
+function plannedAt(post: SocialPost): Date | null {
+  if (post.scheduledAt) return new Date(post.scheduledAt)
+  if (!post.scheduledDate) return null
+  const d = new Date(`${post.scheduledDate}T${post.scheduledTime || '00:00'}`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+/**
+ * Where a post is in publishing, for the badges on the board, table and
+ * editor. Only the server moves a post into these states (scheduling queues
+ * it; the publisher marks it posted or failed), so this reads them rather
+ * than offering them as choices.
+ */
+export function postMoment(post: SocialPost): PostMoment | null {
+  const enabled = post.platforms.filter((p) => p.enabled)
+  const latestPublished = enabled
+    .map((p) => (p.status === 'posted' && p.publishedAt ? new Date(p.publishedAt) : null))
+    .filter((d): d is Date => d !== null)
+    .sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+
+  // Its time came for a platform you post to yourself: that comes first.
+  if (enabled.some((p) => p.status === 'reminder')) {
+    return { kind: 'reminder', at: plannedAt(post), label: 'Your turn to post' }
+  }
+
+  switch (post.status) {
+    case 'scheduled':
+      return { kind: 'scheduled', at: plannedAt(post), label: 'Scheduled' }
+    case 'publishing':
+      return { kind: 'publishing', at: plannedAt(post), label: 'Publishing' }
+    case 'posted':
+      return { kind: 'posted', at: latestPublished ?? plannedAt(post), label: 'Posted' }
+    case 'partially_published':
+      return { kind: 'partial', at: latestPublished, label: 'Partly posted' }
+    case 'failed':
+      return { kind: 'failed', at: null, label: 'Failed' }
+    default:
+      return null
+  }
+}
+
+const MOMENT_FORMAT = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
+/** Caption plus hashtags, as it should be pasted on a platform by hand. */
+export function postTextFor(post: SocialPost, platform: Platform): string {
+  const target = post.platforms.find((p) => p.platform === platform)
+  const caption = (target?.caption?.trim() ? target.caption : post.caption) ?? ''
+  const tags = (target?.hashtags ?? [])
+    .map((t) => t.trim().replace(/^#+/, ''))
+    .filter(Boolean)
+    .filter((t) => !new RegExp(`#${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(caption))
+  return [caption.trim(), tags.map((t) => `#${t}`).join(' ')].filter(Boolean).join('\n\n')
+}
+
+/** Where to post by hand on each platform. */
+export const MANUAL_POST_URL: Record<Platform, string> = {
+  facebook: 'https://www.facebook.com/',
+  linkedin: 'https://www.linkedin.com/feed/?shareActive=true',
+  tiktok: 'https://www.tiktok.com/upload',
+  youtube: 'https://studio.youtube.com/',
+}
+
+/** e.g. "Thu, 19 Nov, 10:20 PM" in the viewer's own time zone. */
+export function formatMoment(at: Date): string {
+  return MOMENT_FORMAT.format(at)
 }

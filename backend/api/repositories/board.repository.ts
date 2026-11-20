@@ -82,5 +82,16 @@ export const boardRepository = {
   },
 
   delete: (id: string, session?: ProductSession) =>
-    BoardModel.deleteOne({_id: id}, {session}).exec()
+    BoardModel.deleteOne({_id: id}, {session}).exec(),
+
+  /** Ids of every board the account owns (account deletion). */
+  listIdsOwnedBy: (ownerId: Types.ObjectId, session?: ProductSession) =>
+    BoardModel.find({ownerId}, {_id: 1})
+      .session(session ?? null)
+      .lean()
+      .exec()
+      .then(rows => rows.map(row => row._id as Types.ObjectId)),
+
+  deleteByIds: (ids: Types.ObjectId[], session?: ProductSession) =>
+    BoardModel.deleteMany({_id: {$in: ids}}, {session}).exec()
 };

@@ -70,7 +70,11 @@ export interface Store {
   getLists: (boardId: string) => List[];
   getCards: (listId: string) => Card[];
   getCard: (id: string) => Card | undefined;
-  createBoard: (templateId: string, name: string) => Promise<string>;
+  createBoard: (
+    templateId: string,
+    name: string,
+    visibility?: "private" | "workspace" | "public",
+  ) => Promise<string>;
   deleteBoard: (id: string) => void;
   renameBoard: (id: string, name: string) => void;
   toggleStar: (id: string) => void;
@@ -114,6 +118,14 @@ export interface Store {
   toggleDone: (id: string) => void;
   setBoardVisibility: (id: string, visibility: Visibility) => Promise<void>;
   setBoardBackground: (id: string, background: string) => void;
+  /** Toggle the signed-in person's reaction on a comment (saved per person). */
+  toggleCommentReaction: (cardId: string, commentId: string, emoji: string) => void;
+  /** Upload a photo to the board and make it the background. Rejects on failure. */
+  setBoardBackgroundImage: (
+    id: string,
+    file: File,
+    onProgress?: (percent: number) => void,
+  ) => Promise<void>;
   setBoardDescription: (id: string, description: string) => void;
   addLabel: (boardId: string, name: string, color: string) => string;
   updateLabel: (
@@ -136,6 +148,10 @@ export interface Store {
    * old create-response bug on the way. Called when the board is opened.
    */
   syncBoardStructure: (boardId: string) => Promise<void>;
+  /** The first board-list fetch has settled (success or failure). */
+  boardsLoaded: boolean;
+  /** This board's lists and cards have been fetched at least once. */
+  isBoardLoaded: (boardId: string) => boolean;
   /** The board id whose visibility or members are mid-request, if any. */
   pendingBoardId: string | null;
   /** The signed-in account id, for spotting "you" in a people list. */

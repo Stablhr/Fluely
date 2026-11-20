@@ -1,54 +1,23 @@
-const STORAGE_KEY = 'kali_user_comment_reactions'
+import type { Reactions } from '@/lib/kali/store/schema'
 
-type ReactionMap = Record<string, Record<string, string[]>>
-
-function load(): ReactionMap {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
+/**
+ * Reads a comment's reactions in either shape: per person (`{count, userIds}`,
+ * what the server sends now) or the older bare count (`{"👍": 1}`), which
+ * becomes an anonymous count. Used for server responses *and* for data cached
+ * in the browser before reactions were per person.
+ */
+export function normalizeReactions(raw: unknown): Reactions {
+  const out: Reactions = {}
+  if (!raw || typeof raw !== 'object') return out
+  for (const [emoji, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === 'number') {
+      if (value > 0) out[emoji] = { count: value, userIds: [] }
+    } else if (value && typeof value === 'object') {
+      const v = value as { count?: unknown; userIds?: unknown }
+      const userIds = Array.isArray(v.userIds) ? v.userIds.map(String) : []
+      const count = typeof v.count === 'number' ? v.count : userIds.length
+      if (count > 0) out[emoji] = { count, userIds }
+    }
   }
-}
-
-function save(map: ReactionMap) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(map))
-  } catch {
-    // quota exceeded — best effort
-  }
-}
-
-export function hasUserCommentReaction(
-  cardId: string,
-  commentId: string,
-  emoji: string,
-): boolean {
-  const map = load()
-  return map[cardId]?.[commentId]?.includes(emoji) ?? false
-}
-
-export function toggleUserCommentReaction(
-  cardId: string,
-  commentId: string,
-  emoji: string,
-): boolean {
-  const map = load()
-  if (!map[cardId]) map[cardId] = {}
-  if (!map[cardId][commentId]) map[cardId][commentId] = []
-
-  const list = map[cardId][commentId]
-  const idx = list.indexOf(emoji)
-  let added: boolean
-
-  if (idx === -1) {
-    list.push(emoji)
-    added = true
-  } else {
-    list.splice(idx, 1)
-    added = false
-  }
-
-  save(map)
-  return added
+  return out
 }

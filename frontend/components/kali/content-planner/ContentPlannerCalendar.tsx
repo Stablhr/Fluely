@@ -157,7 +157,7 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
 function PostPill({ post, onClick }: { post: SocialPost; onClick: () => void }) {
   const platforms = enabledPlatforms(post)
   const dot = columnMeta(columnForStatus(post.status)).dot
-  const accent = platforms.length === 1 ? platformColor(platforms[0]) : platformColor(platforms[0] ?? 'instagram')
+  const accent = platforms.length === 1 ? platformColor(platforms[0]) : platformColor(platforms[0] ?? 'facebook')
 
   return (
     <button

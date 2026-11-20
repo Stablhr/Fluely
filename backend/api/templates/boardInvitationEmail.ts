@@ -101,7 +101,7 @@ export function renderInviteEmail(params: InviteEmailParams) {
       ? 'Editors can create, edit, and move cards on this board.'
       : 'Viewers can view the board and its cards but cannot make changes.';
 
-  const title = `${params.inviterName} invited you to collaborate on "${params.boardName}" on Fluely`;
+  const title = `${params.inviterName} invited you to collaborate on "${params.boardName}" on ${params.appName ?? 'Fluely'}`;
 
   const bodyHtml = `
     ${safeRecipient ? `<p style="margin:0 0 10px;">Hi ${safeRecipient},</p>` : ''}

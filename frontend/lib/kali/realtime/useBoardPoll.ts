@@ -16,7 +16,8 @@ export function useBoardPoll(
   const router = useRouter();
   const {
     applyBoardPoll,
-    replacePresence
+    replacePresence,
+    syncBoards
   } = useStore();
 
   const sinceRef = useRef(initialRevision);
@@ -95,13 +96,16 @@ export function useBoardPoll(
       // recoverable by retrying, so stop and leave the board.
       if (status === 403 || status === 404) {
         stopPolling();
+        // Re-read the board list first, so the board is gone from it by the
+        // time the list shows instead of lingering in this device's cache.
+        void syncBoards();
         router.replace("/boards");
         return;
       }
 
       // 429 / network / 5xx: swallow, next tick retries
     }
-  }, [boardId, applyBoardPoll, router, stopPolling]);
+  }, [boardId, applyBoardPoll, router, stopPolling, syncBoards]);
 
   useEffect(() => {
     if (!enabled || !boardId) return;

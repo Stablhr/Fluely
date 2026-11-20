@@ -1,6 +1,7 @@
 import {Types} from 'mongoose';
 import {NotificationDocument, NotificationModel} from '../models/Notification.model';
 import {NotificationType} from '../constants/product';
+import {ProductSession} from '../utils/transaction';
 
 /** Newest first; the bell only ever shows a window of the most recent items. */
 const LIST_LIMIT = 50;
@@ -75,7 +76,18 @@ export const notificationRepository = {
 
   /** Drop all mention notifications for a deleted card. */
   deleteMentionsForCard: (cardId: Types.ObjectId) =>
-    NotificationModel.deleteMany({cardId, type: 'mention'}).exec()
+    NotificationModel.deleteMany({cardId, type: 'mention'}).exec(),
+
+  /** The account's own notifications, plus everyone's about the given boards. */
+  deleteForUserOrBoards: (
+    userId: Types.ObjectId,
+    boardIds: Types.ObjectId[],
+    session?: ProductSession
+  ) =>
+    NotificationModel.deleteMany(
+      {$or: [{userId}, {boardId: {$in: boardIds}}]},
+      {session}
+    ).exec()
 };
 
 export type NotificationRow = NotificationDocument;

@@ -1,4 +1,5 @@
 import {Types} from 'mongoose';
+import {isOwnCloudinaryUrl} from '../utils/cloudinaryUrl';
 import {boardRepository} from '../repositories/board.repository';
 import {boardCollaboratorRepository} from '../repositories/boardCollaborator.repository';
 import {userRepository} from '../repositories/user.repository';
@@ -23,6 +24,7 @@ import {Actor} from '../utils/actor';
 import {BoardDocument} from '../models/Board.model';
 import {BoardAccessLevel, BoardVisibility} from '../constants/product';
 import {logger} from '../logging/logger';
+import {env} from '../config/env';
 
 /**
  * The plain shape produced by `toObject()`. Deliberately not `BoardDocument`,
@@ -69,6 +71,7 @@ type UpdateBoardInput = {
   name?: string;
   description?: string;
   background?: string;
+  backgroundMediaId?: string | null;
   labels?: {id: string; name: string; color: string}[];
   listOrder?: string[];
   archivedAt?: string | null;
@@ -104,6 +107,30 @@ async function serializeBoard(board: BoardRow) {
     createdAt: board.createdAt,
     updatedAt: board.updatedAt
   };
+}
+
+
+/**
+ * The media a background may point at: an image that still exists, scoped to
+ * this very board, and stored on our Cloudinary. Anything else is one error, so
+ * the response does not reveal whether an id exists on another board.
+ */
+async function resolveBackgroundMedia(board: BoardDocument, mediaId: string) {
+  const media = await mediaRepository.findById(mediaId);
+  if (
+    !media ||
+    !media.boardId ||
+    !media.boardId.equals(board._id) ||
+    media.kind !== 'image' ||
+    !isOwnCloudinaryUrl(media.url)
+  ) {
+    throw new ApiError(
+      400,
+      ErrorCodes.INVALID_BACKGROUND_MEDIA,
+      'Choose an image uploaded to this board as its background'
+    );
+  }
+  return media;
 }
 
 /** Rejects a stale write rather than silently clobbering a concurrent change. */
@@ -328,7 +355,21 @@ export const boardService = {
     const patch: Record<string, unknown> = {};
     if (input.name !== undefined) patch.name = input.name;
     if (input.description !== undefined) patch.description = input.description;
-    if (input.background !== undefined) patch.background = input.background;
+    // The DTO refuses both at once. A colour (or "default") drops any photo;
+    // a photo sets the URL from the stored record, never from the client.
+    if (input.backgroundMediaId !== undefined) {
+      if (input.backgroundMediaId === null) {
+        patch.backgroundMediaId = null;
+        patch.background = 'default';
+      } else {
+        const media = await resolveBackgroundMedia(board, input.backgroundMediaId);
+        patch.backgroundMediaId = media._id;
+        patch.background = media.url;
+      }
+    } else if (input.background !== undefined) {
+      patch.background = input.background;
+      patch.backgroundMediaId = null;
+    }
     if (input.labels !== undefined) patch.labels = input.labels;
     if (input.archivedAt !== undefined) {
       patch.archivedAt = input.archivedAt ? new Date(input.archivedAt) : null;
@@ -359,7 +400,7 @@ export const boardService = {
             ? {before: {name: board.name}}
             : {})
         },
-        revision: result.updated.revision
+        revision: updated!.revision
       });
 
       return {updated: updated!, activity};
@@ -408,7 +449,7 @@ export const boardService = {
         targetType: 'board',
         targetId: board._id.toString(),
         metadata: {from: board.visibility, to: visibility},
-        revision: result.updated.revision
+        revision: updated!.revision
       });
 
       return {updated: updated!, activity};

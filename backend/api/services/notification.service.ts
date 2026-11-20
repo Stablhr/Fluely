@@ -8,6 +8,8 @@ import {listRepository} from '../repositories/list.repository';
 import {emailService} from './email.service';
 import {boardInvitationEmailTemplate} from '../templates/boardInvitationEmail';
 import {boardInvitationResponseEmailTemplate} from '../templates/boardInvitationResponseEmail';
+import {mentionEmailTemplate} from '../templates/mentionEmail';
+import {resolvePreferences} from '../utils/preferences';
 import {Actor} from '../utils/actor';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
@@ -201,17 +203,22 @@ export const notificationService = {
     const type: NotificationType =
       params.decision === 'accepted' ? 'board_invitation_accepted' : 'board_invitation_declined';
 
-    await notificationRepository.create({
-      userId: params.inviterId,
-      type,
-      actorId: params.inviteeId,
-      boardId: params.boardId,
-      collaboratorId: params.collaboratorId
-    });
-
-    // The response email goes to the inviter, not the invitee.
+    // Both the in-app card and the email go to the inviter, and each honours
+    // the inviter's `invitationResponses` switch for that channel.
     const inviter = await userRepository.findById(params.inviterId.toString());
-    if (!inviter?.email) return;
+    const prefs = resolvePreferences(inviter?.preferences);
+
+    if (prefs.notifications.inApp.invitationResponses) {
+      await notificationRepository.create({
+        userId: params.inviterId,
+        type,
+        actorId: params.inviteeId,
+        boardId: params.boardId,
+        collaboratorId: params.collaboratorId
+      });
+    }
+
+    if (!inviter?.email || !prefs.notifications.email.invitationResponses) return;
     const template = boardInvitationResponseEmailTemplate({
       recipientName: displayName(inviter),
       inviteeName,
@@ -243,20 +250,44 @@ export const notificationService = {
   }) {
     const actor = await userRepository.findById(params.actorId.toString());
     const actorName = displayName(actor) || 'Someone';
+    const snippet = params.snippet.slice(0, 100);
 
     await Promise.all(
       params.mentionedUserIds.map(async (mentionedUserId) => {
         // Skip self-mentions.
         if (mentionedUserId === params.actorId.toString()) return;
-        await notificationRepository.create({
-          userId: new Types.ObjectId(mentionedUserId),
-          type: 'mention',
-          actorId: params.actorId,
-          boardId: params.boardId,
-          cardId: params.cardId,
-          commentId: params.commentId,
-          snippet: params.snippet.slice(0, 100)
-        });
+
+        const recipient = await userRepository.findById(mentionedUserId);
+        const prefs = resolvePreferences(recipient?.preferences);
+
+        if (prefs.notifications.inApp.mentions) {
+          await notificationRepository.create({
+            userId: new Types.ObjectId(mentionedUserId),
+            type: 'mention',
+            actorId: params.actorId,
+            boardId: params.boardId,
+            cardId: params.cardId,
+            commentId: params.commentId,
+            snippet
+          });
+        }
+
+        if (recipient?.email && prefs.notifications.email.mentions) {
+          const template = mentionEmailTemplate({
+            recipientName: recipient.firstName,
+            actorName,
+            boardName: params.boardName,
+            snippet,
+            boardUrl: `${env.FRONTEND_URL}/boards/${params.boardId.toString()}`
+          });
+          await sendBestEffortEmail({
+            to: recipient.email,
+            subject: template.subject,
+            text: template.text,
+            html: template.html,
+            what: 'mention'
+          });
+        }
       })
     );
 

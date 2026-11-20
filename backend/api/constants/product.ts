@@ -41,7 +41,7 @@ export const WRITE_ACCESS_LEVELS: readonly BoardAccessLevel[] = ['owner', 'edito
 export const BoardTemplates = ['blank', 'simple', 'social_content'] as const;
 export type BoardTemplate = (typeof BoardTemplates)[number];
 
-export const SocialPlatforms = ['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube'] as const;
+export const SocialPlatforms = ['facebook', 'x', 'linkedin', 'tiktok', 'youtube'] as const;
 export type SocialPlatform = (typeof SocialPlatforms)[number];
 
 export const SocialPostStatuses = ['draft', 'scheduled', 'queued', 'published', 'failed', 'cancelled'] as const;
@@ -115,3 +115,6 @@ export const NotificationTypes = [
   'mention'
 ] as const;
 export type NotificationType = (typeof NotificationTypes)[number];
+
+/** At most this many distinct emojis on one comment. */
+export const MAX_COMMENT_REACTION_EMOJIS = 20;

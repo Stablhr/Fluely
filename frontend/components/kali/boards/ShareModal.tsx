@@ -36,7 +36,7 @@ const ROLE_DESCRIPTIONS: Record<CollaboratorRole, string> = {
 /** Deterministic chip colour from the person, so avatars stay stable. */
 function colorFor(seed: string): string {
   const palette = [
-    "#3971B8",
+    "#2554C7",
     "#0DABA3",
     "#8B7CF6",
     "#E1306C",

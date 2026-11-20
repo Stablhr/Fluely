@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useThemePreference } from '@/lib/theme/useTheme'
 import { Droppable } from '@hello-pangea/dnd'
 import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
 import { Check, GripVertical } from 'lucide-react'
@@ -26,15 +27,17 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(list.name)
 
-  // Default list container color — mirrors --color-list-default (src/index.css).
-  // Resolved at runtime so the contrast engine sees the same hex as the render.
+  // Default list container color — mirrors --color-list-default (app/kali.css).
+  // Resolved at runtime so the contrast engine sees the same hex as the render,
+  // and re-read when the light/dark theme flips.
+  const { resolved: resolvedTheme } = useThemePreference()
   const defaultListBg = useMemo(
     () =>
       window
         .getComputedStyle(document.documentElement)
         .getPropertyValue('--color-list-default')
-        .trim() || '#ffffff',
-    [],
+        .trim() || (resolvedTheme === 'dark' ? '#14171d' : '#f1f3f6'),
+    [resolvedTheme],
   )
   const bg = list.backgroundColor || defaultListBg
   const theme = useAdaptiveTheme(bg)

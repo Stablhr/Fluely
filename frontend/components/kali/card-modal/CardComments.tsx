@@ -8,7 +8,9 @@ import { YOU_ID } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import { uid } from '@/lib/kali/utils/id'
 import { formatDateTime } from '@/lib/kali/utils/dates'
-import { hasUserCommentReaction, toggleUserCommentReaction } from '@/lib/kali/utils/reactions'
+import Tooltip from '../shared/Tooltip'
+import { useThemePreference } from '@/lib/theme/useTheme'
+import type { ReactionEntry } from '@/lib/kali/store/schema'
 import SectionLabel from '../shared/SectionLabel'
 import Avatar from '../shared/Avatar'
 import ProfilePopover from '../shared/ProfilePopover'
@@ -89,6 +91,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
   const you = store.data.members[YOU_ID]
 
   const boardMembers = store.getBoardMembers(card.boardId)
+  const { resolved: resolvedTheme } = useThemePreference()
 
   // Make sure the board roster (with avatar URLs) is loaded so comment authors
   // resolve to their real name + photo instead of the generic fallback.
@@ -240,28 +243,37 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
     setMentionOpen(false)
   }
 
+  // Reactions are saved per person on the server (not as part of the card).
   const toggleCommentReaction = (commentId: string, emoji: string) => {
-    const comments = card.comments.map((c) => {
-      if (c.id !== commentId) return c
-      const current = c.reactions[emoji] ?? 0
-      const added = toggleUserCommentReaction(card.id, commentId, emoji)
-      return {
-        ...c,
-        reactions: {
-          ...c.reactions,
-          [emoji]: added ? current + 1 : Math.max(0, current - 1),
-        },
-      }
-    })
-    const cleaned = comments.map((c) => {
-      const r = { ...c.reactions }
-      for (const [k, v] of Object.entries(r)) {
-        if (v <= 0) delete r[k]
-      }
-      return { ...c, reactions: r }
-    })
-    store.updateCard(card.id, { comments: cleaned })
-    store.addActivity(card.id, `Reacted ${emoji} to a comment`)
+    store.toggleCommentReaction(card.id, commentId, emoji)
+  }
+
+  /** "You, Carine Grigson and 1 other" — who reacted, for the tooltip. */
+  const reactorNames = (entry: ReactionEntry): string => {
+    const me = store.currentUserId
+    const names = entry.userIds
+      .slice()
+      .sort((a, b) => (a === me ? -1 : b === me ? 1 : 0))
+      .map((id) =>
+        id === me ? 'You' : boardMembers.find((m) => m.id === id)?.name ?? 'Someone',
+      )
+    const shown = names.slice(0, 8)
+    // Named people beyond the first 8, and reactions from before names were
+    // recorded (nobody has claimed them yet), are counted separately.
+    const hiddenNamed = names.length - shown.length
+    const anonymous = Math.max(0, entry.count - names.length)
+    const parts = [...shown]
+    if (hiddenNamed > 0) parts.push(`${hiddenNamed} other${hiddenNamed === 1 ? '' : 's'}`)
+    if (anonymous > 0) {
+      parts.push(
+        shown.length === 0
+          ? `${anonymous} reaction${anonymous === 1 ? '' : 's'} from before names were recorded`
+          : `${anonymous} earlier reaction${anonymous === 1 ? '' : 's'}`,
+      )
+    }
+    return parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
   }
 
   const canDeleteComment = (comment: { authorId: string }) =>
@@ -350,9 +362,9 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
         : undefined) ?? {
         id: comment.authorId,
         name: comment.authorId === store.currentUserId || comment.authorId === YOU_ID ? 'You' : 'Unknown',
-        color: '#3971B8',
+        color: '#2554C7',
       }
-    const reactionEntries = Object.entries(comment.reactions).filter(([, c]) => c > 0)
+    const reactionEntries = Object.entries(comment.reactions).filter(([, r]) => r.count > 0)
     const pickerOpen = activePicker === comment.id
 
     return (
@@ -368,7 +380,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
           <Avatar member={author} size={36} />
         </ProfilePopover>
         <div className="min-w-0 flex-1">
-          <div className="rounded-2xl bg-brand-vanilla/15 px-4 py-3 dark:bg-brand-vanilla/10">
+          <div className="rounded-card border border-border bg-surface-alt px-4 py-3">
             <div className="flex items-baseline gap-2">
               <span className="font-heading text-sm font-semibold text-text-primary">{author.name}</span>
               <span className="font-mono text-[11px] text-text-muted">{formatDateTime(comment.createdAt)}</span>
@@ -384,9 +396,11 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
               <button
                 type="button"
                 onClick={() => setActivePicker(pickerOpen ? null : comment.id)}
+                aria-label="Add reaction"
+                aria-expanded={pickerOpen}
                 className="inline-flex items-center gap-1 transition-colors hover:text-text-secondary"
               >
-                <SmilePlus size={13} />
+                <SmilePlus size={13} aria-hidden />
               </button>
               <button
                 type="button"
@@ -399,9 +413,10 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                 <button
                   type="button"
                   onClick={() => deleteComment(comment.id)}
+                  aria-label="Delete comment"
                   className="inline-flex items-center gap-1 transition-colors hover:text-danger-text"
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={13} aria-hidden />
                 </button>
               )}
             </div>
@@ -414,7 +429,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                   toggleCommentReaction(comment.id, emojiData.emoji)
                   setActivePicker(null)
                 }}
-                theme={Theme.LIGHT}
+                theme={resolvedTheme === 'dark' ? Theme.DARK : Theme.LIGHT}
                 width={320}
                 height={380}
                 lazyLoadEmojis
@@ -427,23 +442,39 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
 
           {reactionEntries.length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
-              {reactionEntries.map(([emoji, count]) => {
-                const active = hasUserCommentReaction(card.id, comment.id, emoji)
+              {reactionEntries.map(([emoji, entry]) => {
+                const active = Boolean(store.currentUserId && entry.userIds.includes(store.currentUserId))
+                const who = reactorNames(entry)
                 return (
-                  <button
+                  <Tooltip
                     key={emoji}
-                    type="button"
-                    disabled={readOnly}
-                    onClick={() => toggleCommentReaction(comment.id, emoji)}
-                    className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs transition-colors duration-150 active:scale-[0.98] ${
-                      active
-                        ? 'bg-primary-subtle text-primary-hover ring-1 ring-inset ring-primary'
-                        : 'bg-surface-alt text-text-secondary hover:bg-surface-elevated'
-                    }`}
+                    content={
+                      <>
+                        <span className="mr-1">{emoji}</span>
+                        {who}
+                      </>
+                    }
                   >
-                    <span>{emoji}</span>
-                    <span className="font-mono text-[10px]">{count}</span>
-                  </button>
+                    <button
+                      type="button"
+                      // Viewers can't react, but they can still focus the chip
+                      // to read who reacted, so it isn't `disabled`.
+                      aria-disabled={readOnly || undefined}
+                      aria-pressed={active}
+                      aria-label={`${emoji} ${entry.count}${active ? ', including you' : ''}`}
+                      onClick={() => {
+                        if (!readOnly) toggleCommentReaction(comment.id, emoji)
+                      }}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs transition-colors duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+                        active
+                          ? 'bg-primary-subtle text-primary-text ring-1 ring-inset ring-primary'
+                          : 'bg-surface-alt text-text-secondary hover:bg-surface-elevated'
+                      } ${readOnly ? 'cursor-default' : ''}`}
+                    >
+                      <span aria-hidden>{emoji}</span>
+                      <span className="text-[11px] font-medium tabular-nums">{entry.count}</span>
+                    </button>
+                  </Tooltip>
                 )
               })}
             </div>

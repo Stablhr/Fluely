@@ -84,6 +84,13 @@ Uploaded files go to Cloudinary; nothing is written to local disk. `multer` uses
 shared helpers in `api/services/cloudinary.service.ts`, which read the client configured once in
 `api/config/cloudinary.ts`. Assets live under `fluely/{avatars,boards,tasks,content-planner}`.
 
+Every upload path (`POST /media`, `/media/signature`, `/media/register`) runs the same scope check:
+no board means a personal upload; a `boardId` needs edit access (a board the caller cannot see is
+reported as not found); a `cardId` needs its `boardId` and must belong to it. `register` records the
+asset from Cloudinary's Admin API (`getUploadedAsset`): URL, size, resource type and folder come from
+Cloudinary, the folder must match the scope's, and the URL must pass `isOwnCloudinaryUrl`
+(`api/utils/cloudinaryUrl.ts`). Never store a media URL the browser supplied.
+
 A record stores the Cloudinary `url` (`secure_url`), `publicId`, and `resourceType`; deletion calls
 `deleteFromCloudinary(publicId, resourceType)` with the exact resource type it was uploaded as.
 
@@ -98,6 +105,24 @@ leaves the server (`PublicAccount` carries `avatarUrl` only).
 > instead: `POST /media/signature` returns signed parameters, the browser uploads to Cloudinary in
 > chunks, and `POST /media/register` records the result as a `MediaAttachment`.
 
+## Account Settings
+
+`User.preferences` (notification switches per channel for `mentions` and `invitationResponses`,
+plus `defaultBoardVisibility`) has schema defaults, so older accounts need no migration;
+`GET/PATCH /account/me/profile` read and deep-merge it, and `notification.service.ts` honours it.
+Board invitations are always delivered. `DELETE /account/me` (`{password, confirmation: "DELETE"}`)
+removes the account and what it owns via `accountService.deleteAccount`; workspaces it owns that
+have other members pass to the longest-standing member instead of being deleted.
+
+## Comment Reactions
+
+Comments live inside the card. Reactions are written only by
+`POST /boards/:boardId/cards/:cardId/comments/:commentId/reactions` (`{emoji}`), which toggles the
+caller's own id with a conditional `$addToSet`/`$pull`; the card PATCH keeps stored reactions and
+ignores any the client sends. Storage per emoji is `{userIds, legacy}` (a bare number is a legacy
+anonymous count, see `Card.model.ts`); every card DTO serves `{count, userIds}`. Who may react follows
+the board's `settings.commentPermission`, checked in `card.service.ts` (`canComment`).
+
 ## Routes and Cron
 
 Mounted in `api/routes/index.ts`: `/auth`, `/account`, `/boards` (boards, lists, cards, collaborators,
@@ -108,8 +133,9 @@ in production: the endpoint then requires Vercel's `Authorization: Bearer <CRON_
 
 ## Testing
 
-- Jest suites live in `backend/tests/`: board access, board children (lists/cards), board polling,
-  media access, and shared security state (blocklist + rate-limit store)
+- Jest suites live in `backend/tests/`: board access, board backgrounds, board children (lists/cards), comment reactions, board polling,
+  media access, shared security state (blocklist + rate-limit store), and account settings
+  (preferences, notification preferences, account deletion)
 - Tests that need a database use `mongodb-memory-server-core` (downloads a MongoDB binary on first
   run); never point tests at the real `MONGO_URI`
 - CI runs `npm test` for the backend on every push and pull request

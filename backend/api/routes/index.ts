@@ -8,6 +8,7 @@ import notificationRoutes from './notification.routes';
 import embedRoutes from './embeds.routes';
 import cronRoutes from './cron.routes';
 import workspaceRoutes from './workspace.routes';
+import {publishingJobRoutes, socialAccountRoutes, socialPostRoutes} from './social.routes';
 
 const router = Router();
 
@@ -19,6 +20,9 @@ router.use('/media', mediaRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/embeds', embedRoutes);
 router.use('/workspaces', workspaceRoutes);
+router.use('/social-accounts', socialAccountRoutes);
+router.use('/social-posts', socialPostRoutes);
+router.use('/publishing-jobs', publishingJobRoutes);
 router.use('/cron', cronRoutes);
 
 export default router;

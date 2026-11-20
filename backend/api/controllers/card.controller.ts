@@ -63,6 +63,40 @@ export const cardController = {
     }
   },
 
+  /** Read access is proven by the route; the service applies the board's
+   *  comment permission, which may be narrower. */
+  async claimLegacyReactions(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json(
+        await cardService.claimLegacyReactions(
+          actorFromRequest(req),
+          requireBoard(req),
+          req.boardAccess,
+          req.body.claims
+        )
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async toggleCommentReaction(req: Request, res: Response, next: NextFunction) {
+    try {
+      res.status(200).json(
+        await cardService.toggleCommentReaction(
+          actorFromRequest(req),
+          requireBoard(req),
+          req.boardAccess,
+          req.params.cardId,
+          req.params.commentId,
+          req.body.emoji
+        )
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async move(req: Request, res: Response, next: NextFunction) {
     try {
       res.status(200).json(

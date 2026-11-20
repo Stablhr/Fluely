@@ -1,7 +1,16 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { socialPostsApi, publishingJobsApi } from '@/lib/kali/api/social-posts'
+import {
+  socialPostsApi,
+  publishingJobsApi,
+  SCHEDULE_RESULT_EVENT,
+  POST_OUTCOME_EVENT,
+  REMINDER_DUE_EVENT,
+  type PostOutcomeEventDetail,
+  type ReminderDueEventDetail,
+  type ScheduleResultEventDetail,
+} from '@/lib/kali/api/social-posts'
 import { loadSocialPosts, saveSocialPosts } from '@/lib/kali/store/storage'
 import { localToUTC } from '@/lib/kali/utils/timezones'
 import type { SocialPost, SocialPostPlatform, SocialMediaAttachment, SocialAnalytics, PublishingJob, Platform } from '@/lib/kali/store/schema'
@@ -23,6 +32,25 @@ function toSocialPost(raw: AnyRecord): SocialPost {
 }
 
 /**
+ * Set once this browser's stored posts have been copied to the server. Before
+ * posts were stored on the server they lived only in localStorage; after the
+ * copy the server is the source of truth and localStorage is just a cache, so
+ * the copy must not repeat (it would bring back posts a teammate deleted).
+ */
+const IMPORTED_KEY = 'kali_social_posts_imported'
+
+function alreadyImported(): boolean {
+  try {
+    return window.localStorage.getItem(IMPORTED_KEY) === '1'
+  } catch {
+    return true
+  }
+}
+
+/** Platform targets, media and analytics are edited locally, then saved together. */
+const SYNC_DELAY_MS = 400
+
+/**
  * React hook that manages social posts with API-first + localStorage fallback.
  * Provides the same interface as the store methods so StoreProvider can delegate to it.
  */
@@ -42,6 +70,15 @@ export function useSocialPosts() {
     let cancelled = false
     async function load() {
       try {
+        if (!alreadyImported()) {
+          const local = loadSocialPosts()
+          if (local.length > 0) await socialPostsApi.importLocal(local)
+          try {
+            window.localStorage.setItem(IMPORTED_KEY, '1')
+          } catch {
+            // ignore
+          }
+        }
         const data = await socialPostsApi.list()
         if (!cancelled) {
           setPosts(data.map((p) => toSocialPost(p as unknown as AnyRecord)))
@@ -74,34 +111,90 @@ export function useSocialPosts() {
     setPosts(fn)
   }, [])
 
-  const addPost = useCallback(async (input: Omit<SocialPost, 'id' | 'createdAt' | 'updatedAt'>): Promise<SocialPost> => {
+  // Saves a post's targets, media and analytics shortly after local edits,
+  // coalescing a burst of changes (toggling several platforms) into one write.
+  const syncTimers = useRef(new Map<string, number>())
+  const syncPost = useCallback((id: string) => {
+    const timers = syncTimers.current
+    window.clearTimeout(timers.get(id))
+    timers.set(id, window.setTimeout(() => {
+      timers.delete(id)
+      const post = postsRef.current.find((p) => p.id === id)
+      if (!post) return
+      socialPostsApi
+        .update(id, { platforms: post.platforms, media: post.media, analytics: post.analytics })
+        .catch(() => setIsOnline(false))
+    }, SYNC_DELAY_MS))
+  }, [])
+
+  /**
+   * "Scheduled" is not a label the client can set: it means publishing jobs
+   * are queued. Saving a post as Scheduled (creating it, editing it, a board
+   * drag) queues it for its date and time, and the planner reports the outcome
+   * through SCHEDULE_RESULT_EVENT.
+   */
+  const queueFromSave = useCallback(async (post: SocialPost, serverStatus: SocialPost['status']) => {
+    const report = (detail: ScheduleResultEventDetail) =>
+      window.dispatchEvent(new CustomEvent(SCHEDULE_RESULT_EVENT, { detail }))
+    if (!post.scheduledDate) {
+      mutate((prev) => prev.map((p) => (p.id === post.id ? { ...p, status: serverStatus } : p)))
+      report({ postId: post.id, ok: false, errors: ['Pick a date to schedule this post'] })
+      return
+    }
+    const result = await socialPostsApi.schedule(post.id, {
+      scheduledDate: post.scheduledDate,
+      scheduledTime: post.scheduledTime || undefined,
+      timezone: post.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    })
+    mutate((prev) => prev.map((p) => (p.id === post.id ? toSocialPost(result.post as unknown as AnyRecord) : p)))
+    const errors = result.validation.filter((v) => !v.valid).flatMap((v) => v.errors)
+    report({
+      postId: post.id,
+      ok: result.jobsCreated.length > 0 && errors.length === 0,
+      errors,
+      scheduledAt: result.jobsCreated.length > 0 ? result.scheduledAt : undefined,
+    })
+  }, [mutate])
+
+  const addPost = useCallback(async (
+    input: Omit<SocialPost, 'id' | 'createdAt' | 'updatedAt'> & { id?: string },
+  ): Promise<SocialPost> => {
     const optimistic: SocialPost = {
       ...input,
-      id: crypto.randomUUID(),
+      id: input.id ?? crypto.randomUUID(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
     mutate((prev) => [optimistic, ...prev])
     try {
-      const created = await socialPostsApi.create(input)
-      mutate((prev) => prev.map((p) => (p.id === optimistic.id ? toSocialPost(created as unknown as AnyRecord) : p)))
+      const created = await socialPostsApi.create(optimistic)
+      if (optimistic.status === 'scheduled') {
+        await queueFromSave(optimistic, created.status)
+      } else {
+        mutate((prev) => prev.map((p) => (p.id === optimistic.id ? toSocialPost(created as unknown as AnyRecord) : p)))
+      }
       return created
     } catch {
       setIsOnline(false)
       return optimistic
     }
-  }, [mutate])
+  }, [mutate, queueFromSave])
 
   const updatePost = useCallback(async (id: string, patch: Partial<SocialPost>) => {
+    const before = postsRef.current.find((p) => p.id === id)
     mutate((prev) =>
       prev.map((p) => (p.id === id ? { ...p, ...patch, updatedAt: new Date().toISOString() } : p))
     )
+    const wantsSchedule = patch.status === 'scheduled'
+    const { status: _status, ...rest } = patch
+    void _status
     try {
-      await socialPostsApi.update(id, patch)
+      const saved = await socialPostsApi.update(id, wantsSchedule ? rest : patch)
+      if (wantsSchedule) await queueFromSave({ ...before, ...patch, id } as SocialPost, saved.status)
     } catch {
       setIsOnline(false)
     }
-  }, [mutate])
+  }, [mutate, queueFromSave])
 
   const deletePost = useCallback(async (id: string) => {
     mutate((p) => p.filter((x) => x.id !== id))
@@ -182,7 +275,8 @@ export function useSocialPosts() {
         return { ...p, platforms: [...p.platforms, entry], updatedAt: new Date().toISOString() }
       })
     )
-  }, [mutate])
+    syncPost(postId)
+  }, [mutate, syncPost])
 
   const removePlatform = useCallback((postId: string, platform: Platform) => {
     mutate((prev) =>
@@ -192,7 +286,8 @@ export function useSocialPosts() {
           : p
       )
     )
-  }, [mutate])
+    syncPost(postId)
+  }, [mutate, syncPost])
 
   const updatePlatform = useCallback((postId: string, platform: Platform, patch: Partial<SocialPostPlatform>) => {
     mutate((prev) =>
@@ -205,7 +300,8 @@ export function useSocialPosts() {
         }
       })
     )
-  }, [mutate])
+    syncPost(postId)
+  }, [mutate, syncPost])
 
   const addMedia = useCallback((postId: string, media: Omit<SocialMediaAttachment, 'id'>) => {
     mutate((prev) =>
@@ -215,7 +311,8 @@ export function useSocialPosts() {
         return { ...p, media: [...p.media, attachment], updatedAt: new Date().toISOString() }
       })
     )
-  }, [mutate])
+    syncPost(postId)
+  }, [mutate, syncPost])
 
   const removeMedia = useCallback((postId: string, mediaId: string) => {
     mutate((prev) =>
@@ -225,7 +322,8 @@ export function useSocialPosts() {
           : p
       )
     )
-  }, [mutate])
+    syncPost(postId)
+  }, [mutate, syncPost])
 
   const updateAnalytics = useCallback((postId: string, platform: Platform, analytics: SocialAnalytics) => {
     mutate((prev) =>
@@ -236,7 +334,8 @@ export function useSocialPosts() {
         return { ...p, analytics: [...updated, analytics], updatedAt: new Date().toISOString() }
       })
     )
-  }, [mutate])
+    syncPost(postId)
+  }, [mutate, syncPost])
 
   const applyPost = useCallback((id: string, patch: Partial<SocialPost>, platform?: Platform, platformPatch?: Partial<SocialPostPlatform>) => {
     mutate((prev) =>
@@ -283,23 +382,64 @@ export function useSocialPosts() {
     }
   }, [mutate])
 
-  // Real-time polling: while any post is publishing, refresh its status every 10s.
+  // Live status: a scheduled post turns into "Posted", "Failed" or "Your turn
+  // to post" on its own. Posts with a platform still waiting for its time --
+  // or publishing, or retrying -- are re-read from the server every 10s for
+  // the first 15 minutes after they are due, then every minute, so a stuck
+  // post never polls hot forever. Nothing is fetched while nothing is due.
+  // Outcomes are worked out per platform, so a post that went out on
+  // LinkedIn but waits for you on a personal profile still announces both.
   useEffect(() => {
-    const activePosts = postsRef.current.filter(
-      (p) => p.status === 'publishing' || p.platforms.some((pl) => pl.enabled && pl.status === 'publishing'),
-    )
-    if (activePosts.length === 0) return
-
+    const WAITING = ['scheduled', 'publishing']
+    let ticks = 0
     const timer = window.setInterval(() => {
-      activePosts.forEach((p) => {
-        refreshPost(p.id).then((fresh) => {
-          if (fresh) refreshJobs(fresh.id)
-        })
-      })
-    }, 10000)
+      ticks += 1
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      const now = Date.now()
+      for (const p of postsRef.current) {
+        const waiting =
+          p.status === 'publishing' || p.platforms.some((pl) => pl.enabled && WAITING.includes(pl.status))
+        if (!waiting) continue
+        const due = p.scheduledAt ? Date.parse(p.scheduledAt) : now
+        if (due > now + 5_000) continue
+        const overdueMs = now - due
+        if (overdueMs > 15 * 60_000 && ticks % 6 !== 0) continue
+        const before = new Map(p.platforms.map((pl) => [pl.platform, pl.status]))
+        void refreshPost(p.id).then((fresh) => {
+          if (!fresh) return
+          const after = fresh as SocialPost
+          const became = (status: SocialPost['platforms'][number]['status']) =>
+            after.platforms.filter((pl) => pl.enabled && pl.status === status && before.get(pl.platform) !== status)
 
+          const posted = became('posted')
+          const failed = became('failed')
+          if (posted.length > 0 || failed.length > 0) {
+            const detail: PostOutcomeEventDetail = {
+              postId: after.id,
+              title: after.title,
+              status: after.status,
+              posted: posted.map((pl) => ({ platform: pl.platform, url: pl.publishedUrl, simulated: pl.dryRun })),
+              failed: failed.map((pl) => ({ platform: pl.platform, error: pl.error })),
+            }
+            window.dispatchEvent(new CustomEvent(POST_OUTCOME_EVENT, { detail }))
+            refreshJobs(after.id)
+          }
+
+          const yourTurn = became('reminder')
+          if (yourTurn.length > 0) {
+            const detail: ReminderDueEventDetail = {
+              postId: after.id,
+              title: after.title,
+              caption: after.caption,
+              platforms: yourTurn.map((pl) => pl.platform),
+            }
+            window.dispatchEvent(new CustomEvent(REMINDER_DUE_EVENT, { detail }))
+          }
+        })
+      }
+    }, 10_000)
     return () => window.clearInterval(timer)
-  }, [posts, refreshPost, refreshJobs])
+  }, [refreshPost, refreshJobs])
 
   const schedulePost = useCallback(async (
     id: string,

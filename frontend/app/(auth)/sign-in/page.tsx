@@ -55,8 +55,8 @@ export default function SignInPage() {
       // app's auth gate renders the dashboard straight from cache rather than
       // firing another /auth/me round trip and flashing a loading screen.
       queryClient.setQueryData(meQueryKey, {user});
-      // Hold the curtain until MIN_CURTAIN_MS so the mascot gets a readable
-      // pass, then hand off to the dashboard. Deliberately no hide() on
+      // Hold the curtain until MIN_CURTAIN_MS so it reads as feedback rather
+      // than a one-frame flash, then hand off to the dashboard. Deliberately no hide() on
       // success: the curtain stays up across the navigation so the dashboard
       // never flashes in behind it.
       await holdForMinimum(startedAt);

@@ -4,8 +4,9 @@ import type { Platform } from '@/lib/kali/store/schema'
 import { PLATFORM_COLORS } from '@/lib/kali/store/schema'
 import PlatformIcon from '../social/PlatformIcon'
 import type { PlatformFilter } from './types'
+import { platformLabel } from './planner-model'
 
-const ALL_PLATFORMS: Platform[] = ['facebook', 'instagram', 'youtube', 'tiktok']
+const ALL_PLATFORMS: Platform[] = ['facebook', 'linkedin', 'youtube', 'tiktok']
 
 interface PlatformFilterBarProps {
   active: PlatformFilter
@@ -40,7 +41,7 @@ export default function PlatformFilterBar({ active, onChange }: PlatformFilterBa
           style={active === p ? { background: PLATFORM_COLORS[p] } : undefined}
         >
           <PlatformIcon platform={p} size={11} />
-          <span className="hidden sm:inline">{p.charAt(0).toUpperCase() + p.slice(1)}</span>
+          <span className="hidden sm:inline">{platformLabel(p)}</span>
         </button>
       ))}
     </div>

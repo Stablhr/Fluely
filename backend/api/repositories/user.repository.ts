@@ -1,5 +1,6 @@
 import {Types} from 'mongoose';
-import {UserDocument, UserModel} from '../models/User.model';
+import {UserDocument, UserModel, UserPreferences} from '../models/User.model';
+import {ProductSession} from '../utils/transaction';
 
 export const userRepository = {
   findByEmail: (email: string) =>
@@ -81,5 +82,18 @@ export const userRepository = {
     UserModel.updateOne(
       {email: email.toLowerCase()},
       {isVerified: true, verificationCode: null, verificationExpiry: null}
-    ).exec()
+    ).exec(),
+
+  /**
+   * Sets individual preference leaves by dotted path (e.g.
+   * `preferences.notifications.email.mentions`), so a partial patch merges into
+   * what is stored atomically instead of a read-modify-write.
+   */
+  setPreferenceFields: (
+    userId: string,
+    fields: Record<string, UserPreferences['defaultBoardVisibility'] | boolean>
+  ) => UserModel.updateOne({_id: userId}, {$set: fields}).exec(),
+
+  deleteById: (userId: Types.ObjectId, session?: ProductSession) =>
+    UserModel.deleteOne({_id: userId}, {session}).exec()
 };

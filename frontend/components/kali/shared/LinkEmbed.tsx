@@ -64,7 +64,7 @@ export default function LinkEmbed({
               controls
               preload="metadata"
               src={descriptor.sourceUrl}
-              className="absolute inset-0 h-full w-full bg-brand-ink object-contain"
+              className="absolute inset-0 h-full w-full bg-black object-contain"
             />
           ) : (
             <iframe
@@ -98,14 +98,14 @@ export default function LinkEmbed({
                 type="button"
                 onClick={() => setExpanded(true)}
                 aria-label={`Play ${label} preview`}
-                className="absolute inset-0 flex items-center justify-center bg-brand-ink/25 transition-colors hover:bg-brand-ink/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                className="absolute inset-0 flex items-center justify-center bg-black/25 transition-colors hover:bg-black/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
               >
                 <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
                   <ProviderIcon provider={descriptor.provider} size={24} />
                 </span>
               </button>
             ) : (
-              <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-brand-ink/25">
+              <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center bg-black/25">
                 <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
                   <ProviderIcon provider={descriptor.provider} size={24} />
                 </span>

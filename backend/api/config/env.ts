@@ -18,6 +18,12 @@ const envSchema = z.object({
   SMTP_FROM: z.string().optional(),
   COOKIE_SECURE: z.string().optional(),
   COOKIE_SAMESITE: z.enum(['strict', 'lax', 'none']).optional(),
+  /**
+   * Prefix for the auth cookie names (default "dc"). Cookies are shared by
+   * every port on a host, so two apps on localhost that use the same names
+   * sign each other out; give each local app its own prefix.
+   */
+  COOKIE_PREFIX: z.string().regex(/^[a-z][a-z0-9_]{0,19}$/i, 'letters, digits and _ only').optional(),
   CORS_ORIGINS: z.string().optional(),
   FRONTEND_URL: z.string().url().optional(),
   MEDIA_MAX_FILE_SIZE_MB: z.coerce.number().positive().max(2000).optional(),
@@ -35,7 +41,51 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().optional(),
   /** Root folder every asset is stored under. Defaults to `fluely`. */
   CLOUDINARY_FOLDER: z.string().optional(),
-  SOCIAL_SIMULATION_FAILURE_RATE: z.coerce.number().min(0).max(1).optional()
+  SOCIAL_SIMULATION_FAILURE_RATE: z.coerce.number().min(0).max(1).optional(),
+  /**
+   * Social scheduling; see docs/SOCIAL_SCHEDULING_SETUP.md. Every value is
+   * optional so the app boots without them: a platform with no credentials
+   * offers a demo connection, and without QStash the local server checks for
+   * due posts on a timer.
+   */
+  API_PUBLIC_URL: z.string().url().optional(),
+  /** 32 bytes, base64. Encrypts stored platform tokens (AES-256-GCM). */
+  SOCIAL_TOKEN_KEY: z.string().optional(),
+  FACEBOOK_MODE: z.enum(['live', 'dryrun', 'disabled']).optional(),
+  TIKTOK_MODE: z.enum(['live', 'dryrun', 'disabled']).optional(),
+  YOUTUBE_MODE: z.enum(['live', 'dryrun', 'disabled']).optional(),
+  LINKEDIN_MODE: z.enum(['live', 'dryrun', 'disabled']).optional(),
+  META_APP_ID: z.string().optional(),
+  META_APP_SECRET: z.string().optional(),
+  META_GRAPH_VERSION: z.string().optional(),
+  /** Facebook Login for Business configuration id (optional; used instead of a permission list). */
+  META_LOGIN_CONFIG_ID: z.string().optional(),
+  TIKTOK_CLIENT_KEY: z.string().optional(),
+  TIKTOK_CLIENT_SECRET: z.string().optional(),
+  /**
+   * Public https base that forwards to this backend, used only as TikTok's
+   * redirect (TikTok refuses http://localhost). Leave empty when
+   * API_PUBLIC_URL is already https.
+   */
+  TIKTOK_REDIRECT_BASE: z.string().url().optional(),
+  TIKTOK_PRIVACY: z
+    .enum(['SELF_ONLY', 'PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR'])
+    .optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  LINKEDIN_CLIENT_ID: z.string().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().optional(),
+  /** `true` once LinkedIn approves the Community Management API. */
+  LINKEDIN_ORGANIZATIONS: z.string().optional(),
+  /**
+   * Pins LinkedIn's versioned API (YYYYMM). Leave unset: versions retire in
+   * under a year, so by default a recent one is chosen per request.
+   */
+  LINKEDIN_API_VERSION: z.string().regex(/^\d{6}$/).optional(),
+  QSTASH_URL: z.string().url().optional(),
+  QSTASH_TOKEN: z.string().optional(),
+  QSTASH_CURRENT_SIGNING_KEY: z.string().optional(),
+  QSTASH_NEXT_SIGNING_KEY: z.string().optional()
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -67,5 +117,14 @@ export const env = {
     .map(value => value.trim().toLowerCase())
     .filter(Boolean),
   SOCIAL_SIMULATION_FAILURE_RATE:
-    parsed.data.SOCIAL_SIMULATION_FAILURE_RATE ?? 0
+    parsed.data.SOCIAL_SIMULATION_FAILURE_RATE ?? 0,
+  API_PUBLIC_URL: (parsed.data.API_PUBLIC_URL ?? `http://localhost:${parsed.data.PORT ?? 5000}`).replace(
+    /\/+$/,
+    ''
+  ),
+  META_GRAPH_VERSION: parsed.data.META_GRAPH_VERSION ?? 'v25.0',
+  TIKTOK_PRIVACY: parsed.data.TIKTOK_PRIVACY ?? 'SELF_ONLY',
+  TIKTOK_REDIRECT_BASE: parsed.data.TIKTOK_REDIRECT_BASE?.replace(/\/+$/, ''),
+  LINKEDIN_ORGANIZATIONS: parsed.data.LINKEDIN_ORGANIZATIONS === 'true',
+  QSTASH_URL: (parsed.data.QSTASH_URL ?? 'https://qstash.upstash.io').replace(/\/+$/, '')
 };

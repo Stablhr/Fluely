@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import PlannerViewSkeleton from './PlannerViewSkeleton'
 import { DragDropContext } from '@hello-pangea/dnd'
 import type { DropResult } from '@hello-pangea/dnd'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -73,6 +74,10 @@ export default function PlannerView() {
 
   const navButtonClass =
     'flex h-7 w-7 items-center justify-center rounded-md text-text-secondary transition-colors duration-150 hover:bg-primary-subtle hover:text-primary-hover active:scale-[0.98]'
+
+  if (!store.boardsLoaded && Object.keys(store.data.boards).length === 0) {
+    return <PlannerViewSkeleton />
+  }
 
   return (
     <div className="flex h-full flex-col">

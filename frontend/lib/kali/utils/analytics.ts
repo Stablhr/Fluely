@@ -4,7 +4,7 @@ const MOCK_REACH: Record<Platform, [number, number]> = {
   youtube: [800, 12000],
   facebook: [200, 5000],
   tiktok: [500, 20000],
-  instagram: [300, 8000],
+  linkedin: [150, 4000],
 }
 
 function rand(min: number, max: number): number {

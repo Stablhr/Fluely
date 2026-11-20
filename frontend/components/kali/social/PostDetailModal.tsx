@@ -14,8 +14,8 @@ import {
   Hash,
   Play,
   Globe,
-  Camera,
   Music,
+  Briefcase,
 } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import type { SocialPost, Platform, PlatformStatus } from '@/lib/kali/store/schema'
@@ -27,8 +27,8 @@ import { useToast } from '../shared/useToastState'
 const PLATFORM_ICONS: Record<Platform, typeof Play> = {
   youtube: Play,
   facebook: Globe,
-  instagram: Camera,
   tiktok: Music,
+  linkedin: Briefcase,
 }
 
 const STATUS_META: Record<PlatformStatus, { label: string; icon: typeof Clock; className: string }> = {
@@ -38,6 +38,7 @@ const STATUS_META: Record<PlatformStatus, { label: string; icon: typeof Clock; c
   posted: { label: 'Posted', icon: CheckCircle2, className: 'text-success-text' },
   failed: { label: 'Failed', icon: XCircle, className: 'text-danger-text' },
   cancelled: { label: 'Cancelled', icon: Ban, className: 'text-text-muted' },
+  reminder: { label: 'Your turn to post', icon: Clock, className: 'text-warning-text' },
 }
 
 function formatDateTime(iso?: string): string {
@@ -122,7 +123,7 @@ export default function PostDetailModal({ postId, onClose, onEdit }: {
 
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="post-detail-title">
-      <div className="absolute inset-0 bg-brand-ink/50 backdrop-blur-sm" onClick={handleClose} />
+      <div className="animate-overlay absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
       <div className="relative z-10 flex h-full items-start justify-center overflow-y-auto p-3 pt-8 sm:pt-16">
         <div className="animate-in flex w-full max-w-2xl flex-col rounded-[14px] border border-border bg-surface glass-heavy shadow-modal">
           {/* Header */}

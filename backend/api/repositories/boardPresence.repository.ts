@@ -39,5 +39,16 @@ export const boardPresenceRepository = {
     ).lean().session(session ?? null).exec() as Promise<
       Pick<BoardPresenceDocument, 'userId' | 'name'>[]
     >;
+  },
+
+  async deleteForUserOrBoards(
+    userId: Types.ObjectId,
+    boardIds: Types.ObjectId[],
+    session?: ProductSession
+  ): Promise<void> {
+    await BoardPresenceModel.deleteMany(
+      {$or: [{userId}, {boardId: {$in: boardIds}}]},
+      {session}
+    ).exec();
   }
 };

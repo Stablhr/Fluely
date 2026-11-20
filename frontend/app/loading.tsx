@@ -9,8 +9,8 @@ import LoadingScreen from '@/components/auth/LoadingScreen';
  * nothing covered the outgoing page, and no brand on screen at all.
  *
  * It now renders the same loading curtain the auth flows use, so route
- * transitions and the streamed first paint of a full page load show the mascot
- * and progress bar. Nesting inside (app) matters: (app)/loading.tsx is closer to
+ * transitions and the streamed first paint of a full page load show the brand
+ * mark and progress bar. Nesting inside (app) matters: (app)/loading.tsx is closer to
  * those routes and keeps its own DashboardSkeleton, so navigating around the
  * planner does not blank the screen to a full-screen curtain.
  *

@@ -1,10 +1,24 @@
+import bcrypt from 'bcrypt';
 import {Types} from 'mongoose';
 import {userRepository} from '../repositories/user.repository';
 import {boardRepository} from '../repositories/board.repository';
 import {boardCollaboratorRepository} from '../repositories/boardCollaborator.repository';
+import {listRepository} from '../repositories/list.repository';
+import {cardRepository} from '../repositories/card.repository';
+import {mediaRepository} from '../repositories/media.repository';
+import {activityLogRepository} from '../repositories/activityLog.repository';
+import {mentionRepository} from '../repositories/mention.repository';
+import {notificationRepository} from '../repositories/notification.repository';
+import {boardPresenceRepository} from '../repositories/boardPresence.repository';
+import {workspaceRepository} from '../repositories/workspace.repository';
 import {CLOUDINARY_FOLDERS} from '../config/cloudinary';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
+import {CloudinaryResourceType} from '../constants/product';
+import {withProductTransaction} from '../utils/transaction';
+import {preferencePatchToSetFields, resolvePreferences} from '../utils/preferences';
+import type {AccountPreferencesPatchInput} from '../dtos/product.dto';
+import {logger} from '../logging/logger';
 import {deleteFromCloudinary, uploadToCloudinary} from './cloudinary.service';
 
 export type ProfilePatch = {
@@ -18,6 +32,7 @@ export type ProfilePatch = {
   avatarColor?: string | null;
   phone?: string | null;
   profileVisibility?: Record<string, 'me' | 'boards'> | null;
+  preferences?: AccountPreferencesPatchInput;
 };
 
 function sanitizeText(value: string | null | undefined): string | null {
@@ -43,6 +58,7 @@ function toProfile(account: any) {
     accentColor: account.accentColor ?? null,
     phone: account.phone ?? null,
     profileVisibility: account.profileVisibility ?? null,
+    preferences: resolvePreferences(account.preferences),
     createdAt: account.createdAt,
   };
 }
@@ -276,9 +292,140 @@ export const accountService = {
     }
 
     await userRepository.updateProfile(userId.toString(), update as any);
+    if (patch.preferences !== undefined) {
+      const fields = preferencePatchToSetFields(patch.preferences);
+      if (Object.keys(fields).length > 0) {
+        await userRepository.setPreferenceFields(userId.toString(), fields);
+      }
+    }
     const updated = await userRepository.findById(userId.toString());
     if (!updated) throw new ApiError(404, ErrorCodes.USER_NOT_FOUND, 'Account not found');
     return toProfile(updated);
+  },
+
+  /**
+   * Permanently deletes a user account and everything it owns.
+   *
+   * What goes: boards the account owns with all of their lists, cards,
+   * collaborator rows, presence, activity, mentions, notifications and media;
+   * the account's media library items that are not attached to any board; its
+   * avatar; its collaborator rows, presence, mentions and notifications on
+   * other people's boards; its card assignments; and its workspace
+   * memberships.
+   *
+   * What stays: content the account contributed to boards it does not own
+   * (comments, attachments, activity entries) -- that belongs to the board.
+   *
+   * Workspaces it owns are deleted when it is the only member. A workspace
+   * with other members is handed to its longest-standing remaining member
+   * instead, so nobody else loses the workspace or its board visibility.
+   *
+   * Database writes run in one transaction where the deployment supports it.
+   * Without one, access grants are revoked first and the account row last, so
+   * a failure part-way leaves no one with stray access and the account still
+   * able to retry. Cloudinary assets are destroyed only after the database
+   * commits (best effort): a stray file is recoverable, a record pointing at a
+   * destroyed file is not.
+   */
+  async deleteAccount(userId: Types.ObjectId, password: string) {
+    const account = await userRepository.findById(userId.toString());
+    if (!account) throw new ApiError(404, ErrorCodes.USER_NOT_FOUND, 'Account not found');
+
+    const matches = await bcrypt.compare(password, account.passwordHash);
+    if (!matches) {
+      // 400 rather than 401: the session is fine, the confirmation is wrong,
+      // and a 401 would trigger the client's refresh-and-retry interceptor.
+      throw new ApiError(400, ErrorCodes.INVALID_CREDENTIALS, 'Password is incorrect');
+    }
+
+    const ownedBoardIds = await boardRepository.listIdsOwnedBy(userId);
+    const [boardMedia, libraryMedia] = await Promise.all([
+      ownedBoardIds.length > 0 ? mediaRepository.listForBoards(ownedBoardIds) : Promise.resolve([]),
+      mediaRepository.listUnattachedForOwner(userId)
+    ]);
+    const mediaById = new Map(
+      [...boardMedia, ...libraryMedia].map(row => [row._id.toString(), row])
+    );
+    const media = [...mediaById.values()];
+    const assets: {publicId: string; resourceType: CloudinaryResourceType}[] = media
+      .filter(row => Boolean(row.publicId))
+      .map(row => ({publicId: row.publicId, resourceType: row.resourceType ?? 'image'}));
+    if (account.avatarPublicId) {
+      assets.push({publicId: account.avatarPublicId, resourceType: 'image'});
+    }
+
+    const transferredWorkspaces = await withProductTransaction(async session => {
+      // 1. Revoke access first: nobody keeps a seat on the doomed boards, and
+      //    the account loses its seats everywhere else.
+      await boardCollaboratorRepository.deleteForBoards(ownedBoardIds, session);
+      await boardCollaboratorRepository.deleteForUser(userId, session);
+
+      // 2. Workspaces: delete solo ones, hand shared ones to another member.
+      const ownedWorkspaces = await workspaceRepository.listOwnedBy(userId, session);
+      const soloWorkspaceIds: Types.ObjectId[] = [];
+      const transferred: string[] = [];
+      for (const workspace of ownedWorkspaces) {
+        const others = await workspaceRepository.listOtherMembers(workspace._id, userId, session);
+        const heir = others[0];
+        if (heir) {
+          await workspaceRepository.transferOwnership(workspace._id, heir.userId, session);
+          transferred.push(workspace._id.toString());
+        } else {
+          soloWorkspaceIds.push(workspace._id);
+        }
+      }
+      await workspaceRepository.deleteMembershipsForUser(userId, session);
+      if (soloWorkspaceIds.length > 0) {
+        await workspaceRepository.deleteByIds(soloWorkspaceIds, session);
+      }
+
+      // 3. Everything hanging off the owned boards, and the account's traces.
+      await mentionRepository.deleteForUserOrBoards(userId, ownedBoardIds, session);
+      await notificationRepository.deleteForUserOrBoards(userId, ownedBoardIds, session);
+      await boardPresenceRepository.deleteForUserOrBoards(userId, ownedBoardIds, session);
+      await cardRepository.pullMember(userId, session);
+      if (ownedBoardIds.length > 0) {
+        await activityLogRepository.deleteForBoards(ownedBoardIds, session);
+        await cardRepository.deleteForBoards(ownedBoardIds, session);
+        await listRepository.deleteForBoards(ownedBoardIds, session);
+      }
+      if (media.length > 0) {
+        await mediaRepository.deleteByIds(media.map(row => row._id as Types.ObjectId), session);
+      }
+      if (ownedBoardIds.length > 0) {
+        await boardRepository.deleteByIds(ownedBoardIds, session);
+      }
+
+      // 4. The account itself, last.
+      await userRepository.deleteById(userId, session);
+      return transferred;
+    });
+
+    const failed: string[] = [];
+    await Promise.all(
+      assets.map(asset =>
+        deleteFromCloudinary(asset.publicId, asset.resourceType).catch(() => {
+          failed.push(asset.publicId);
+        })
+      )
+    );
+    if (failed.length > 0) {
+      logger.warn(
+        {userId: userId.toString(), publicIds: failed},
+        'Could not destroy some Cloudinary assets of a deleted account'
+      );
+    }
+
+    logger.info(
+      {
+        userId: userId.toString(),
+        boards: ownedBoardIds.length,
+        media: media.length,
+        transferredWorkspaces
+      },
+      'Account deleted'
+    );
+    return {success: true as const};
   },
 
   /**

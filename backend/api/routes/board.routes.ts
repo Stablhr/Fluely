@@ -26,13 +26,16 @@ import {
   collaboratorIdParamsSchema,
   collaboratorInviteSchema,
   collaboratorRolePatchSchema,
+  commentIdParamsSchema,
   invitationIdParamsSchema,
   invitationRespondSchema,
   listCreateSchema,
   listIdParamsSchema,
   listPatchSchema,
   listReorderSchema,
-  pollQuerySchema
+  pollQuerySchema,
+  reactionSchema,
+  reactionClaimSchema
 } from '../dtos/product.dto';
 
 const router = Router();
@@ -238,6 +241,29 @@ router.post(
   validateRequest({params: cardIdParamsSchema, body: cardMoveSchema}),
   requireBoardAccess('write'),
   cardController.move
+);
+
+/**
+ * Toggles the caller's reaction on a comment. Only read access is required
+ * here: the board's `settings.commentPermission` decides who may react, and
+ * the service applies it.
+ */
+router.post(
+  '/:boardId/cards/:cardId/comments/:commentId/reactions',
+  authActionLimiter,
+  validateRequest({params: commentIdParamsSchema, body: reactionSchema}),
+  requireBoardAccess('read'),
+  cardController.toggleCommentReaction
+);
+
+// Attributes old anonymous reactions to the person whose browser remembers
+// making them (see cardService.claimLegacyReactions).
+router.post(
+  '/:boardId/reactions/claim',
+  authActionLimiter,
+  validateRequest({params: boardIdParamsSchema, body: reactionClaimSchema}),
+  requireBoardAccess('read'),
+  cardController.claimLegacyReactions
 );
 
 router.delete(

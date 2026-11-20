@@ -9,8 +9,10 @@ import type { SocialPost } from '@/lib/kali/store/schema'
 import { formatDate } from '@/lib/kali/utils/dates'
 import PlatformIcon from '../social/PlatformIcon'
 import { beginDragCursor, endDragCursor } from '@/lib/kali/utils/dragCursor'
+import PostMomentBadge from './PostMomentBadge'
 import {
   POST_COLUMNS,
+  postMoment,
   columnForStatus,
   enabledPlatforms,
   platformColor,
@@ -128,7 +130,7 @@ function BoardCard({ post, index, onOpen }: { post: SocialPost; index: number; o
   const thumb = postThumbnail(post)
   // Single-platform posts carry that platform's colour; multi-platform ones fall
   // back to the ink brown so the accent never implies the wrong destination.
-  const accent = platforms.length === 1 ? platformColor(platforms[0]) : '#8a9068'
+  const accent = platforms.length === 1 ? platformColor(platforms[0]) : '#64748b'
 
   return (
     <Draggable draggableId={post.id} index={index}>
@@ -204,7 +206,9 @@ function BoardCard({ post, index, onOpen }: { post: SocialPost; index: number; o
                   </span>
                 ))}
               </p>
-              {date && (
+              {postMoment(post) ? (
+                <PostMomentBadge post={post} size="xs" className="min-w-0" />
+              ) : date && (
                 <p className="truncate font-mono text-[10px] text-text-muted">
                   {post.scheduledTime ? `${formatDate(date)} ${post.scheduledTime}` : formatDate(date)}
                 </p>

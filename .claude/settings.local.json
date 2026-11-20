@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(vercel redeploy *)",
+      "Bash(vercel promote *)",
+      "Bash(vercel deploy *)",
+      "Bash(vercel --prod *)",
+      "Bash(vercel --prod)"
+    ]
+  }
+}

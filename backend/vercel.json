@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/cleanup-done-cards",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/publish-due",
+      "schedule": "15 4 * * *"
     }
   ]
 }

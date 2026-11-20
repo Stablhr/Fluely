@@ -3,26 +3,21 @@
 @import "shadcn/tailwind.css";
 @import "./kali.css";
 
-/* The product is light-only: every route group renders on the ivory canvas
-   (#fbfcee) declared in :root below, and there is no dark palette.
-
-   `dark` stays declared as a CLASS-based variant on purpose. Tailwind v4
-   otherwise falls back to its built-in `@media (prefers-color-scheme: dark)`,
-   which would make every `dark:*` class in the vendored shadcn components
-   switch on for visitors whose OS is set to dark. Nothing ever adds a `dark`
-   class to <html>, so these utilities stay inert — but declaring the variant
-   keeps that guarantee explicit rather than dependent on the vendored classes
-   only ever referencing CSS variables. */
+/* Light and dark themes. `dark` is a CLASS-based variant on purpose: the theme
+   is the user's choice (Settings → Appearance, stored by lib/theme), and
+   lib/theme puts `.dark` on <html> — for "System" it follows the OS. Without
+   this line Tailwind v4 would key `dark:*` off the media query alone and ignore
+   an explicit Light choice on a dark OS. */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* So Matcha brand faces. next/font publishes --font-poppins / --font-comfortaa. */
-  --font-heading: var(--font-poppins);
-  --font-body: var(--font-comfortaa);
+  /* One UI typeface (Geist); the heading/body utilities are kept as aliases. */
+  --font-heading: var(--font-geist-sans);
+  --font-body: var(--font-geist-sans);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-mono);
+  --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -61,40 +56,76 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* So Matcha brand palette — see frontend/Design.md §2. */
+/* Slate palette (shadcn variable names) — see frontend/Design.md §2. The app
+   tokens in kali.css read four of these (background, primary,
+   primary-foreground, border), so both systems flip together. */
 :root {
-  --background: #fbfcee;
-  --foreground: #343b1b;
+  --background: #f7f8fa;
+  --foreground: #0f172a;
   --card: #ffffff;
-  --card-foreground: #343b1b;
+  --card-foreground: #0f172a;
   --popover: #ffffff;
-  --popover-foreground: #343b1b;
-  --primary: #3971b8;
-  --primary-foreground: #fbfcee;
-  --secondary: #f2f2e0;
-  --secondary-foreground: #343b1b;
-  --muted: #f2f2e0;
-  --muted-foreground: #6b7350;
-  --accent: #e8efd6;
-  --accent-foreground: #343b1b;
-  --destructive: #c0392f;
-  --border: #e4e3cd;
-  --input: #e4e3cd;
-  --ring: #3971b8;
-  --chart-1: #c8d69b;
-  --chart-2: #f6e6a5;
-  --chart-3: #3971b8;
-  --chart-4: #8a9068;
-  --chart-5: #343b1b;
-  --radius: 1.25rem;
-  --sidebar: #3971b8;
-  --sidebar-foreground: #fbfcee;
-  --sidebar-primary: #f6e6a5;
-  --sidebar-primary-foreground: #343b1b;
-  --sidebar-accent: #2f5c96;
-  --sidebar-accent-foreground: #fbfcee;
-  --sidebar-border: #2f5c96;
-  --sidebar-ring: #c8d69b;
+  --popover-foreground: #0f172a;
+  --primary: #2554c7;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f3f6;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f3f6;
+  --muted-foreground: #64748b;
+  --accent: #f1f3f6;
+  --accent-foreground: #0f172a;
+  --destructive: #c2341f;
+  --border: #e3e6eb;
+  --input: #d5dae1;
+  --ring: #2554c7;
+  --chart-1: #2554c7;
+  --chart-2: #7c9cf0;
+  --chart-3: #0f766e;
+  --chart-4: #b45309;
+  --chart-5: #64748b;
+  --radius: 0.5rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #2554c7;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ebf0fc;
+  --sidebar-accent-foreground: #1e46a8;
+  --sidebar-border: #e3e6eb;
+  --sidebar-ring: #2554c7;
+}
+
+.dark {
+  --background: #0c0e12;
+  --foreground: #e7e9ee;
+  --card: #14171d;
+  --card-foreground: #e7e9ee;
+  --popover: #1e222b;
+  --popover-foreground: #e7e9ee;
+  --primary: #3563e9;
+  --primary-foreground: #ffffff;
+  --secondary: #1b1f27;
+  --secondary-foreground: #e7e9ee;
+  --muted: #1b1f27;
+  --muted-foreground: #7f8898;
+  --accent: #1b1f27;
+  --accent-foreground: #e7e9ee;
+  --destructive: #e0533c;
+  --border: #262b34;
+  --input: #303642;
+  --ring: #3563e9;
+  --chart-1: #3563e9;
+  --chart-2: #93b2ff;
+  --chart-3: #2bb3a6;
+  --chart-4: #d4891a;
+  --chart-5: #7f8898;
+  --sidebar: #14171d;
+  --sidebar-foreground: #e7e9ee;
+  --sidebar-primary: #3563e9;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #172036;
+  --sidebar-accent-foreground: #93b2ff;
+  --sidebar-border: #262b34;
+  --sidebar-ring: #3563e9;
 }
 
 @layer base {
@@ -105,6 +136,6 @@
     @apply bg-background text-foreground;
   }
   html {
-    @apply font-mono;
+    @apply font-sans;
   }
 }

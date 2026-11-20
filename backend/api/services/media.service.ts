@@ -2,6 +2,8 @@ import path from 'path';
 import {Types} from 'mongoose';
 import {mediaRepository} from '../repositories/media.repository';
 import {boardRepository} from '../repositories/board.repository';
+import {cardRepository} from '../repositories/card.repository';
+import {isOwnCloudinaryUrl} from '../utils/cloudinaryUrl';
 import {cloudinary, isCloudinaryConfigured} from '../config/cloudinary';
 import {env} from '../config/env';
 import {getBoardAccessLevel, canWrite} from './boardAccess.service';
@@ -15,6 +17,7 @@ import {
   CloudinaryResourceType,
   deleteFromCloudinary,
   folderForMedia,
+  getUploadedAsset,
   uploadToCloudinary
 } from './cloudinary.service';
 
@@ -50,6 +53,46 @@ function serialize(doc: {
   };
 }
 
+/**
+ * Decides where an upload may be attached, for every upload path (proxied
+ * upload, signature, register):
+ * - no board: a personal upload (content planner media), always allowed;
+ * - a board: the caller must be able to edit it. A board they cannot see at all
+ *   is reported as not found, so the endpoint does not reveal which ids exist;
+ * - a card: needs its board, and must belong to that board.
+ */
+async function resolveUploadScope(
+  actorId: Types.ObjectId,
+  scope: {boardId?: string; cardId?: string}
+): Promise<{boardId: Types.ObjectId | null; cardId: Types.ObjectId | null}> {
+  if (scope.cardId && !scope.boardId) {
+    throw new ApiError(400, ErrorCodes.VALIDATION_ERROR, 'cardId requires boardId');
+  }
+  const boardId = scope.boardId ? parseObjectId(scope.boardId, 'boardId') : null;
+  const cardId = scope.cardId ? parseObjectId(scope.cardId, 'cardId') : null;
+  if (!boardId) return {boardId: null, cardId: null};
+
+  const board = await boardRepository.findById(boardId.toString());
+  if (!board) {
+    throw new ApiError(404, ErrorCodes.BOARD_NOT_FOUND, 'Board not found');
+  }
+  const level = await getBoardAccessLevel({actorType: 'user', actorId}, board);
+  if (level === 'none') {
+    throw new ApiError(404, ErrorCodes.BOARD_NOT_FOUND, 'Board not found');
+  }
+  if (!canWrite(level)) {
+    throw new ApiError(403, ErrorCodes.FORBIDDEN, 'You have view-only access to this board');
+  }
+
+  if (cardId) {
+    const card = await cardRepository.findByIdForBoard(cardId.toString(), boardId);
+    if (!card) {
+      throw new ApiError(404, ErrorCodes.CARD_NOT_FOUND, 'Card not found on this board');
+    }
+  }
+  return {boardId, cardId};
+}
+
 export const mediaService = {
   /**
    * Streams every uploaded buffer to Cloudinary, then records one row per file.
@@ -67,6 +110,8 @@ export const mediaService = {
       throw new ApiError(400, ErrorCodes.VALIDATION_ERROR, 'No files were uploaded');
     }
 
+    const {boardId, cardId} = await resolveUploadScope(ownerId, scope);
+
     const used = await mediaRepository.usedBytes(ownerId);
     const currentBytes = used[0]?.total ?? 0;
     const incomingBytes = files.reduce((sum, file) => sum + file.size, 0);
@@ -79,8 +124,6 @@ export const mediaService = {
       );
     }
 
-    const boardId = scope.boardId ? parseObjectId(scope.boardId, 'boardId') : null;
-    const cardId = scope.cardId ? parseObjectId(scope.cardId, 'cardId') : null;
     const folder = folderForMedia({boardId: scope.boardId, cardId: scope.cardId});
 
     const uploaded: {file: UploadedFile; result: Awaited<ReturnType<typeof uploadToCloudinary>>}[] =
@@ -181,6 +224,9 @@ export const mediaService = {
     ownerId: Types.ObjectId,
     scope: {boardId?: string; cardId?: string}
   ) {
+    // Access first: a caller who may not upload here learns that, not how
+    // storage is configured.
+    await resolveUploadScope(ownerId, scope);
     if (!isCloudinaryConfigured) {
       throw new ApiError(
         503,
@@ -213,7 +259,10 @@ export const mediaService = {
 
   /**
    * Registers a media asset that was uploaded directly to Cloudinary by the
-   * browser, creating the MediaAttachment row. Board access is verified.
+   * browser, creating the MediaAttachment row. Board access is verified, the
+   * asset must sit in the folder its signature was issued for, and its URL,
+   * size and resource type come from Cloudinary's Admin API rather than from
+   * the request.
    *
    * The kind is derived from the MIME type rather than trusted from the
    * client, so a video can never be recorded as an image (which would break
@@ -247,22 +296,30 @@ export const mediaService = {
       );
     }
 
-    const boardId = scope.boardId ? parseObjectId(scope.boardId, 'boardId') : null;
-    const cardId = scope.cardId ? parseObjectId(scope.cardId, 'cardId') : null;
+    const {boardId, cardId} = await resolveUploadScope(ownerId, scope);
 
-    if (boardId) {
-      const board = await boardRepository.findById(boardId.toString());
-      if (board) {
-        const level = await getBoardAccessLevel({actorType: 'user', actorId: ownerId}, board);
-        if (!canWrite(level)) {
-          throw new ApiError(403, ErrorCodes.FORBIDDEN, 'You have view-only access to this board');
-        }
-      }
+    // Record what Cloudinary says about the asset, not what the browser says:
+    // the stored URL is rendered in other people's browsers.
+    const asset = await getUploadedAsset(data.publicId);
+    if (!asset || !isOwnCloudinaryUrl(asset.secureUrl)) {
+      throw new ApiError(400, ErrorCodes.VALIDATION_ERROR, 'That upload could not be found');
+    }
+    // The signature only allowed uploads into the scope's folder, so an asset
+    // anywhere else was not uploaded through it (or not for this scope).
+    if (asset.folder !== folderForMedia(scope)) {
+      throw new ApiError(400, ErrorCodes.VALIDATION_ERROR, 'That upload does not belong here');
+    }
+    if (asset.bytes > mediaConfig.maxFileSizeBytes) {
+      throw new ApiError(
+        413,
+        ErrorCodes.FILE_TOO_LARGE,
+        `File is larger than the ${Math.round(mediaConfig.maxFileSizeBytes / 1024 / 1024)}MB limit`
+      );
     }
 
     const usedBytes = await mediaRepository.usedBytes(ownerId);
     const currentBytes = usedBytes[0]?.total ?? 0;
-    if (currentBytes + data.sizeBytes > mediaConfig.quotaBytes) {
+    if (currentBytes + asset.bytes > mediaConfig.quotaBytes) {
       throw new ApiError(
         413,
         ErrorCodes.QUOTA_EXCEEDED,
@@ -271,16 +328,8 @@ export const mediaService = {
     }
 
     const kind = kindForMimeType(mimeType);
-    // Cloudinary's `auto` upload reports the real resource type, but fall back
-    // to the derived kind so a video is never stored as an image.
-    const resourceType: CloudinaryResourceType =
-      data.resourceType === 'video' || data.resourceType === 'raw'
-        ? data.resourceType
-        : kind === 'video'
-          ? 'video'
-          : kind === 'image'
-            ? 'image'
-            : 'raw';
+    // Cloudinary's own resource type, so `destroy` later uses the right one.
+    const resourceType: CloudinaryResourceType = asset.resourceType;
 
     const created = await mediaRepository.create({
       ownerId,
@@ -289,10 +338,10 @@ export const mediaService = {
       kind: kind as MediaKind,
       resourceType,
       originalName: path.basename(data.name),
-      url: data.url,
+      url: asset.secureUrl,
       publicId: data.publicId,
       mimeType: data.mimeType,
-      sizeBytes: data.sizeBytes
+      sizeBytes: asset.bytes
     });
     return serialize(created);
   }

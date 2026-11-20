@@ -1,5 +1,6 @@
 import type { AppData, Board, SocialPost, SocialPostPlatform } from "./schema";
 import { emptyData } from "./schema";
+import { normalizeReactions } from "@/lib/kali/utils/reactions";
 
 function storageKey(userId?: string | null): string {
   return userId ? `kali_data:${userId}` : "kali_data";
@@ -88,6 +89,11 @@ export function loadData(userId?: string | null): AppData {
       return emptyData();
     }
     if (!parsed.ui) parsed.ui = emptyData().ui;
+    // Reactions used to be cached as bare counts; read them in today's shape.
+    for (const card of Object.values(parsed.cards ?? {})) {
+      if (!card || !Array.isArray(card.comments)) continue;
+      card.comments = card.comments.map((c) => ({ ...c, reactions: normalizeReactions(c.reactions) }));
+    }
     for (const board of Object.values(parsed.boards)) {
       migrateBoard(board);
     }

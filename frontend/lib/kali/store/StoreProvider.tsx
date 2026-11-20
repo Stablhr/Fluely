@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type {
+  Reactions,
   AppData,
   Board,
   Card,
@@ -64,6 +65,8 @@ import {
   reorderCardsOnServer,
   reorderListsOnServer,
   setCardMemberOnServer,
+  toggleCommentReactionOnServer,
+  claimLegacyReactionsOnServer,
   toCard,
   toList,
   updateCardOnServer,
@@ -78,6 +81,7 @@ import {
 } from "@/lib/kali/api/notifications";
 import type { AppNotificationDto } from "@/lib/kali/api/notifications";
 import { getFriendlyErrorMessage } from "@/lib/api/getFriendlyErrorMessage";
+import { uploadMediaFile, type UploadProgress } from "@/lib/api/mediaApi";
 
 function patchRecord<T extends { id: string }>(
   rec: Record<string, T>,
@@ -99,6 +103,12 @@ const now = () => new Date().toISOString();
  * revision, so it keeps working entirely on local mutations. Everything else
  * goes to the server and is reconciled with what comes back.
  */
+/** Where browsers kept their own reactions before reactions were per person. */
+const LEGACY_REACTIONS_KEY = "kali_user_comment_reactions";
+
+/** How often the board list is re-read while the app is open and visible. */
+const BOARD_LIST_REFRESH_MS = 30_000;
+
 function isServerBoard(board: Board | undefined): board is Board {
   return Boolean(board?.ownerId && board.revision !== null);
 }
@@ -185,7 +195,8 @@ function toCardPatch(patch: Partial<Card>): Partial<CreateCardInput> {
       authorId: c.authorId,
       parentId: c.parentId ?? null,
       text: c.text,
-      reactions: c.reactions,
+      // Reactions are not sent: the server owns them per person and changes
+      // them only through the reactions endpoint.
       createdAt: c.createdAt,
     }));
   }
@@ -484,6 +495,17 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     withCurrentUser(loadData(currentUser?.id), currentUser),
   );
   const [error, setError] = useState<string | null>(null);
+  // Load progress, so pages can show a skeleton instead of an empty state
+  // while the first fetch is in flight.
+  const [boardsLoaded, setBoardsLoaded] = useState(false);
+  const [loadedStructures, setLoadedStructures] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const markStructureLoaded = useCallback((boardId: string) => {
+    setLoadedStructures((prev) =>
+      prev.has(boardId) ? prev : new Set(prev).add(boardId),
+    );
+  }, []);
   const [pendingBoardId, setPendingBoardId] = useState<string | null>(null);
   const [pendingInvitations, setPendingInvitations] = useState<
     PendingInvitation[]
@@ -521,6 +543,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
    * depends on it in turn). Assigned next to its definition below.
    */
   const scheduleStructureSyncRef = useRef<(boardId: string) => void>(() => {});
+  /** Per-board backoff for catching up to a newer server revision (see applyBoardPoll). */
+  const catchUpRef = useRef(new Map<string, { at: number; attempts: number }>());
 
   useEffect(() => {
     dataRef.current = data;
@@ -992,12 +1016,14 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
           },
         };
       });
+      markStructureLoaded(boardId);
     } catch (err) {
+      markStructureLoaded(boardId);
       setError(
         getFriendlyErrorMessage(err, "Could not load this board’s contents."),
       );
     }
-  }, [currentUser?.id, currentUser?.name, importLocalChildren, mutate, repairBoardChildren, setError]);
+  }, [currentUser?.id, currentUser?.name, importLocalChildren, markStructureLoaded, mutate, repairBoardChildren, setError]);
 
   /**
    * Sends a child write to the server and adopts the new board revision.
@@ -1062,7 +1088,10 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         } catch (err) {
           failed = true;
           failure = err;
-          if (options?.surfaceGlobalError !== false) {
+          // A clash with a collaborator's edit that survived the retries needs
+          // no banner: the board is re-read below, so the view already shows
+          // their changes and nothing is lost.
+          if (options?.surfaceGlobalError !== false && !isRevisionConflict(err)) {
             setError(getFriendlyErrorMessage(err, failureMessage));
           }
           options?.onError?.(err);
@@ -1120,6 +1149,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
   const createBoard = async (
     templateId: string,
     name: string,
+    visibility: Visibility = "private",
   ): Promise<string> => {
     const template =
       BOARD_TEMPLATES.find((t) => t.id === templateId) ?? BOARD_TEMPLATES[0];
@@ -1139,6 +1169,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         background: template.swatch,
         templateId: template.id,
         labels: labelPayload,
+        visibility,
       });
     } catch (err) {
       setError(
@@ -1901,6 +1932,59 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     );
   };
 
+  /** Replaces one comment's reactions in the store, without a card write. */
+  const setCommentReactions = (cardId: string, commentId: string, reactions: Reactions) =>
+    mutate((prev) => {
+      const current = prev.cards[cardId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        cards: {
+          ...prev.cards,
+          [cardId]: {
+            ...current,
+            comments: current.comments.map((c) => (c.id === commentId ? { ...c, reactions } : c)),
+          },
+        },
+      };
+    });
+
+  /**
+   * Adds or removes the signed-in person's reaction. Shown at once; the
+   * server's answer (which includes everyone else's reactions) replaces it,
+   * and a failure puts the previous state back.
+   */
+  const toggleCommentReaction = (cardId: string, commentId: string, emoji: string) => {
+    const card = dataRef.current.cards[cardId];
+    const comment = card?.comments.find((c) => c.id === commentId);
+    const me = currentUser?.id;
+    if (!card || !comment || !me) return;
+
+    const previous = comment.reactions;
+    const entry = previous[emoji] ?? { count: 0, userIds: [] };
+    const mine = entry.userIds.includes(me);
+    const nextEntry = mine
+      ? { count: entry.count - 1, userIds: entry.userIds.filter((id) => id !== me) }
+      : { count: entry.count + 1, userIds: [...entry.userIds, me] };
+    const next = { ...previous };
+    if (nextEntry.count > 0) next[emoji] = nextEntry;
+    else delete next[emoji];
+    setCommentReactions(cardId, commentId, next);
+
+    const board = dataRef.current.boards[card.boardId];
+    if (!isServerBoard(board)) return;
+    void writeThrough(
+      board.id,
+      () =>
+        toggleCommentReactionOnServer(board.id, cardId, commentId, emoji).then((res) => {
+          setCommentReactions(cardId, commentId, res.reactions);
+          return res.revision;
+        }),
+      "Could not update your reaction.",
+      { onError: () => setCommentReactions(cardId, commentId, previous) },
+    );
+  };
+
   const moveCard = (cardId: string, destListId: string, destIndex: number) => {
     const card = dataRef.current.cards[cardId];
     const dest = dataRef.current.lists[destListId];
@@ -2149,10 +2233,9 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       });
       return {
         ok: false,
-        error: getFriendlyErrorMessage(
-          result.error,
-          "That list no longer exists.",
-        ),
+        error: isRevisionConflict(result.error)
+          ? "Could not move that card. Try again."
+          : getFriendlyErrorMessage(result.error, "That list no longer exists."),
       };
     }
 
@@ -2390,10 +2473,21 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     }
   };
 
-  const setBoardBackground = (id: string, background: string) =>
+  /** Adopts the server's view of a board after a successful board PATCH. */
+  const adoptServerBoard = (boardId: string, dto: BoardDto) =>
+    mutate((prev) => {
+      const current = prev.boards[boardId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        boards: { ...prev.boards, [boardId]: { ...current, ...mergeServerBoard(current, dto) } },
+      };
+    });
+
+  const writeBoardBackground = (id: string, background: string) =>
     mutate((prev) => {
       const board = prev.boards[id];
-      if (!board || !canWrite(id)) return prev;
+      if (!board) return prev;
       return {
         ...prev,
         boards: {
@@ -2410,6 +2504,54 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         },
       };
     });
+
+  /**
+   * Sets a color (or "default") as the background. Applied at once, then saved;
+   * a failed save puts the previous background back and says why.
+   */
+  const setBoardBackground = (id: string, background: string) => {
+    const board = dataRef.current.boards[id];
+    if (!board || !canWrite(id)) return;
+    const previous = board.background;
+    writeBoardBackground(id, background);
+    if (!isServerBoard(board)) return;
+    void (async () => {
+      try {
+        try {
+          adoptServerBoard(id, await updateBoardOnServer(id, { background }, board.revision));
+        } catch (err) {
+          // A collaborator saved the board in the meantime: take its current
+          // revision and try once more, instead of reporting a clash.
+          if (!isRevisionConflict(err)) throw err;
+          const structure = await fetchStructure(id);
+          applyRevision(id, structure.revision);
+          adoptServerBoard(id, await updateBoardOnServer(id, { background }, structure.revision));
+        }
+      } catch (err) {
+        writeBoardBackground(id, previous);
+        setError(getFriendlyErrorMessage(err, "Could not change the board background."));
+      }
+    })();
+  };
+
+  /**
+   * Uploads a photo to the board's media and makes it the background. Resolves
+   * once both are saved; rejects (with the store untouched) if either fails, so
+   * the picker can show the error in place.
+   */
+  const setBoardBackgroundImage = async (id: string, file: File, onProgress?: UploadProgress) => {
+    const board = dataRef.current.boards[id];
+    if (!board || !canWrite(id) || !isServerBoard(board)) {
+      throw new Error("This board can't have a photo background.");
+    }
+    const media = await uploadMediaFile(file, { boardId: id }, onProgress);
+    const dto = await updateBoardOnServer(
+      id,
+      { backgroundMediaId: media.id },
+      dataRef.current.boards[id]?.revision ?? board.revision,
+    );
+    adoptServerBoard(id, dto);
+  };
 
   const setBoardDescription = (id: string, description: string) =>
     mutate((prev) => {
@@ -2708,7 +2850,9 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
 
       setPendingInvitations(invitations as PendingInvitation[]);
 
-      if (dtos.length === 0) return;
+      // No early return when the list is empty: that is exactly the case where
+      // a member's last shared board was deleted, and the reconcile below is
+      // what removes it from this device.
 
       mutate((prev) => {
         const boards: Record<string, Board> = { ...prev.boards };
@@ -2778,10 +2922,97 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         await syncBoards();
       } catch {
         // syncBoards has already put a readable message in the error slot.
+      } finally {
+        setBoardsLoaded(true);
       }
     }
     void load();
   }, [syncBoards]);
+
+  // Keep the board list current while the app is open, so a board its owner
+  // deleted (or access that was revoked) disappears for everyone else without
+  // a reload. Board pages already poll their own board; this covers the board
+  // list and every other page. Paused while the tab is hidden, and refreshed
+  // as soon as it is shown again.
+  useEffect(() => {
+    if (!boardsLoaded) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void syncBoards();
+    };
+    const timer = window.setInterval(refresh, BOARD_LIST_REFRESH_MS);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [boardsLoaded, syncBoards]);
+  // One-time claim of old anonymous reactions. Before reactions were stored per
+  // person, each browser kept its own list (cardId → commentId → emojis) under
+  // LEGACY_REACTIONS_KEY. Sending it lets the server put this person's name on
+  // the reactions they really made; the list is removed once every board's
+  // claims went through, so this runs at most until it succeeds.
+  useEffect(() => {
+    if (typeof window === "undefined" || !boardsLoaded || !currentUser?.id) return;
+    let raw: string | null = null;
+    try {
+      raw = window.localStorage.getItem(LEGACY_REACTIONS_KEY);
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    let record: Record<string, Record<string, string[]>>;
+    try {
+      record = JSON.parse(raw);
+    } catch {
+      window.localStorage.removeItem(LEGACY_REACTIONS_KEY);
+      return;
+    }
+    const me = currentUser.id;
+    const byBoard = new Map<string, { cardId: string; commentId: string; emoji: string }[]>();
+    for (const [cardId, comments] of Object.entries(record ?? {})) {
+      const card = dataRef.current.cards[cardId];
+      if (!card || !isServerBoard(dataRef.current.boards[card.boardId])) continue;
+      for (const [commentId, emojis] of Object.entries(comments ?? {})) {
+        const comment = card.comments.find((c) => c.id === commentId);
+        if (!comment || !Array.isArray(emojis)) continue;
+        for (const emoji of emojis) {
+          const entry = comment.reactions[emoji];
+          // Only anonymous reactions can be claimed, and only once.
+          if (!entry || entry.userIds.includes(me) || entry.count <= entry.userIds.length) continue;
+          const list = byBoard.get(card.boardId) ?? [];
+          list.push({ cardId, commentId, emoji });
+          byBoard.set(card.boardId, list);
+        }
+      }
+    }
+    if (byBoard.size === 0) {
+      window.localStorage.removeItem(LEGACY_REACTIONS_KEY);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      let allOk = true;
+      for (const [boardId, claims] of byBoard) {
+        try {
+          const res = await claimLegacyReactionsOnServer(boardId, claims.slice(0, 200));
+          if (cancelled) return;
+          if (res.claimed > 0) {
+            applyRevision(boardId, res.revision);
+            void syncBoardStructure(boardId);
+          }
+        } catch {
+          allOk = false;
+        }
+      }
+      if (allOk && !cancelled) window.localStorage.removeItem(LEGACY_REACTIONS_KEY);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [boardsLoaded, currentUser?.id, applyRevision, syncBoardStructure]);
+
   // One-time migration of the removed Inbox into a board. Runs per user and is
   // guarded by a localStorage flag so it never duplicates.
   useEffect(() => {
@@ -3107,11 +3338,23 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
         }
       }
 
-      // If server revision is newer than our board's, schedule a structure sync
+      // If the server's revision is newer than ours, catch up. Backed off per
+      // board: if the catch-up itself fails (e.g. rate-limited), our revision
+      // never moves, and re-trying on every 3.5s poll kept the limiter
+      // saturated indefinitely. Retry after 15s, 30s, 60s… (max 5 min), and
+      // reset as soon as we've caught up.
       const board = dataRef.current.boards[boardId];
       if (board && board.revision !== null && response.revision > board.revision) {
-        scheduleStructureSync(boardId);
-        void syncBoards();
+        const now = Date.now();
+        const last = catchUpRef.current.get(boardId);
+        const wait = last ? Math.min(5 * 60_000, 15_000 * 2 ** (last.attempts - 1)) : 0;
+        if (!last || now - last.at >= wait) {
+          catchUpRef.current.set(boardId, { at: now, attempts: (last?.attempts ?? 0) + 1 });
+          scheduleStructureSync(boardId);
+          void syncBoards();
+        }
+      } else {
+        catchUpRef.current.delete(boardId);
       }
 
       return "ok";
@@ -3468,7 +3711,7 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
       createdAt: now(),
       updatedAt: now(),
     };
-    social.addPost(input).catch(() => {});
+    social.addPost({ ...input, id: optimistic.id }).catch(() => {});
     return optimistic;
   };
 
@@ -3590,6 +3833,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     toggleDone,
     setBoardVisibility,
     setBoardBackground,
+    setBoardBackgroundImage,
+    toggleCommentReaction,
     setBoardDescription,
     addLabel,
     updateLabel,
@@ -3598,6 +3843,8 @@ export function StoreProvider({ children, currentUser }: StoreProviderProps) {
     /* Collaboration */
     syncBoards,
     syncBoardStructure,
+    boardsLoaded,
+    isBoardLoaded: (boardId: string) => loadedStructures.has(boardId),
     pendingBoardId,
     currentUserId: currentUser?.id ?? null,
     canWrite,

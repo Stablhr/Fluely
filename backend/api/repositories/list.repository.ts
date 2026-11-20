@@ -46,5 +46,8 @@ export const listRepository = {
     ListModel.deleteOne({_id: id, boardId}, {session}).exec(),
 
   deleteForBoard: (boardId: Types.ObjectId, session?: ProductSession) =>
-    ListModel.deleteMany({boardId}, {session}).exec()
+    ListModel.deleteMany({boardId}, {session}).exec(),
+
+  deleteForBoards: (boardIds: Types.ObjectId[], session?: ProductSession) =>
+    ListModel.deleteMany({boardId: {$in: boardIds}}, {session}).exec()
 };

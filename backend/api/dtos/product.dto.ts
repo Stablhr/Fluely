@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {MAX_PREVIEW_URL_LENGTH} from '../constants/linkPreview';
+import {BoardVisibilities} from '../constants/product';
 
 const objectId = z.string().regex(/^[a-f\d]{24}$/i, 'Invalid ObjectId');
 const text = (max: number) => z.string().trim().max(max);
@@ -44,11 +45,29 @@ export const preferencesSchema = z.object({
 
 export const preferencesPatchSchema = preferencesSchema;
 
+/**
+ * A board background the client may set directly: the default surface or a hex
+ * colour. The frontend renders `background` straight into CSS, so a URL,
+ * `url(...)`, gradient or any other free text is refused here -- a photo
+ * background is chosen through `backgroundMediaId` instead, and the server fills
+ * in the stored media's Cloudinary URL itself.
+ */
+export const BOARD_BACKGROUND_HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+const boardBackground = z
+  .string()
+  .trim()
+  .refine(
+    value => value === 'default' || BOARD_BACKGROUND_HEX.test(value),
+    'Background must be "default" or a hex colour like #1f2937'
+  );
+
 export const boardCreateSchema = z.object({
   name: requiredText(120),
   description: text(5000).default(''),
   visibility: z.enum(['private', 'workspace', 'public']).default('private'),
-  background: text(500).default('default'),
+  // Same rule as PATCH: a photo can only be set afterwards, from media
+  // uploaded to the board, so a new board can't point at an outside URL.
+  background: boardBackground.default('default'),
   settings: z.object({
     commentPermission: z.enum(['everyone', 'members', 'editors']).default('members'),
     selfJoin: z.boolean().default(false)
@@ -61,11 +80,13 @@ export const boardCreateSchema = z.object({
   template: z.enum(['blank', 'simple', 'social_content']).default('blank')
 });
 
+
 export const boardPatchSchema = z.object({
   name: requiredText(120).optional(),
   description: text(5000).optional(),
   visibility: z.enum(['private', 'workspace', 'public']).optional(),
-  background: text(500).optional(),
+  background: boardBackground.optional(),
+  backgroundMediaId: objectId.nullable().optional(),
   settings: z.object({
     commentPermission: z.enum(['everyone', 'members', 'editors']).optional(),
     selfJoin: z.boolean().optional()
@@ -78,7 +99,12 @@ export const boardPatchSchema = z.object({
   listOrder: z.array(objectId).max(1000).optional(),
   archivedAt: z.string().datetime({offset: true}).nullable().optional(),
   expectedRevision: z.number().int().positive().optional()
-}).refine(value => Object.keys(value).length > 0, 'At least one field is required');
+})
+  .refine(value => Object.keys(value).length > 0, 'At least one field is required')
+  .refine(
+    value => value.background === undefined || value.backgroundMediaId === undefined,
+    'Send either background or backgroundMediaId, not both'
+  );
 
 export const boardListQuerySchema = paginationQuerySchema.extend({
   scope: z.enum(['accessible', 'discoverable']).default('accessible'),
@@ -178,7 +204,9 @@ export const cardPatchSchema = z.object({
     authorId: objectId.nullable().optional(),
     parentId: requiredText(80).nullable().optional(),
     text: text(10000),
-    reactions: z.record(z.number()).optional(),
+    // Reactions are written only through the reactions endpoint. Still accepted
+    // so older clients that echo them back do not get a 400, but ignored.
+    reactions: z.unknown().optional(),
     createdAt: z.string().datetime({offset: true}).optional()
   })).optional(),
   expectedRevision: z.number().int().positive().optional()
@@ -232,8 +260,40 @@ export const commentPatchSchema = z.object({
   body: requiredText(5000)
 });
 
+/**
+ * An emoji key. It doubles as a MongoDB field name, so beyond looking like an
+ * emoji it must never contain `.` or `$`: rejecting every ASCII character
+ * (letters, digits, punctuation, whitespace, control characters) and any
+ * Unicode whitespace covers that.
+ */
+export const reactionEmoji = z
+  .string()
+  .trim()
+  .min(1)
+  .max(16)
+  .refine(value => !/[\u0000-\u007f]|\s/.test(value), 'Must be an emoji');
+
+export const commentIdParamsSchema = z.object({
+  boardId: objectId,
+  cardId: objectId,
+  commentId: requiredText(80)
+});
+
+export const reactionClaimSchema = z.object({
+  claims: z
+    .array(
+      z.object({
+        cardId: objectId,
+        commentId: requiredText(80),
+        emoji: reactionEmoji
+      })
+    )
+    .min(1)
+    .max(200)
+});
+
 export const reactionSchema = z.object({
-  emoji: requiredText(20)
+  emoji: reactionEmoji
 });
 
 export const memberCreateSchema = z.object({
@@ -265,6 +325,30 @@ export const mediaListQuerySchema = paginationQuerySchema.extend({
   search: text(200).optional()
 });
 
+const notificationChannelPatchSchema = z
+  .object({
+    mentions: z.boolean().optional(),
+    invitationResponses: z.boolean().optional()
+  })
+  .strict();
+
+/**
+ * Partial preferences: any subset of the nested keys, deep-merged by the
+ * service. Strict at every level so a typo is a 400 rather than a silent no-op.
+ */
+export const accountPreferencesPatchSchema = z
+  .object({
+    notifications: z
+      .object({
+        inApp: notificationChannelPatchSchema.optional(),
+        email: notificationChannelPatchSchema.optional()
+      })
+      .strict()
+      .optional(),
+    defaultBoardVisibility: z.enum(BoardVisibilities).optional()
+  })
+  .strict();
+
 export const profilePatchSchema = z.object({
   displayName: z.string().trim().min(2).max(50).optional().nullable(),
   username: z.string().trim().toLowerCase().regex(/^[a-z0-9_.]{3,24}$/).optional().nullable(),
@@ -275,8 +359,22 @@ export const profilePatchSchema = z.object({
   accentColor: z.string().trim().max(30).optional().nullable(),
   avatarColor: z.string().trim().max(30).optional().nullable(),
   phone: z.string().trim().max(40).optional().nullable(),
-  profileVisibility: z.record(z.enum(['me', 'boards'])).optional().nullable()
+  profileVisibility: z.record(z.enum(['me', 'boards'])).optional().nullable(),
+  preferences: accountPreferencesPatchSchema.optional()
 });
+
+/**
+ * Deleting an account is irreversible, so the caller re-proves who they are
+ * with the current password and types the literal word `DELETE`.
+ */
+export const accountDeleteSchema = z
+  .object({
+    password: z.string().min(1, 'Password is required').max(200),
+    confirmation: z.literal('DELETE', {
+      errorMap: () => ({message: 'Type DELETE to confirm'})
+    })
+  })
+  .strict();
 
 /** Scope for a direct-to-Cloudinary upload (video / large files). */
 export const mediaSignatureSchema = z.object({
@@ -297,7 +395,7 @@ export const mediaRegisterSchema = z.object({
 });
 
 export const socialAccountCreateSchema = z.object({
-  platform: z.enum(['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube']),
+  platform: z.enum(['facebook', 'x', 'linkedin', 'tiktok', 'youtube']),
   handle: requiredText(100),
   displayName: requiredText(120).optional()
 });
@@ -318,7 +416,7 @@ const socialPostFields = {
   caption: text(2200).default(''),
   mediaIds: z.array(objectId).max(20).default([]),
   cardId: objectId.nullable().optional(),
-  platforms: z.array(z.enum(['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube'])).min(1).max(6),
+  platforms: z.array(z.enum(['facebook', 'x', 'linkedin', 'tiktok', 'youtube'])).min(1).max(5),
   tags: z.array(requiredText(50)).max(30).default([]),
   aiGeneration: z.boolean().default(false),
   schedule: z.object({
@@ -335,7 +433,7 @@ export const socialPostPatchSchema = z.object({
   caption: text(2200).optional(),
   mediaIds: z.array(objectId).max(20).optional(),
   cardId: objectId.nullable().optional(),
-  platforms: z.array(z.enum(['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube'])).min(1).max(6).optional(),
+  platforms: z.array(z.enum(['facebook', 'x', 'linkedin', 'tiktok', 'youtube'])).min(1).max(5).optional(),
   tags: z.array(requiredText(50)).max(30).optional(),
   aiGeneration: z.boolean().optional(),
   schedule: z.object({
@@ -364,7 +462,7 @@ export const captionSchema = z.object({
   title: requiredText(300),
   tone: z.enum(['neutral', 'friendly', 'professional', 'playful']).default('friendly'),
   keywords: z.array(requiredText(50)).max(20).default([]),
-  platform: z.enum(['instagram', 'facebook', 'x', 'linkedin', 'tiktok', 'youtube']).optional()
+  platform: z.enum(['facebook', 'x', 'linkedin', 'tiktok', 'youtube']).optional()
 });
 
 export const activityQuerySchema = paginationQuerySchema.extend({
@@ -407,3 +505,5 @@ export type SocialAccountPatchInput = z.infer<typeof socialAccountPatchSchema>;
 export type RunDueInput = z.infer<typeof runDueSchema>;
 export type CaptionInput = z.infer<typeof captionSchema>;
 
+export type AccountPreferencesPatchInput = z.infer<typeof accountPreferencesPatchSchema>;
+export type AccountDeleteInput = z.infer<typeof accountDeleteSchema>;

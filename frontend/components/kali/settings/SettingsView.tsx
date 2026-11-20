@@ -1,8 +1,14 @@
 ﻿'use client'
 
 import { useRef, useState, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield } from 'lucide-react'
+import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield, Link2 } from 'lucide-react'
 import AvatarCropModal from './AvatarCropModal'
+import AccountSection from './AccountSection'
+import AppearanceSection from './AppearanceSection'
+import NotificationsSection from './NotificationsSection'
+import SharingSection from './SharingSection'
+import DangerZoneSection from './DangerZoneSection'
+import ConnectedAccountsSection from './ConnectedAccountsSection'
 import { useQueryClient } from '@tanstack/react-query'
 import { meQueryKey, useMeQuery } from '@/lib/hooks/auth/useMeQuery'
 import { getDisplayName } from '@/lib/api/authApi'
@@ -41,22 +47,23 @@ const inputClass =
   'w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-primary/20'
 
 const AVATAR_COLORS = [
-  { label: 'Celtic Blue', value: '#3971b8' },
-  { label: 'Tea Green', value: '#c8d69b' },
-  { label: 'Vanilla', value: '#f6e6a5' },
-  { label: 'Warm rose', value: '#ff8b5e' },
-  { label: 'Lavender', value: '#8b7cf6' },
-  { label: 'Mint', value: '#33b27a' },
+  { label: 'Cobalt', value: '#2554c7' },
+  { label: 'Teal', value: '#0f766e' },
+  { label: 'Violet', value: '#6d4fc4' },
+  { label: 'Amber', value: '#b45309' },
+  { label: 'Rose', value: '#be3a5e' },
+  { label: 'Slate', value: '#475569' },
 ]
 
 const PRONOUNS_OPTIONS = ['', 'he/him', 'she/her', 'they/them', 'custom']
-const ACCENT_SWATCHES = ['#3971b8', '#c8d69b', '#f6e6a5', '#ff8b5e', '#8b7cf6', '#33b27a', '#ff5e6c']
+const ACCENT_SWATCHES = ['#2554c7', '#0369a1', '#0f766e', '#15803d', '#6d4fc4', '#b45309', '#be3a5e', '#475569']
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User, description: 'How you appear to collaborators.' },
   { id: 'account', label: 'Account & Security', icon: Lock, description: 'Password, sessions, and account access.' },
   { id: 'appearance', label: 'Appearance', icon: Palette, description: 'Theme, density, and motion.' },
   { id: 'notifications', label: 'Notifications', icon: Bell, description: 'In-app and email alerts.' },
+  { id: 'accounts', label: 'Connected accounts', icon: Link2, description: 'Social accounts your workspace posts to.' },
   { id: 'sharing', label: 'Sharing & Privacy', icon: Shield, description: 'Default visibility and privacy.' },
   { id: 'danger', label: 'Danger Zone', icon: AlertTriangle, description: 'Destructive actions.' },
 ] as const
@@ -132,7 +139,7 @@ export default function SettingsView() {
         bio: profile.bio ?? '',
         pronouns: profile.pronouns ?? '',
         timezone: profile.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-        accentColor: profile.accentColor ?? '#3971b8',
+        accentColor: profile.accentColor ?? '#2554c7',
         avatarColor: profile.avatarColor ?? colorFromId(profile.id ?? me?.user?.id ?? 'you'),
         phone: profile.phone ?? '',
         profileVisibility: profile.profileVisibility ?? { email: 'me', phone: 'me', others: 'boards' },
@@ -215,7 +222,7 @@ export default function SettingsView() {
         bio: profile.bio ?? '',
         pronouns: profile.pronouns ?? '',
         timezone: profile.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-        accentColor: profile.accentColor ?? '#3971b8',
+        accentColor: profile.accentColor ?? '#2554c7',
         avatarColor: profile.avatarColor ?? colorFromId(profile.id ?? me?.user?.id ?? 'you'),
         phone: profile.phone ?? '',
         profileVisibility: profile.profileVisibility ?? { email: 'me', phone: 'me', others: 'boards' },
@@ -330,7 +337,7 @@ export default function SettingsView() {
     ? storeAvatarUrl
     : (profile?.avatarUrl ?? user?.avatarUrl ?? null)
   const avatarColor = draft.avatarColor ?? profile?.avatarColor ?? colorFromId(profile?.id ?? user?.id ?? 'you')
-  const accentColor = draft.accentColor ?? profile?.accentColor ?? '#3971b8'
+  const accentColor = draft.accentColor ?? profile?.accentColor ?? '#2554c7'
 
   useEffect(() => {
     if (!dirty) return
@@ -803,76 +810,17 @@ export default function SettingsView() {
               </div>
             )}
 
-            {tab === 'account' && (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 max-w-[1600px]">
-                <Section title="Password" description="Change your password via the reset flow.">
-                  <p className="text-[13px] text-text-secondary">
-                    Use the &quot;Forgot password&quot; link on the sign-in page to reset your password.
-                  </p>
-                </Section>
-                <Section title="Active sessions" description="Devices currently signed in.">
-                  <p className="text-[13px] text-text-muted">Session management is not available yet.</p>
-                </Section>
-              </div>
-            )}
+            {tab === 'account' && <AccountSection />}
 
-            {tab === 'appearance' && (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 max-w-[1600px]">
-                <Section title="Theme" description="Follows your system preference.">
-                  <p className="text-[13px] text-text-muted">Light / dark theme switching is not available yet.</p>
-                </Section>
-                <Section title="Density" description="Compact or comfortable spacing.">
-                  <p className="text-[13px] text-text-muted">Density options are not available yet.</p>
-                </Section>
-                <Section title="Motion" description="Reduce animations.">
-                  <p className="text-[13px] text-text-muted">Motion options are not available yet.</p>
-                </Section>
-              </div>
-            )}
+            {tab === 'appearance' && <AppearanceSection />}
 
-            {tab === 'notifications' && (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 max-w-[1600px]">
-                <Section title="In-app" description="Notifications shown in the app.">
-                  <ul className="divide-y divide-border">
-                    {['Mentions', 'Invitations', 'Card moves'].map((label) => (
-                      <li key={label} className="flex items-center justify-between py-2.5">
-                        <span className="text-[13px] text-text-primary">{label}</span>
-                        <span className="text-[11px] text-text-muted">On</span>
-                      </li>
-                    ))}
-                  </ul>
-                </Section>
-                <Section title="Email" description="Email digests and alerts.">
-                  <ul className="divide-y divide-border">
-                    {['Weekly digest', 'Mentions', 'Invitations'].map((label) => (
-                      <li key={label} className="flex items-center justify-between py-2.5">
-                        <span className="text-[13px] text-text-primary">{label}</span>
-                        <span className="text-[11px] text-text-muted">On</span>
-                      </li>
-                    ))}
-                  </ul>
-                </Section>
-              </div>
-            )}
+            {tab === 'notifications' && <NotificationsSection />}
 
-            {tab === 'sharing' && (
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 max-w-[1600px]">
-                <Section title="Default visibility" description="Who can see your new boards by default.">
-                  <p className="text-[13px] text-text-muted">Default visibility options are not available yet.</p>
-                </Section>
-                <Section title="Privacy" description="Control what is shared with collaborators.">
-                  <p className="text-[13px] text-text-muted">Additional privacy controls are not available yet.</p>
-                </Section>
-              </div>
-            )}
+            {tab === 'accounts' && <ConnectedAccountsSection />}
 
-            {tab === 'danger' && (
-              <div className="grid grid-cols-1 gap-4 max-w-[1600px]">
-                <Section title="Delete account" description="Permanently remove your account and all data.">
-                  <p className="text-[13px] text-text-muted">Account deletion is not available yet. Contact support.</p>
-                </Section>
-              </div>
-            )}
+            {tab === 'sharing' && <SharingSection onOpenProfile={() => setTab('profile')} />}
+
+            {tab === 'danger' && <DangerZoneSection />}
           </div>
 
           {/* Sticky save bar */}

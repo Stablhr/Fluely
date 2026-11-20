@@ -104,7 +104,17 @@ export interface ActivityItem {
   createdAt: string;
 }
 
-export type Reactions = Record<string, number>;
+/**
+ * One emoji's reactions on a comment. `userIds` are the server ids of the
+ * people who reacted; `count` can be higher when older, anonymous reactions
+ * (stored before reactions were per person) are included.
+ */
+export interface ReactionEntry {
+  count: number;
+  userIds: string[];
+}
+
+export type Reactions = Record<string, ReactionEntry>;
 
 /**
  * A card's cover.
@@ -215,7 +225,7 @@ export interface InboxItem {
 
 /* ── Social Media Scheduler types ────────────────────────────── */
 
-export type Platform = "youtube" | "facebook" | "tiktok" | "instagram";
+export type Platform = "youtube" | "facebook" | "tiktok" | "linkedin";
 
 /**
  * Planning stages come first (idea → draft → in_review) because the content
@@ -233,8 +243,9 @@ export type SocialPostStatus =
   | "failed"
   | "cancelled";
 
+/** `reminder`: its time came and the person posts it themselves (reminder account). */
 export type PlatformStatus =
-  "pending" | "scheduled" | "publishing" | "posted" | "failed" | "cancelled";
+  "pending" | "scheduled" | "publishing" | "posted" | "failed" | "cancelled" | "reminder";
 
 export type RepeatFrequency =
   "none" | "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
@@ -244,6 +255,12 @@ export type MediaType = "image" | "video" | "audio";
 export interface SocialPostPlatform {
   platform: Platform;
   enabled: boolean;
+  /** Connected account to post as; empty means the workspace's first one. */
+  accountId?: string | null;
+  /** Published in dry-run mode: simulated, nothing reached the platform. */
+  dryRun?: boolean;
+  /** Posted by the person themselves after a reminder. */
+  manual?: boolean;
   status: PlatformStatus;
   caption: string;
   hashtags: string[];
@@ -362,7 +379,7 @@ export const PLATFORM_DEFAULTS: Record<
   youtube: { caption: "", visibility: "public", hashtags: [] },
   facebook: { caption: "", visibility: "public", hashtags: [] },
   tiktok: { caption: "", visibility: "public", hashtags: [] },
-  instagram: { caption: "", visibility: "public", hashtags: [] },
+  linkedin: { caption: "", visibility: "public", hashtags: [] },
 };
 
 export const PLATFORM_LIMITS: Record<
@@ -384,10 +401,10 @@ export const PLATFORM_LIMITS: Record<
     maxHashtags: 30,
     supportedMedia: ["video", "image"],
   },
-  instagram: {
-    maxCaption: 2200,
+  linkedin: {
+    maxCaption: 3000,
     maxHashtags: 30,
-    supportedMedia: ["image", "video"],
+    supportedMedia: ["image"],
   },
 };
 
@@ -395,7 +412,7 @@ export const PLATFORM_COLORS: Record<Platform, string> = {
   youtube: "#FF0000",
   facebook: "#1877F2",
   tiktok: "#000000",
-  instagram: "#E4405F",
+  linkedin: "#0A66C2",
 };
 
 export interface TaskNotification {
@@ -433,22 +450,23 @@ export interface AppData {
 
 export const YOU_ID = "member-you";
 
+/* Muted mid-tones that all carry white text at AA contrast. */
 export const MEMBER_COLORS = [
-  "#3971B8",
-  "#4AA8FF",
-  "#FF8B5E",
-  "#8B7CF6",
-  "#33B27A",
-  "#F6C453",
-  "#FF5E6C",
+  "#2554C7",
+  "#0369A1",
+  "#0F766E",
+  "#6D4FC4",
+  "#15803D",
+  "#B45309",
+  "#BE3A5E",
 ];
 
 export const LABEL_SWATCHES = [
-  { name: "Marketing", color: "#8B7CF6" },
-  { name: "Design", color: "#FF8B5E" },
-  { name: "Engineering", color: "#4AA8FF" },
-  { name: "Urgent", color: "#FF5E6C" },
-  { name: "Low priority", color: "#33B27A" },
+  { name: "Marketing", color: "#6D4FC4" },
+  { name: "Design", color: "#C2410C" },
+  { name: "Engineering", color: "#0369A1" },
+  { name: "Urgent", color: "#C2341F" },
+  { name: "Low priority", color: "#15803D" },
 ] as const;
 
 export interface BoardTemplate {
@@ -465,7 +483,7 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
     id: "blank",
     name: "Blank Board",
     description: "A single empty list. Build whatever workflow you need.",
-    swatch: "#0DABA3",
+    swatch: "#475569",
     lists: ["To Do"],
     labels: [],
   },
@@ -473,7 +491,7 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
     id: "simple-project",
     name: "Simple Project",
     description: "Classic To Do → In Progress → Review → Done workflow.",
-    swatch: "#4AA8FF",
+    swatch: "#2554C7",
     lists: ["To Do", "In Progress", "Review", "Done"],
     labels: [...LABEL_SWATCHES],
   },
@@ -482,7 +500,7 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
     name: "Social Media Content",
     description:
       "Content approval pipeline from Pending to Done, with platform tags.",
-    swatch: "#8B7CF6",
+    swatch: "#6D4FC4",
     lists: [
       "Pending",
       "In Progress",
@@ -493,24 +511,23 @@ export const BOARD_TEMPLATES: BoardTemplate[] = [
       "Done",
     ],
     labels: [
-      { name: "Instagram", color: "#E1306C" },
-      { name: "Facebook", color: "#4AA8FF" },
-      { name: "Blog", color: "#8B7CF6" },
-      { name: "TikTok", color: "#7F7FD5" },
-      { name: "Story", color: "#33B27A" },
+      { name: "Facebook", color: "#2554C7" },
+      { name: "Blog", color: "#6D4FC4" },
+      { name: "TikTok", color: "#334155" },
+      { name: "Story", color: "#15803D" },
     ],
   },
 ];
 
 export const BOARD_BACKGROUNDS = [
-  "#0DABA3",
-  "#0A8981",
-  "#132A29",
-  "#FF8B5E",
-  "#33B27A",
-  "#4AA8FF",
-  "#8B7CF6",
-  "#FF5E6C",
+  "#2554C7",
+  "#1E3A8A",
+  "#0F766E",
+  "#334155",
+  "#0F172A",
+  "#6D4FC4",
+  "#B45309",
+  "#BE3A5E",
 ];
 
 export function emptyData(): AppData {

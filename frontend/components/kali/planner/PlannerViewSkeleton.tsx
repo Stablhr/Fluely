@@ -4,7 +4,7 @@ import { Skeleton } from '../shared/Skeleton'
 
 export default function PlannerViewSkeleton() {
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" aria-busy="true" aria-label="Loading schedule">
       {/* Toolbar skeleton */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface px-3 py-2 sm:px-4 sm:py-3">
         <Skeleton className="h-6 w-20" />
@@ -36,7 +36,7 @@ export default function PlannerViewSkeleton() {
         </div>
 
         {/* Day columns */}
-        <div className="flex min-w-0 flex-1 gap-2">
+        <div className="stagger flex min-w-0 flex-1 gap-2">
           {Array.from({ length: 7 }, (_, day) => (
             <div key={day} className="flex min-w-0 flex-1 flex-col">
               {/* Day header */}

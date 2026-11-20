@@ -1,10 +1,18 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
-import { LayoutGrid, CalendarRange, Table2, Plus, BarChart3, Lightbulb } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { LayoutGrid, CalendarRange, Table2, Plus, BarChart3, Lightbulb, Link2 } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import type { Platform, SocialPostStatus } from '@/lib/kali/store/schema'
 import Button from '../shared/Button'
+import { useToast } from '../shared/useToastState'
+import AccountConnectionPanel from '../social/AccountConnectionPanel'
+import {
+  POST_OUTCOME_EVENT,
+  SCHEDULE_RESULT_EVENT,
+  type PostOutcomeEventDetail,
+  type ScheduleResultEventDetail,
+} from '@/lib/kali/api/social-posts'
 import PlatformOverview from './PlatformOverview'
 import PostDetailPanel from './PostDetailPanel'
 import ContentPlannerCalendar from './ContentPlannerCalendar'
@@ -13,7 +21,7 @@ import ContentPlannerTable from './ContentPlannerTable'
 import EngagementInsightsPanel from './EngagementInsightsPanel'
 import TipsGoalsSidebar from './TipsGoalsSidebar'
 import PlatformFilterBar from './PlatformFilterBar'
-import { enabledPlatforms } from './planner-model'
+import { enabledPlatforms, formatMoment, platformLabel } from './planner-model'
 import type { PlatformFilter, SidebarTab } from './types'
 
 type ViewId = 'calendar' | 'board' | 'table'
@@ -75,7 +83,7 @@ export default function ContentPlanner() {
         caption: '',
         platforms: [
           {
-            platform: 'instagram',
+            platform: 'facebook',
             enabled: true,
             status: 'pending',
             caption: '',
@@ -97,6 +105,66 @@ export default function ContentPlanner() {
 
   const toggleSidebar = (tab: SidebarTab) =>
     setSidebarTab((prev) => (prev === tab ? null : tab))
+
+  const { toast } = useToast()
+
+  // Coming back from a platform's sign-in: show the accounts, whose panel
+  // reports the outcome and tidies the URL.
+  useEffect(() => {
+    if (!new URLSearchParams(window.location.search).has('social')) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of the redirect query
+    setSidebarTab('accounts')
+  }, [])
+
+  // Saving a post as Scheduled queues it on the server; say whether it worked.
+  useEffect(() => {
+    const onResult = (event: Event) => {
+      const { ok, errors, scheduledAt } = (event as CustomEvent<ScheduleResultEventDetail>).detail
+      if (ok) {
+        toast(scheduledAt ? `Scheduled for ${formatMoment(new Date(scheduledAt))}` : 'Post scheduled', 'success', {
+          duration: 5000,
+        })
+      } else if (scheduledAt && errors.length) {
+        // Some platforms were queued, others could not be.
+        toast(`Scheduled for ${formatMoment(new Date(scheduledAt))}, except: ${errors.join(' · ')}`, 'error', {
+          duration: 9000,
+        })
+      }
+      else if (errors.length) {
+        toast(errors.join(' · '), 'error', {
+          duration: 9000,
+          action: errors.some((e) => e.startsWith('Connect') || e.startsWith('Reconnect'))
+            ? { label: 'Accounts', onClick: () => setSidebarTab('accounts') }
+            : undefined,
+        })
+      }
+    }
+    window.addEventListener(SCHEDULE_RESULT_EVENT, onResult)
+    return () => window.removeEventListener(SCHEDULE_RESULT_EVENT, onResult)
+  }, [toast])
+
+  // A scheduled post went out (or could not): say so, with a link to it.
+  useEffect(() => {
+    const onOutcome = (event: Event) => {
+      const { title, posted, failed } = (event as CustomEvent<PostOutcomeEventDetail>).detail
+      const name = title?.trim() ? `\u201c${title.trim()}\u201d` : 'Your post'
+      if (posted.length > 0) {
+        const where = posted.map((p) => platformLabel(p.platform)).join(', ')
+        const simulated = posted.every((p) => p.simulated)
+        const link = posted.find((p) => p.url)?.url
+        toast(`${name} was posted to ${where}${simulated ? ' (simulated)' : ''}`, 'success', {
+          duration: 8000,
+          action: link ? { label: 'View', onClick: () => window.open(link, '_blank', 'noopener') } : undefined,
+        })
+      }
+      if (failed.length > 0) {
+        const detail = failed.map((f) => `${platformLabel(f.platform)}: ${f.error ?? 'failed'}`).join(' · ')
+        toast(`${name} could not be posted. ${detail}`, 'error', { duration: 10000 })
+      }
+    }
+    window.addEventListener(POST_OUTCOME_EVENT, onOutcome)
+    return () => window.removeEventListener(POST_OUTCOME_EVENT, onOutcome)
+  }, [toast])
 
   return (
     <div className="flex h-full flex-col">
@@ -154,6 +222,19 @@ export default function ContentPlanner() {
             >
               <Lightbulb size={15} />
             </button>
+            <button
+              type="button"
+              onClick={() => toggleSidebar('accounts')}
+              aria-pressed={sidebarTab === 'accounts'}
+              title="Connected accounts"
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors duration-150 ${
+                sidebarTab === 'accounts'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-text-secondary hover:bg-surface-alt hover:text-text-primary'
+              }`}
+            >
+              <Link2 size={15} />
+            </button>
           </div>
 
           <Button variant="primary" size="sm" onClick={() => openCreate()}>
@@ -179,10 +260,17 @@ export default function ContentPlanner() {
         </div>
 
         {sidebarTab && (
-          <aside className="hidden h-full w-[240px] shrink-0 flex-col border-l border-border bg-surface md:flex lg:w-[270px]">
+          <aside
+            className={`h-full shrink-0 flex-col border-l border-border bg-surface ${
+              sidebarTab === 'accounts'
+                ? // A full-screen sheet on phones, where the row sits below the overview cards.
+                  'fixed inset-0 z-50 flex w-full sm:static sm:z-auto sm:w-[300px]'
+                : 'hidden w-[240px] md:flex lg:w-[270px]'
+            }`}
+          >
             <div className="flex shrink-0 items-center justify-between border-b border-border px-2 py-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-                {sidebarTab === 'engagement' ? 'Engagement' : 'Tips'}
+                {sidebarTab === 'engagement' ? 'Engagement' : sidebarTab === 'accounts' ? 'Connected accounts' : 'Tips'}
               </span>
               <button
                 type="button"
@@ -193,7 +281,11 @@ export default function ContentPlanner() {
                 Close
               </button>
             </div>
-            {sidebarTab === 'engagement' ? (
+            {sidebarTab === 'accounts' ? (
+              <div className="min-h-0 flex-1 overflow-y-auto p-2">
+                <AccountConnectionPanel />
+              </div>
+            ) : sidebarTab === 'engagement' ? (
               <EngagementInsightsPanel socialPosts={socialPosts} />
             ) : (
               <TipsGoalsSidebar activeTab="tips" socialPosts={socialPosts} />

@@ -8,11 +8,11 @@ export default function AdminDashboard() {
         <p className="text-muted-foreground">Welcome to the admin panel.</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border bg-white p-6 shadow-sm">
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
           <h3 className="text-sm font-medium text-muted-foreground">Total Users</h3>
           <p className="mt-2 text-3xl font-bold">--</p>
         </div>
-        <div className="rounded-lg border bg-white p-6 shadow-sm">
+        <div className="rounded-lg border bg-card p-6 shadow-sm">
           <h3 className="text-sm font-medium text-muted-foreground">Verified Users</h3>
           <p className="mt-2 text-3xl font-bold">--</p>
         </div>

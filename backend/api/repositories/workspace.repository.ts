@@ -62,5 +62,37 @@ export const workspaceRepository = {
     WorkspaceMemberModel.deleteOne({workspaceId, userId}).exec(),
 
   countMembers: (workspaceId: Types.ObjectId) =>
-    WorkspaceMemberModel.countDocuments({workspaceId}).exec()
+    WorkspaceMemberModel.countDocuments({workspaceId}).exec(),
+
+  listOwnedBy: (ownerId: Types.ObjectId, session?: Session) =>
+    WorkspaceModel.find({ownerId}).session(session ?? null).exec(),
+
+  /** Members other than `excludeUserId`, longest-standing first. */
+  listOtherMembers: (workspaceId: Types.ObjectId, excludeUserId: Types.ObjectId, session?: Session) =>
+    WorkspaceMemberModel.find({workspaceId, userId: {$ne: excludeUserId}})
+      .sort({joinedAt: 1, _id: 1})
+      .session(session ?? null)
+      .exec(),
+
+  /** Hands the workspace to an existing member, promoting their membership row. */
+  transferOwnership: async (
+    workspaceId: Types.ObjectId,
+    newOwnerId: Types.ObjectId,
+    session?: Session
+  ) => {
+    await WorkspaceModel.updateOne({_id: workspaceId}, {ownerId: newOwnerId}, {session}).exec();
+    await WorkspaceMemberModel.updateOne(
+      {workspaceId, userId: newOwnerId},
+      {role: 'owner'},
+      {session}
+    ).exec();
+  },
+
+  deleteByIds: async (ids: Types.ObjectId[], session?: Session) => {
+    await WorkspaceMemberModel.deleteMany({workspaceId: {$in: ids}}, {session}).exec();
+    await WorkspaceModel.deleteMany({_id: {$in: ids}}, {session}).exec();
+  },
+
+  deleteMembershipsForUser: (userId: Types.ObjectId, session?: Session) =>
+    WorkspaceMemberModel.deleteMany({userId}, {session}).exec()
 };

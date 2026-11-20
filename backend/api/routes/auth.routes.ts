@@ -13,9 +13,11 @@ import {
   changePasswordDto
 } from '../dtos/auth.dto';
 import {
-  authLimiter,
   authActionLimiter,
-  authReadLimiter
+  authReadLimiter,
+  loginLimiter,
+  passwordResetLimiter,
+  signupLimiter
 } from '../middleware/rateLimit';
 import {requireAuth} from '../middleware/auth';
 import {issueCsrfToken} from '../middleware/csrf';
@@ -25,41 +27,41 @@ const router = Router();
 // sensitive write operations — strict limit
 router.post(
   '/register',
-  authLimiter,
+  signupLimiter,
   validate(registerDto),
   authController.register
 );
-router.post('/verify', authLimiter, validate(verifyDto), authController.verify);
+router.post('/verify', signupLimiter, validate(verifyDto), authController.verify);
 router.post(
   '/resend-verification',
-  authLimiter,
+  signupLimiter,
   validate(resendVerificationDto),
   authController.resendVerification
 );
-router.post('/login', authLimiter, validate(loginDto), authController.login);
+router.post('/login', loginLimiter, validate(loginDto), authController.login);
 
 // password reset — strict limit
 router.post(
   '/forgot-password',
-  authLimiter,
+  passwordResetLimiter,
   validate(forgotPasswordDto),
   authController.forgotPassword
 );
 router.post(
   '/verify-reset-code',
-  authLimiter,
+  passwordResetLimiter,
   validate(verifyDto),
   authController.verifyResetCode
 );
 router.post(
   '/resend-reset-code',
-  authLimiter,
+  passwordResetLimiter,
   validate(resendResetCodeDto),
   authController.resendResetCode
 );
 router.post(
   '/reset-password',
-  authLimiter,
+  passwordResetLimiter,
   validate(resetPasswordDto),
   authController.resetPassword
 );
