@@ -17,7 +17,7 @@ export const boardCollaboratorController = {
   async list(req: Request, res: Response, next: NextFunction) {
     try {
       res.status(200).json({
-        collaborators: await boardCollaboratorService.list(requireBoard(req))
+        collaborators: await boardCollaboratorService.list(requireBoard(req), actorFromRequest(req))
       });
     } catch (error) {
       next(error);
@@ -31,7 +31,7 @@ export const boardCollaboratorController = {
   async listMembers(req: Request, res: Response, next: NextFunction) {
     try {
       res.status(200).json({
-        members: await boardMemberService.list(requireBoard(req))
+        members: await boardMemberService.list(requireBoard(req), actorFromRequest(req).actorId)
       });
     } catch (error) {
       next(error);

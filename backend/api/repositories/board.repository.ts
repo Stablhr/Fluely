@@ -1,4 +1,4 @@
-import {FilterQuery, Types} from 'mongoose';
+import {Types} from 'mongoose';
 import {BoardDocument, BoardModel} from '../models/Board.model';
 import {BoardVisibility} from '../constants/product';
 import {ProductSession} from '../utils/transaction';
@@ -74,12 +74,6 @@ export const boardRepository = {
    */
   bumpRevision: (filter: Record<string, unknown>, session?: ProductSession) =>
     BoardModel.findOneAndUpdate(filter, {$inc: {revision: 1}}, {new: true, session}).exec(),
-
-  findWithRevision: (id: string, expectedRevision?: number) => {
-    const filter: FilterQuery<BoardDocument> = {_id: id};
-    if (expectedRevision !== undefined) filter.revision = expectedRevision;
-    return BoardModel.findOne(filter).exec();
-  },
 
   delete: (id: string, session?: ProductSession) =>
     BoardModel.deleteOne({_id: id}, {session}).exec(),

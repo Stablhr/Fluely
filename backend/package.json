@@ -31,7 +31,6 @@
     "mongoose": "^8.12.1",
     "multer": "^2.4.0",
     "nodemailer": "^9.0.5",
-    "nodemon": "^3.1.14",
     "pino": "^10.3.1",
     "pusher": "^5.3.4",
     "zod": "^3.24.1"
@@ -52,7 +51,6 @@
     "mongodb-memory-server-core": "^10.4.3",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.9",
-    "ts-node": "^10.9.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.3"
   },

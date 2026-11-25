@@ -78,6 +78,10 @@ export const notificationRepository = {
   deleteMentionsForCard: (cardId: Types.ObjectId) =>
     NotificationModel.deleteMany({cardId, type: 'mention'}).exec(),
 
+  /** Everyone's notifications about a deleted board. */
+  deleteForBoard: (boardId: Types.ObjectId) =>
+    NotificationModel.deleteMany({boardId}).exec(),
+
   /** The account's own notifications, plus everyone's about the given boards. */
   deleteForUserOrBoards: (
     userId: Types.ObjectId,

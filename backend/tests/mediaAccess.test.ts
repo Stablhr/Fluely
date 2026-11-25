@@ -3,6 +3,7 @@ import {Types} from 'mongoose';
 jest.mock('../api/repositories/media.repository', () => ({
   mediaRepository: {
     create: jest.fn(),
+    existsByPublicId: jest.fn(async () => false),
     findById: jest.fn(),
     findByIds: jest.fn(async () => []),
     findByIdForOwner: jest.fn(),
@@ -36,8 +37,8 @@ jest.mock('../api/services/cloudinary.service', () => ({
   uploadToCloudinary: jest.fn(),
   deleteFromCloudinary: jest.fn(async () => undefined),
   getUploadedAsset: jest.fn(),
-  folderForMedia: (scope: {boardId?: string; cardId?: string}) =>
-    scope.cardId ? 'fluely/tasks' : scope.boardId ? 'fluely/boards' : 'fluely/content-planner'
+  folderForMedia: (scope: {boardId?: string; cardId?: string}, ownerId: unknown) =>
+    `${scope.cardId ? 'fluely/tasks' : scope.boardId ? 'fluely/boards' : 'fluely/content-planner'}/${ownerId}`
 }));
 
 jest.mock('../api/repositories/card.repository', () => ({
@@ -142,7 +143,7 @@ describe('mediaService.register', () => {
       secureUrl: OWN_URL('video/upload/v1/clip.mp4'),
       bytes: 2048,
       resourceType: 'video',
-      folder: 'fluely/boards'
+      folder: `fluely/boards/${EDITOR}`
     });
 
     await mediaService.register(
@@ -169,7 +170,7 @@ describe('mediaService.register', () => {
       {
         name: 'photo.png',
         url: 'https://res.cloudinary.com/demo/image/upload/photo.png',
-        publicId: 'fluely/content-planner/photo',
+        publicId: `fluely/content-planner/${OWNER}/photo`,
         mimeType: 'image/png',
         sizeBytes: 100,
         resourceType: 'auto'
@@ -229,7 +230,7 @@ describe('mediaService.register', () => {
       {
         name: 'photo.png',
         url: 'https://tracker.example.com/pixel.png',
-        publicId: 'fluely/boards/photo',
+        publicId: `fluely/boards/${OWNER}/photo`,
         mimeType: 'image/png',
         sizeBytes: 1,
         resourceType: 'image'
@@ -237,7 +238,7 @@ describe('mediaService.register', () => {
       {boardId: BOARD.toString()}
     );
 
-    expect(mockedAsset).toHaveBeenCalledWith('fluely/boards/photo');
+    expect(mockedAsset).toHaveBeenCalledWith(`fluely/boards/${OWNER}/photo`);
     expect(mockedMedia.create).toHaveBeenCalledWith(
       expect.objectContaining({url: OWN_URL('image/upload/v1/photo.png'), sizeBytes: 100})
     );
@@ -261,12 +262,51 @@ describe('mediaService.register', () => {
     expect(mockedMedia.create).not.toHaveBeenCalled();
   });
 
+  it("rejects another user's asset, even on a board the caller can edit", async () => {
+    asCollaborator('editor');
+    // The owner's upload; its public id is visible in any shared image URL.
+    await expect(
+      mediaService.register(
+        EDITOR,
+        {
+          name: 'photo.png',
+          url: 'ignored',
+          publicId: `fluely/boards/${OWNER}/photo`,
+          mimeType: 'image/png',
+          sizeBytes: 100,
+          resourceType: 'image'
+        },
+        {boardId: BOARD.toString()}
+      )
+    ).rejects.toMatchObject({statusCode: 400, code: 'VALIDATION_ERROR'});
+    expect(mockedMedia.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses to register the same asset twice', async () => {
+    mockedMedia.existsByPublicId.mockResolvedValue(true);
+    await expect(
+      mediaService.register(
+        OWNER,
+        {
+          name: 'photo.png',
+          url: 'ignored',
+          publicId: `fluely/boards/${OWNER}/photo`,
+          mimeType: 'image/png',
+          sizeBytes: 100,
+          resourceType: 'image'
+        },
+        {boardId: BOARD.toString()}
+      )
+    ).rejects.toMatchObject({statusCode: 409});
+    expect(mockedMedia.create).not.toHaveBeenCalled();
+  });
+
   it('accepts a dynamic-folder asset whose public id has no folder prefix', async () => {
     mockedAsset.mockResolvedValue({
       secureUrl: OWN_URL('image/upload/v1/photo_abc.png'),
       bytes: 100,
       resourceType: 'image',
-      folder: 'fluely/boards'
+      folder: `fluely/boards/${OWNER}`
     });
     await mediaService.register(
       OWNER,
@@ -330,7 +370,7 @@ describe('mediaService.register', () => {
       secureUrl: OWN_URL('video/upload/huge.mp4'),
       bytes: 10 * 1024 * 1024 * 1024,
       resourceType: 'video',
-      folder: 'fluely/content-planner'
+      folder: `fluely/content-planner/${OWNER}`
     });
     await expect(
       mediaService.register(

@@ -11,8 +11,9 @@ export const adminRepository = {
 
   findById: (id: string) => AdminModel.findById(id).exec(),
 
+  /** Also ends every existing session (see `tokenVersion`). */
   updatePassword: (userId: string, passwordHash: string) =>
-    AdminModel.updateOne({_id: userId}, {passwordHash}).exec(),
+    AdminModel.updateOne({_id: userId}, {$set: {passwordHash}, $inc: {tokenVersion: 1}}).exec(),
 
   create: (data: Partial<AdminDocument>) => AdminModel.create(data)
 };

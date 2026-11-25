@@ -46,10 +46,33 @@ function getVerificationExpiry(minutes: number) {
   return new Date(Date.now() + minutes * 60 * 1000);
 }
 
+/**
+ * A refresh that lost the race for its token. Usually another tab of the same
+ * browser won and already stored fresh cookies, so they must not be cleared.
+ */
+export const REFRESH_TOKEN_REUSED = 'Refresh token already used';
+
 type RefreshTokenPayload = {
   userId: string;
   type: 'user' | 'admin';
+  /** The account's `tokenVersion` when the token was issued. */
+  tv?: number;
 };
+
+function issueTokens(account: {_id: unknown; tokenVersion?: number}, type: 'user' | 'admin') {
+  const userId = String(account._id);
+  const accessToken: string = jwt.sign({userId, type}, env.JWT_SECRET, {
+    expiresIn: ACCESS_TOKEN_TTL_SECONDS
+  });
+  const refreshToken = jwt.sign(
+    {userId, type, tv: account.tokenVersion ?? 0},
+    env.JWT_REFRESH_SECRET,
+    // A unique id per token: without it, two tokens issued for the same account
+    // in the same second are byte-identical, so revoking one revokes both.
+    {expiresIn: REFRESH_TOKEN_TTL_SECONDS, jwtid: createSecureToken(16)}
+  );
+  return {accessToken, refreshToken};
+}
 
 /**
  * The public shape of an account. Both the user and the admin model extend
@@ -330,6 +353,8 @@ export const authService = {
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await repository.updatePassword(userId, passwordHash);
+    // Every other session ends; this one continues with fresh tokens.
+    return issueTokens({_id: account._id, tokenVersion: (account.tokenVersion ?? 0) + 1}, type);
   },
 
   async login(email: string, password: string) {
@@ -363,21 +388,7 @@ export const authService = {
       );
     }
 
-    const accessToken: string = jwt.sign(
-      {userId: account.id, type: userType},
-      env.JWT_SECRET,
-      {expiresIn: ACCESS_TOKEN_TTL_SECONDS}
-    );
-
-    const refreshToken = jwt.sign(
-      {userId: account.id, type: userType},
-      env.JWT_REFRESH_SECRET,
-      // A unique id per token: without it, two tokens issued for the same account
-      // in the same second are byte-identical, so revoking one revokes both.
-      {expiresIn: REFRESH_TOKEN_TTL_SECONDS, jwtid: createSecureToken(16)}
-    );
-
-    return {accessToken, refreshToken, user: account, userType};
+    return {...issueTokens(account, userType), user: account, userType};
   },
 
   /**
@@ -396,14 +407,15 @@ export const authService = {
 
   async refreshAccessToken(refreshToken: string) {
     try {
-      if (await blocklistService.isRevoked(refreshToken)) {
-        throw new ApiError(401, ErrorCodes.UNAUTHORIZED, 'Token revoked');
-      }
-
       const payload = jwt.verify(
         refreshToken,
         env.JWT_REFRESH_SECRET
       ) as RefreshTokenPayload;
+
+      // Revoking is the claim: of two refreshes racing with one token, only one wins.
+      if (!(await blocklistService.revoke(refreshToken))) {
+        throw new ApiError(401, ErrorCodes.UNAUTHORIZED, REFRESH_TOKEN_REUSED);
+      }
 
       const account = await findAccountById(payload.userId, payload.type);
 
@@ -411,26 +423,18 @@ export const authService = {
         throw new ApiError(401, ErrorCodes.UNAUTHORIZED, 'Invalid token');
       }
 
+      // The password changed after this token was issued.
+      if ((payload.tv ?? 0) !== (account.tokenVersion ?? 0)) {
+        throw new ApiError(401, ErrorCodes.UNAUTHORIZED, 'Session ended');
+      }
+
       if (!account.isVerified) {
         throw new ApiError(403, ErrorCodes.NOT_VERIFIED, 'Email not verified');
       }
 
-      await blocklistService.revoke(refreshToken);
-
-      const accessToken = jwt.sign(
-        {userId: account.id, type: payload.type},
-        env.JWT_SECRET,
-        {expiresIn: ACCESS_TOKEN_TTL_SECONDS}
-      );
-
-      const newRefreshToken = jwt.sign(
-        {userId: account.id, type: payload.type},
-        env.JWT_REFRESH_SECRET,
-        {expiresIn: REFRESH_TOKEN_TTL_SECONDS, jwtid: createSecureToken(16)}
-      );
-
-      return {accessToken, refreshToken: newRefreshToken};
-    } catch {
+      return issueTokens(account, payload.type);
+    } catch (error) {
+      if (error instanceof ApiError && error.message === REFRESH_TOKEN_REUSED) throw error;
       throw new ApiError(401, ErrorCodes.UNAUTHORIZED, 'Invalid token');
     }
   },

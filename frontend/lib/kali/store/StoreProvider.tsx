@@ -59,7 +59,6 @@ import {
   createCardOnServer,
   createListOnServer,
   deleteCardOnServer,
-  deleteListOnServer,
   fetchStructure,
   moveCardOnServer,
   reorderCardsOnServer,

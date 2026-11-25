@@ -20,8 +20,9 @@ function expiryOf(token: string): Date {
  * Rows remove themselves (TTL index) once the token would have expired anyway.
  */
 export const blocklistService = {
-  async revoke(token: string): Promise<void> {
-    await revokedTokenRepository.add(hashToken(token), expiryOf(token));
+  /** True when this call revoked the token, false when it already was. */
+  async revoke(token: string): Promise<boolean> {
+    return revokedTokenRepository.add(hashToken(token), expiryOf(token));
   },
 
   async isRevoked(token: string): Promise<boolean> {

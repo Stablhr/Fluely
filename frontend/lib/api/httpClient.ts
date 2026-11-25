@@ -18,7 +18,9 @@ const resolvedBaseUrl = API_BASE_URL;
 
 let refreshPromise: Promise<void> | null = null;
 
-let csrfToken: string | null = null;
+// One in-flight/cached token promise: every GET /auth/csrf rotates the cookie,
+// so concurrent mutations must share a single fetch.
+let csrfPromise: Promise<string> | null = null;
 let httpClientRef: ReturnType<typeof axios.create>;
 
 const refreshClient = axios.create({
@@ -30,11 +32,28 @@ const refreshClient = axios.create({
   }
 });
 
-async function ensureCsrfToken(): Promise<string | null> {
-  if (csrfToken) return csrfToken;
-  const res = await httpClientRef.get<{csrfToken: string}>('/auth/csrf');
-  csrfToken = res.data.csrfToken;
-  return csrfToken;
+function ensureCsrfToken(): Promise<string> {
+  csrfPromise ??= httpClientRef
+    .get<{csrfToken: string}>('/auth/csrf')
+    .then(res => res.data.csrfToken)
+    .catch(error => {
+      csrfPromise = null;
+      throw error;
+    });
+  return csrfPromise;
+}
+
+/**
+ * Forget the cached token, but only if it is the one the failed request sent;
+ * otherwise a parallel request already replaced it and dropping the new one
+ * would rotate the cookie again.
+ */
+async function dropCsrfToken(error: AxiosError) {
+  const sent = error.config?.headers?.['x-csrf-token'];
+  const cached = csrfPromise;
+  if (!cached) return;
+  const current = await cached.catch(() => null);
+  if (csrfPromise === cached && (!sent || current === sent)) csrfPromise = null;
 }
 
 function attachCsrfInterceptor(client: ReturnType<typeof axios.create>) {
@@ -112,7 +131,7 @@ async function refreshAccessToken() {
       // interceptor fetches a fresh one, and try once more. Anything else means
       // the refresh token itself is gone, so let it reject.
       if (!isCsrfError(error)) throw error;
-      csrfToken = null;
+      await dropCsrfToken(error as AxiosError);
       await refreshClient.post('/auth/refresh', {});
     }
   })().finally(() => {
@@ -144,7 +163,7 @@ export const httpClient = (() => {
 
       const axiosError: AxiosError<ApiErrorPayload> = error;
       const originalConfig = axiosError.config as
-        | (AxiosRequestConfig & {_retry?: boolean})
+        | (AxiosRequestConfig & {_retry?: boolean; _csrfRetry?: boolean})
         | undefined;
       const status = axiosError.response?.status;
 
@@ -157,6 +176,13 @@ export const httpClient = (() => {
         url === '/auth/verify' ||
         url === '/auth/resend-verification';
 
+      // A stale CSRF token (cookie rotated or cleared): refetch it and retry once.
+      if (isCsrfError(axiosError) && originalConfig && !originalConfig._csrfRetry) {
+        originalConfig._csrfRetry = true;
+        await dropCsrfToken(axiosError);
+        return client(originalConfig);
+      }
+
       if (
         status === 401 &&
         originalConfig &&
@@ -168,6 +194,14 @@ export const httpClient = (() => {
           await refreshAccessToken();
           return client(originalConfig);
         } catch (refreshError) {
+          // Another tab refreshed with the same token first and its new cookies
+          // are already in the jar, so the original request can simply go again.
+          if (
+            axios.isAxiosError(refreshError) &&
+            (refreshError.response?.data as ApiErrorPayload | undefined)?.message === 'Refresh token already used'
+          ) {
+            return client(originalConfig);
+          }
           // Reject here so your SignInPage catch runs
           return Promise.reject(normalizeAxiosError(refreshError));
         }

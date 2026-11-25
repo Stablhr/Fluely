@@ -15,7 +15,11 @@ if (qstashProblem) {
 let dbInitPromise: Promise<unknown> | null = null;
 const ensureDb = () => {
   if (!dbInitPromise) {
-    dbInitPromise = connectDb();
+    // A failed attempt is forgotten, so the next request tries again.
+    dbInitPromise = connectDb().catch(error => {
+      dbInitPromise = null;
+      throw error;
+    });
   }
   return dbInitPromise;
 };

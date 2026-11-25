@@ -48,7 +48,7 @@ function toMember(
  * they have no access, so assigning them a card would be meaningless and would
  * leak their invitation details to the whole board.
  */
-async function list(board: BoardDocument): Promise<BoardMember[]> {
+async function list(board: BoardDocument, viewerId?: Types.ObjectId): Promise<BoardMember[]> {
   const [owner, rows] = await Promise.all([
     userRepository.findById(board.ownerId.toString()),
     boardCollaboratorRepository.listForBoard(board._id)
@@ -59,12 +59,14 @@ async function list(board: BoardDocument): Promise<BoardMember[]> {
     accepted.map(row => userRepository.findById(row.userId.toString()))
   );
 
-  return [
+  const members = [
     toMember(board.ownerId, owner, 'owner'),
     ...accepted.map((row, index) =>
       toMember(row.userId, people[index], row.role)
     )
   ];
+  // Emails are for the owner; a public board is readable by every signed-in user.
+  return viewerId && board.ownerId.equals(viewerId) ? members : members.map(m => ({...m, email: ''}));
 }
 
 /** True only for the owner or an accepted collaborator on this exact board. */

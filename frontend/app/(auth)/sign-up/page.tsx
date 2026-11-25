@@ -9,6 +9,7 @@ import {Label} from '@/components/ui/label';
 import {useRouter} from 'next/navigation';
 import {registerCustomer} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
+import {withRedirect} from '@/lib/auth/redirects';
 import {
   authErrorClass,
   authFooterClass,
@@ -57,7 +58,7 @@ export default function SignUpPage() {
         email,
         password,
       });
-      router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+      router.push(withRedirect(`/verify-email?email=${encodeURIComponent(email)}`));
     } catch (error) {
       setErrorMessage(
         getFriendlyErrorMessage(

@@ -25,6 +25,7 @@ dotenv.config();
 
 interface LegacyMediaDoc {
   _id: mongoose.Types.ObjectId;
+  ownerId: mongoose.Types.ObjectId;
   boardId?: mongoose.Types.ObjectId | null;
   cardId?: mongoose.Types.ObjectId | null;
   kind?: string;
@@ -93,10 +94,13 @@ async function main() {
 
     try {
       const result = await uploadToCloudinary(buffer, {
-        folder: folderForMedia({
-          boardId: doc.boardId ? doc.boardId.toString() : null,
-          cardId: doc.cardId ? doc.cardId.toString() : null
-        }),
+        folder: folderForMedia(
+          {
+            boardId: doc.boardId ? doc.boardId.toString() : null,
+            cardId: doc.cardId ? doc.cardId.toString() : null
+          },
+          doc.ownerId
+        ),
         resource_type: 'auto',
         use_filename: true,
         unique_filename: true

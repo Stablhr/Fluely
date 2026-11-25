@@ -36,8 +36,9 @@ export const userRepository = {
     >
   ) => UserModel.updateOne({_id: userId}, data).exec(),
 
+  /** Also ends every existing session (see `tokenVersion`). */
   updatePassword: (userId: string, passwordHash: string) =>
-    UserModel.updateOne({_id: userId}, {passwordHash}).exec(),
+    UserModel.updateOne({_id: userId}, {$set: {passwordHash}, $inc: {tokenVersion: 1}}).exec(),
 
   setPrimaryWorkspace: (userId: string, workspaceId: Types.ObjectId | null) =>
     UserModel.updateOne({_id: userId}, {workspaceId}).exec(),

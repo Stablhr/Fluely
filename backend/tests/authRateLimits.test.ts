@@ -8,8 +8,9 @@ jest.mock('../api/services/email.service', () => ({
 }));
 
 import app from '../app';
-import {CSRF_COOKIE} from '../api/constants/cookies';
+import {CSRF_COOKIE, REFRESH_TOKEN_COOKIE} from '../api/constants/cookies';
 import {UserModel} from '../api/models/User.model';
+import {authService} from '../api/services/auth.service';
 
 /*
  * The pre-auth endpoints used to share one budget of 5 requests per 15
@@ -94,5 +95,101 @@ describe('pre-auth rate limits', () => {
     }
     const blocked = await post('/api/auth/forgot-password', {email: 'limits@example.test'});
     expect(blocked.status).toBe(429);
+  });
+});
+
+describe('emailed codes', () => {
+  const email = 'limits@example.test';
+  const resetCode = async () => (await UserModel.findOne({email}))!.resetCode!;
+  const wrong = (code: string) => String((Number(code) % 900000) + 100001).slice(0, 6);
+
+  it('stops a reset code working after 5 wrong guesses, even in parallel', async () => {
+    await createUser();
+    await authService.forgotPassword(email);
+    const code = await resetCode();
+    expect(code).toMatch(/^\d{6}$/);
+
+    // Ten guesses at once: only five may be counted against the code.
+    const guesses = await Promise.allSettled(
+      Array.from({length: 10}, () => authService.verifyResetCode(email, wrong(code)))
+    );
+    expect(guesses.every(g => g.status === 'rejected')).toBe(true);
+    expect((await UserModel.findOne({email}))!.resetAttempts).toBe(5);
+
+    // The right code no longer works; the person has to request a new one.
+    await expect(authService.resetPassword(email, code, 'New-horse-2')).rejects.toMatchObject({statusCode: 400});
+    await authService.forgotPassword(email);
+    await expect(authService.verifyResetCode(email, await resetCode())).resolves.toBeUndefined();
+  });
+
+  it('lets the right code through both reset steps after a few mistakes', async () => {
+    await createUser();
+    await authService.forgotPassword(email);
+    const code = await resetCode();
+    for (let i = 0; i < 4; i += 1) {
+      await expect(authService.verifyResetCode(email, wrong(code))).rejects.toMatchObject({statusCode: 400});
+    }
+    await authService.verifyResetCode(email, code);
+    await authService.resetPassword(email, code, 'New-horse-2');
+    expect((await UserModel.findOne({email}))!.resetCode).toBeNull();
+  });
+
+  it('limits guesses at the email verification code too', async () => {
+    await UserModel.create({
+      firstName: 'New',
+      lastName: 'Person',
+      email,
+      passwordHash: 'x',
+      isVerified: false,
+      verificationCode: '123456',
+      verificationExpiry: new Date(Date.now() + 600_000)
+    });
+    for (let i = 0; i < 5; i += 1) {
+      await expect(authService.verify(email, '654321')).rejects.toMatchObject({statusCode: 400});
+    }
+    await expect(authService.verify(email, '123456')).rejects.toMatchObject({statusCode: 400});
+    expect((await UserModel.findOne({email}))!.isVerified).toBe(false);
+  });
+});
+
+describe('sessions', () => {
+  const email = 'limits@example.test';
+
+  async function signIn() {
+    const res = await post('/api/auth/login', {email, password: PASSWORD});
+    expect(res.status).toBe(200);
+    return refreshCookie(res);
+  }
+
+  function refreshCookie(res: request.Response): string {
+    const cookies = ([] as string[]).concat(res.headers['set-cookie'] ?? []);
+    const found = cookies.find(c => c.startsWith(`${REFRESH_TOKEN_COOKIE}=`));
+    return found!.split(';')[0].slice(REFRESH_TOKEN_COOKIE.length + 1);
+  }
+
+  const refresh = (token: string) => post('/api/auth/refresh', {refreshToken: token});
+
+  it('lets a refresh token be used only once, even by two requests at the same moment', async () => {
+    await createUser();
+    const token = await signIn();
+    const results = await Promise.all([refresh(token), refresh(token)]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 401]);
+  });
+
+  it('ends other sessions when the password changes, and keeps the one that changed it', async () => {
+    await createUser();
+    const other = await signIn();
+    const login = await post('/api/auth/login', {email, password: PASSWORD});
+    const cookies = ([] as string[]).concat(login.headers['set-cookie'] ?? []).map(c => c.split(';')[0]);
+
+    const changed = await request(app)
+      .put('/api/auth/password')
+      .set('Cookie', [...cookies, `${CSRF_COOKIE}=${CSRF}`].join('; '))
+      .set('X-CSRF-Token', CSRF)
+      .send({currentPassword: PASSWORD, newPassword: 'New-horse-2'});
+    expect(changed.status).toBe(200);
+
+    expect((await refresh(other)).status).toBe(401);
+    expect((await refresh(refreshCookie(changed))).status).toBe(200);
   });
 });

@@ -4,7 +4,7 @@ import {useEffect} from 'react';
 import {useRouter} from 'next/navigation';
 import {CalendarRange, Columns3, Users} from 'lucide-react';
 import {useMeQuery} from '@/lib/hooks/auth/useMeQuery';
-import {getDashboardPath} from '@/lib/auth/redirects';
+import {getPostAuthPath} from '@/lib/auth/redirects';
 import {BRAND} from '@/lib/brand';
 import {BrandLogo} from '@/components/brand/Logo';
 import Loading from '../loading';
@@ -21,14 +21,14 @@ const HIGHLIGHTS = [
 
 const AuthLayout = ({children}: AuthLayoutProps) => {
   const router = useRouter();
-  const {data, isLoading, isFetching, isSuccess} = useMeQuery();
+  const {data, isLoading, isSuccess} = useMeQuery();
 
   useEffect(() => {
     if (!isSuccess) return;
-    router.replace(getDashboardPath(data.user.type));
+    router.replace(getPostAuthPath(data.user.type));
   }, [data, isSuccess, router]);
 
-  if (isLoading || isFetching) return <Loading />;
+  if (isLoading) return <Loading />;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8 sm:px-6 lg:px-10">

@@ -50,6 +50,8 @@ export interface BaseUserDocument extends mongoose.Document {
   /** Wrong guesses at the current code; the code stops working after a few. */
   verificationAttempts?: number;
   resetAttempts?: number;
+  /** Bumped when the password changes; refresh tokens carrying an older one stop working. */
+  tokenVersion?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -92,7 +94,8 @@ export function createBaseUserSchema<T extends BaseUserDocument>() {
       resetCode: {type: String, default: null},
       resetExpiry: {type: Date, default: null},
       verificationAttempts: {type: Number, default: 0},
-      resetAttempts: {type: Number, default: 0}
+      resetAttempts: {type: Number, default: 0},
+      tokenVersion: {type: Number, default: 0}
     },
     {timestamps: true}
   );

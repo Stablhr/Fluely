@@ -82,13 +82,14 @@ All API errors must follow this shape (enforced in `api/middleware/errorHandler.
 Uploaded files go to Cloudinary; nothing is written to local disk. `multer` uses in-memory storage
 (`api/middleware/upload.ts`) and `mediaService.create` streams each buffer to Cloudinary through the
 shared helpers in `api/services/cloudinary.service.ts`, which read the client configured once in
-`api/config/cloudinary.ts`. Assets live under `fluely/{avatars,boards,tasks,content-planner}`.
+`api/config/cloudinary.ts`. Assets live under `fluely/{avatars,boards,tasks,content-planner}/<ownerId>`.
 
 Every upload path (`POST /media`, `/media/signature`, `/media/register`) runs the same scope check:
 no board means a personal upload; a `boardId` needs edit access (a board the caller cannot see is
 reported as not found); a `cardId` needs its `boardId` and must belong to it. `register` records the
 asset from Cloudinary's Admin API (`getUploadedAsset`): URL, size, resource type and folder come from
-Cloudinary, the folder must match the scope's, and the URL must pass `isOwnCloudinaryUrl`
+Cloudinary, the folder must match the scope's and the uploader's (so nobody can register, and then
+delete, someone else's asset), a `publicId` already on record is refused, and the URL must pass `isOwnCloudinaryUrl`
 (`api/utils/cloudinaryUrl.ts`). Never store a media URL the browser supplied.
 
 A record stores the Cloudinary `url` (`secure_url`), `publicId`, and `resourceType`; deletion calls

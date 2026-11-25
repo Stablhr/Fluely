@@ -21,6 +21,8 @@ import {hashToken} from '../api/utils/crypto';
 import {UserModel} from '../api/models/User.model';
 import {BoardModel} from '../api/models/Board.model';
 import {BoardCollaboratorModel} from '../api/models/BoardCollaborator.model';
+import {MediaAttachmentModel} from '../api/models/MediaAttachment.model';
+import {deleteFromCloudinary} from '../api/services/cloudinary.service';
 
 /*
  * When an owner deletes a shared board, members' devices drop it by re-reading
@@ -108,5 +110,27 @@ describe('deleting a shared board', () => {
     await as(owner._id).del(`/api/boards/${board._id}`);
     const poll = await as(member._id).get(`/api/boards/${board._id}/poll?since=0`);
     expect([403, 404]).toContain(poll.status);
+  });
+});
+
+describe('deleting a board with files', () => {
+  it('deletes its files from Cloudinary, not only their rows', async () => {
+    const {owner, board} = await sharedBoard();
+    await MediaAttachmentModel.create({
+      ownerId: owner._id,
+      boardId: board._id,
+      kind: 'video',
+      resourceType: 'video',
+      originalName: 'clip.mp4',
+      url: 'https://res.cloudinary.com/demo/video/upload/clip.mp4',
+      publicId: 'fluely/boards/clip',
+      mimeType: 'video/mp4',
+      sizeBytes: 10
+    });
+
+    expect((await as(owner._id).del(`/api/boards/${board._id}`)).status).toBe(200);
+
+    expect(deleteFromCloudinary).toHaveBeenCalledWith('fluely/boards/clip', 'video');
+    expect(await MediaAttachmentModel.countDocuments({boardId: board._id})).toBe(0);
   });
 });

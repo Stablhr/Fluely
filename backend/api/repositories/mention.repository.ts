@@ -36,6 +36,9 @@ export const mentionRepository = {
   deleteByCard: (cardId: Types.ObjectId) =>
     MentionModel.deleteMany({cardId}).exec(),
 
+  deleteForBoard: (boardId: Types.ObjectId) =>
+    MentionModel.deleteMany({boardId}).exec(),
+
   /** Mentions of the account anywhere, plus every mention on the given boards. */
   deleteForUserOrBoards: (
     userId: Types.ObjectId,

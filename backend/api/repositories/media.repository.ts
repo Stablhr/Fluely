@@ -22,6 +22,10 @@ export type CreateMediaInput = Pick<
 export const mediaRepository = {
   create: (data: CreateMediaInput) => MediaAttachmentModel.create(data),
 
+  // shortcut: check-then-insert, not a unique index (publicId_1 already exists non-unique in production);
+  // two simultaneous registers of one's own asset can both pass. Make the index unique if that matters.
+  existsByPublicId: async (publicId: string) => Boolean(await MediaAttachmentModel.exists({publicId})),
+
   findById: (id: string) => MediaAttachmentModel.findById(id).exec(),
 
   findByIds: (ids: string[]) =>

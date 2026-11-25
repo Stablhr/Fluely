@@ -2,6 +2,7 @@ import {Types} from 'mongoose';
 import {cardRepository} from '../repositories/card.repository';
 import {listRepository} from '../repositories/list.repository';
 import {mediaRepository} from '../repositories/media.repository';
+import {destroyMediaAssets} from './media.service';
 import {BoardDocument} from '../models/Board.model';
 import {CardComment, CardCoverSize, CardDocument} from '../models/Card.model';
 import {canWrite} from './boardAccess.service';
@@ -11,8 +12,7 @@ import {
   POSITION_GAP,
   positionAtEnd,
   positionBetween,
-  needsRespace,
-  spacedPositions
+  needsRespace
 } from '../utils/position';
 import {boardMemberService} from './boardMember.service';
 import {notificationService} from './notification.service';
@@ -164,9 +164,64 @@ export function serializeReactions(stored: CardComment['reactions']): CommentRea
   return out;
 }
 
-/** The stored reactions to keep for each comment of a whole-array write. */
-function reactionsById(comments: CardComment[] | undefined) {
-  return new Map((comments ?? []).map(c => [c.id, c.reactions ?? {}]));
+type IncomingComment = NonNullable<CardInput['comments']>[number];
+
+/**
+ * The comments to store for a whole-array write. The client owns only what the
+ * actor wrote: a stored comment keeps its author, time and reactions, and its
+ * text unless the actor wrote it; a new comment is the actor's. Others'
+ * comments missing from the write are kept unless the board owner removed them.
+ * Reactions are only ever written by the reactions endpoint.
+ */
+function mergeComments(
+  actor: Actor,
+  board: BoardDocument,
+  stored: CardComment[] | undefined,
+  incoming: IncomingComment[]
+): CardComment[] {
+  const byId = new Map((stored ?? []).map(c => [c.id, c]));
+  const mine = (c: CardComment) => Boolean(c.authorId?.equals(actor.actorId));
+  const merged: CardComment[] = incoming.map(c => {
+    const before = byId.get(c.id);
+    if (!before) {
+      return {
+        id: c.id,
+        authorId: actor.actorId,
+        parentId: c.parentId ?? null,
+        text: c.text,
+        reactions: {},
+        createdAt: c.createdAt ? new Date(c.createdAt) : new Date()
+      };
+    }
+    return {
+      id: before.id,
+      authorId: before.authorId,
+      parentId: before.parentId,
+      text: mine(before) ? c.text : before.text,
+      reactions: before.reactions ?? {},
+      createdAt: before.createdAt
+    };
+  });
+  const kept = new Set(incoming.map(c => c.id));
+  const othersRemoved = (stored ?? []).filter(c => !kept.has(c.id) && !mine(c));
+  if (othersRemoved.length && !isBoardOwner(actor, board)) merged.push(...othersRemoved);
+  return merged;
+}
+
+/**
+ * Media a card may point at: the actor's own, this board's, or what the card
+ * already shows. Anything else is one error, so the response does not reveal
+ * whether an id exists elsewhere.
+ */
+async function assertUsableMedia(actor: Actor, board: BoardDocument, ids: string[], already: Types.ObjectId[]) {
+  const known = new Set(already.map(String));
+  const wanted = [...new Set(ids)].filter(id => !known.has(id));
+  if (wanted.length === 0) return;
+  const found = await mediaRepository.findByIds(wanted);
+  const usable = found.filter(m => m.ownerId.equals(actor.actorId) || m.boardId?.equals(board._id));
+  if (usable.length !== wanted.length) {
+    throw new ApiError(400, ErrorCodes.MEDIA_NOT_FOUND, 'That file is not available on this board');
+  }
 }
 
 /**
@@ -182,12 +237,16 @@ function canComment(board: BoardDocument, level: BoardAccessLevel | undefined): 
   return level === 'owner' || level === 'editor' || level === 'viewer';
 }
 
-async function serializeCard(card: CardDocument) {
-  const ids = [
+function mediaIdsOf(card: CardDocument): string[] {
+  return [
     ...(card.coverMediaId ? [card.coverMediaId.toString()] : []),
     ...card.mediaIds.map(id => id.toString())
   ];
-  const mediaDocs = await mediaRepository.findByIds(ids);
+}
+
+/** `mediaDocs`: the card's media, already loaded (see `serializeCards`); fetched when absent. */
+async function serializeCard(card: CardDocument, mediaDocs?: Awaited<ReturnType<typeof mediaRepository.findByIds>>) {
+  mediaDocs ??= await mediaRepository.findByIds(mediaIdsOf(card));
   const coverMedia = card.coverMediaId
     ? mediaDocs.find(doc => doc._id.equals(card.coverMediaId))
     : undefined;
@@ -314,12 +373,18 @@ function actionTypeForCardPatch(patch: Record<string, unknown>): ActivityActionT
   return 'card.updated';
 }
 
+/** Many cards with one media query, instead of one per card. */
+async function serializeCards(cards: CardDocument[]) {
+  const mediaDocs = await mediaRepository.findByIds([...new Set(cards.flatMap(mediaIdsOf))]);
+  return Promise.all(cards.map(card => serializeCard(card, mediaDocs)));
+}
+
 export const cardService = {
   serialize: serializeCard,
+  serializeMany: serializeCards,
 
   async list(board: BoardDocument) {
-    const cards = await cardRepository.listByBoard(board._id);
-    return Promise.all(cards.map(serializeCard));
+    return serializeCards(await cardRepository.listByBoard(board._id));
   },
 
   async create(actor: Actor, board: BoardDocument, input: CreateCardInput) {
@@ -333,6 +398,12 @@ export const cardService = {
         'Only the board owner can assign members'
       );
     }
+    await assertUsableMedia(
+      actor,
+      board,
+      [...(input.mediaIds ?? []), ...(input.coverMediaId ? [input.coverMediaId] : [])],
+      []
+    );
 
     const result = await withProductTransaction(async session => {
       // A card may only be filed under a list on its own board, so the target list
@@ -364,15 +435,7 @@ export const cardService = {
           location: input.location ?? null,
           watching: input.watching ?? false,
           mediaIds: (input.mediaIds ?? []).map(id => new Types.ObjectId(id)),
-          comments: (input.comments ?? []).map(c => ({
-            id: c.id,
-            authorId: c.authorId ? new Types.ObjectId(c.authorId) : null,
-            parentId: c.parentId ?? null,
-            text: c.text,
-            // Reactions are only ever written by the reactions endpoint.
-            reactions: {},
-            createdAt: c.createdAt ? new Date(c.createdAt) : new Date()
-          }))
+          comments: mergeComments(actor, board, [], input.comments ?? [])
         },
         session
       );
@@ -418,6 +481,11 @@ export const cardService = {
 
     const result = await withProductTransaction(async session => {
       const before = await requireCardForBoard(cardId, board._id, session);
+      const media = [...(input.mediaIds ?? []), ...(input.coverMediaId ? [input.coverMediaId] : [])];
+      await assertUsableMedia(actor, board, media, [
+        ...(before.mediaIds ?? []),
+        ...(before.coverMediaId ? [before.coverMediaId] : [])
+      ]);
       const revision = await bumpBoardRevision(board._id, input.expectedRevision, session);
 
       const patch: Record<string, unknown> = {};
@@ -448,19 +516,9 @@ export const cardService = {
       }
       if (input.location !== undefined) patch.location = input.location;
       if (input.comments !== undefined) {
-        // Whatever `reactions` the client sends is ignored: a comment that
-        // already exists keeps what is stored (read in this transaction, so a
-        // concurrent toggle conflicts and retries rather than being lost), and
-        // a new comment starts with none.
-        const storedReactions = reactionsById(before.comments);
-        patch.comments = input.comments.map(c => ({
-          id: c.id,
-          authorId: c.authorId ? new Types.ObjectId(c.authorId) : null,
-          parentId: c.parentId ?? null,
-          text: c.text,
-          reactions: storedReactions.get(c.id) ?? {},
-          createdAt: c.createdAt ? new Date(c.createdAt) : new Date()
-        }));
+        // Stored comments are read in this transaction, so a concurrent
+        // reaction toggle conflicts and retries rather than being lost.
+        patch.comments = mergeComments(actor, board, before.comments, input.comments);
       }
 
       await cardRepository.update(cardId, board._id, patch, session);
@@ -1019,11 +1077,6 @@ export const cardService = {
       return {updated, revision, activity};
     });
 
-    const body = {
-      cardOrder,
-      list: serializeListSummary(result.updated),
-      revision: result.revision
-    };
     return {cardOrder, revision: result.revision};
   },
 
@@ -1033,6 +1086,8 @@ export const cardService = {
     cardId: string,
     expectedRevision?: number
   ) {
+    // Files uploaded into this card go with it; library files it only points at stay.
+    const files = Types.ObjectId.isValid(cardId) ? await mediaRepository.listByCard(new Types.ObjectId(cardId)) : [];
     const result = await withProductTransaction(async session => {
       const doomed = await requireCardForBoard(cardId, board._id, session);
       const revision = await bumpBoardRevision(board._id, expectedRevision, session);
@@ -1061,6 +1116,12 @@ export const cardService = {
       return {revision, activity};
     });
 
+    const id = new Types.ObjectId(cardId);
+    await mediaRepository.deleteByCard(id);
+    await mentionRepository.deleteByCard(id);
+    await notificationRepository.deleteMentionsForCard(id);
+    await destroyMediaAssets(files);
+
     const body = {message: 'Card deleted', revision: result.revision};
     return body;
   }
@@ -1077,17 +1138,4 @@ async function listOrderOf(
 ): Promise<Types.ObjectId[]> {
   const list = await listRepository.findByIdForBoard(listId, boardId, session);
   return list ? [...list.cardOrder] : [];
-}
-
-/** The subset of a list the realtime reorder event needs. */
-function serializeListSummary(list: {
-  _id: Types.ObjectId;
-  name: string;
-  cardOrder: Types.ObjectId[];
-}) {
-  return {
-    id: list._id.toString(),
-    name: list.name,
-    cardOrder: (list.cardOrder ?? []).map(id => id.toString())
-  };
 }

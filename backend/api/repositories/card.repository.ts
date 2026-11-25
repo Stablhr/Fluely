@@ -106,8 +106,8 @@ export const cardRepository = {
   delete: (id: string, boardId: Types.ObjectId, session?: ProductSession) =>
     CardModel.deleteOne({_id: id, boardId}, {session}).exec(),
 
-  deleteByList: (listId: Types.ObjectId, boardId: Types.ObjectId) =>
-    CardModel.deleteMany({listId, boardId}).exec(),
+  deleteByList: (listId: Types.ObjectId, boardId: Types.ObjectId, session?: ProductSession) =>
+    CardModel.deleteMany({listId, boardId}, {session}).exec(),
 
   deleteForBoard: (boardId: Types.ObjectId, session?: ProductSession) =>
     CardModel.deleteMany({boardId}, {session}).exec(),

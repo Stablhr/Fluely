@@ -10,7 +10,7 @@ import {useRouter} from 'next/navigation';
 import {useQueryClient} from '@tanstack/react-query';
 import {login} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
-import {getDashboardPath} from '@/lib/auth/redirects';
+import {getPostAuthPath, withRedirect} from '@/lib/auth/redirects';
 import {holdForMinimum} from '@/lib/auth/loadingCurtain';
 import {meQueryKey} from '@/lib/hooks/auth/useMeQuery';
 import {useLoadingScreen} from '@/lib/provider/LoadingScreenProvider';
@@ -60,7 +60,7 @@ export default function SignInPage() {
       // success: the curtain stays up across the navigation so the dashboard
       // never flashes in behind it.
       await holdForMinimum(startedAt);
-      router.replace(getDashboardPath(user.type));
+      router.replace(getPostAuthPath(user.type));
     } catch (error) {
       hide();
       setErrorMessage(getFriendlyErrorMessage(error, 'Failed to sign in'));
@@ -144,7 +144,15 @@ export default function SignInPage() {
 
       <p className={authFooterClass}>
         Don&apos;t have an account?{' '}
-        <Link href="/sign-up" className={authInlineLinkClass}>
+        <Link
+          href="/sign-up"
+          className={authInlineLinkClass}
+          // Keep an invite's `redirect` when the invitee signs up instead.
+          onClick={e => {
+            e.preventDefault();
+            router.push(withRedirect('/sign-up'));
+          }}
+        >
           Sign up
         </Link>
       </p>
