@@ -81,6 +81,8 @@ export default function BoardsHome() {
                   toggleStar(board.id)
                 }}
                 title={board.starred ? 'Unstar' : 'Star'}
+                aria-label={board.starred ? `Unstar ${board.name}` : `Star ${board.name}`}
+                aria-pressed={board.starred}
                 className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/45 opacity-0 transition-opacity duration-150 hover:bg-black/60 group-hover:opacity-100 focus-visible:opacity-100"
               >
                 <Star

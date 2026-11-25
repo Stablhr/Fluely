@@ -12,7 +12,7 @@ import CardLocation from './CardLocation'
 import CardAttachments from './CardAttachments'
 import CardComments from './CardComments'
 import ImageViewer, { type ViewerImage } from './ImageViewer'
-import MoveToListMenu, { type MoveToListTarget } from './MoveToListMenu'
+import MoveToListMenu from './MoveToListMenu'
 import { deleteMedia } from '@/lib/api/mediaApi'
 import CardActivity from './CardActivity'
 import CardCover from './CardCover'
@@ -279,6 +279,7 @@ const { data, updateCard, addActivity, deleteCard, archiveCard, toggleDone, canW
                 type="button"
                 onClick={() => toggleDone(card.id)}
                 title={card.done ? 'Mark as not done' : 'Mark as done'}
+                aria-label={card.done ? 'Mark as not done' : 'Mark as done'}
                 className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold transition-colors duration-150 active:scale-[0.98] sm:px-2.5 ${
                   card.done
                     ? 'bg-success text-white'
@@ -294,6 +295,8 @@ const { data, updateCard, addActivity, deleteCard, archiveCard, toggleDone, canW
               <button
                 type="button"
                 onClick={toggleWatch}
+                aria-label="Watch card"
+                aria-pressed={card.watching}
                 className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold transition-colors duration-150 active:scale-[0.98] sm:px-2.5 ${
                   card.watching
                     ? 'bg-primary-subtle text-primary-hover'

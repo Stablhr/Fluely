@@ -197,12 +197,12 @@ export default function ShareModal({
                     className={`w-full ${inputClass}`}
                   />
                   {errorMsg && (
-                    <p className="mt-1.5 text-xs text-danger-text">
+                    <p role="alert" className="mt-1.5 text-xs text-danger-text">
                       {errorMsg}
                     </p>
                   )}
                   {inviteDone && !errorMsg && (
-                    <p className="mt-1.5 flex items-center gap-1.5 text-xs text-success">
+                    <p role="status" className="mt-1.5 flex items-center gap-1.5 text-xs text-success">
                       <Check size={13} /> Invitation sent
                     </p>
                   )}

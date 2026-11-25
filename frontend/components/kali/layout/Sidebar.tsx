@@ -30,7 +30,7 @@ interface NavLinkProps {
   children: ReactNode | ((state: { isActive: boolean }) => ReactNode);
 }
 
-function NavLink({ to, end, title, className, style, children }: NavLinkProps) {
+function NavLink({ to, end, title, label, className, style, children }: NavLinkProps & { label?: string }) {
   const pathname = usePathname();
   const isActive = end
     ? pathname === to
@@ -41,6 +41,8 @@ function NavLink({ to, end, title, className, style, children }: NavLinkProps) {
     <Link
       href={to}
       title={title}
+      aria-label={label}
+      aria-current={isActive ? "page" : undefined}
       className={typeof className === "function" ? className(state) : className}
       style={typeof style === "function" ? style(state) : style}
     >
@@ -193,6 +195,7 @@ export default function Sidebar({
                 to={item.to}
                 end={item.end}
                 title={collapsed ? item.label : undefined}
+                label={collapsed ? item.label : undefined}
                 className={({ isActive }) =>
                   collapsed
                     ? `relative mx-auto flex h-9 w-9 items-center justify-center rounded-md transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary ${
@@ -220,7 +223,7 @@ export default function Sidebar({
                     {isActive && collapsed && (
                       <span className="absolute left-1 top-1 bottom-1 w-[3px] rounded-full bg-primary" />
                     )}
-                    <Icon size={16} className="shrink-0" />
+                    <Icon size={16} className="shrink-0" aria-hidden="true" />
                     {!collapsed && <span className="flex-1">{item.label}</span>}
                   </>
                 )}
