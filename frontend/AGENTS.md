@@ -57,10 +57,8 @@ namespaced per user id. For boards it is a cache in front of the server:
   import of any board children that still exist only locally.
 - `lib/kali/realtime/useBoardPoll.ts` polls the open board every 3.5 s to pick up collaborators'
   changes.
-- `lib/kali/api/social-posts.ts` and `social-accounts.ts` still use the legacy fetch wrapper in
-  `lib/kali/api/client.ts`, which is inert unless `NEXT_PUBLIC_KALI_API_URL` is set. The backend has
-  no social-post or social-account routes, so social posts live in `localStorage` only. Move them to
-  `httpClient` when those routes are built; don't add new callers of `client.ts`.
+- `lib/kali/api/social-posts.ts` and `social-accounts.ts` also use `httpClient`. Social posts and the
+  media library keep a per-user `localStorage` cache (keys in `storage.ts`), cleared on sign-out.
 - `AppData.inbox` is deprecated: the Inbox page was removed and legacy items are migrated into a
   board on load. Nothing should read or write it.
 

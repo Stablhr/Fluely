@@ -17,6 +17,7 @@ import {
   resendPasswordResetCode
 } from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
+import {withRedirect} from '@/lib/auth/redirects';
 import {
   authErrorClass,
   authFooterClass,
@@ -68,7 +69,7 @@ export default function VerifyEmailClient() {
           code: code.trim()
         });
         setSuccessMessage('Your email has been verified. You can now sign in.');
-        router.push('/sign-in');
+        router.push(withRedirect('/sign-in'));
       }
     } catch (error) {
       setErrorMessage(getFriendlyErrorMessage(error, 'Verification failed.'));
@@ -148,7 +149,7 @@ export default function VerifyEmailClient() {
           disabled={isSubmitting || !canSubmit}
         >
           {isSubmitting
-            ? 'Verifying...'
+            ? 'Verifying…'
             : isResetMode
               ? 'Verify & Continue'
               : 'Verify Email'}
@@ -162,11 +163,11 @@ export default function VerifyEmailClient() {
           onClick={handleResend}
           disabled={isResending || emailFromQuery.trim().length === 0}
         >
-          {isResending ? 'Resending...' : 'Resend code'}
+          {isResending ? 'Resending…' : 'Resend code'}
         </Button>
 
         {errorMessage && (
-          <div className={authErrorClass}>
+          <div role="alert" className={authErrorClass}>
             {errorMessage}
           </div>
         )}

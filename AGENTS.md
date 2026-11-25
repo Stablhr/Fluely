@@ -8,9 +8,9 @@ reset. The planner UI (boards, calendar, scheduled posts) is ported from
 [Stablhr/Kali](https://github.com/Stablhr/Kali) and lives in `frontend/components/kali/`.
 
 The backend persists boards, lists, cards (with comments, attachments, and covers), collaborators, invitations,
-workspaces, notifications, media (Cloudinary), profiles, and link previews. The browser store caches
-that data and keeps what the API does not serve yet — chiefly social posts and connected social
-accounts.
+workspaces, notifications, media (Cloudinary), profiles, link previews, social posts, connected
+social accounts and publishing jobs. The browser store caches that data per signed-in user; only the
+social media library still lives in the browser alone.
 
 ## Stack
 

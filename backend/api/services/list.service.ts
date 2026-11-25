@@ -255,6 +255,9 @@ export const listService = {
       );
 
       await listRepository.delete(listId, board._id, session);
+      // shortcut: the cards' uploaded files and mentions are not cleaned up here; the app archives
+      // lists rather than deleting them, so only direct API calls reach this. Reuse card removal if that changes.
+      await cardRepository.deleteByList(doomed._id, board._id, session);
 
       const activity = await activityService.log(session, {
         boardId: board._id,

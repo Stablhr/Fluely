@@ -15,13 +15,17 @@ export interface UploadScope {
  * Which Cloudinary folder a file belongs in, decided from where it was
  * attached. A card attachment is the common case (`tasks`), a board-level asset
  * (background/cover) is `boards`, and media uploaded on its own -- e.g. from the
- * content planner's media library -- lands in `contentPlanner`. The `avatars`
- * folder is reserved for profile images.
+ * content planner's media library -- lands in `contentPlanner`. Each has one
+ * subfolder per uploader. The `avatars` folder is reserved for profile images.
  */
-export function folderForMedia(scope: UploadScope = {}): string {
-  if (scope.cardId) return CLOUDINARY_FOLDERS.tasks;
-  if (scope.boardId) return CLOUDINARY_FOLDERS.boards;
-  return CLOUDINARY_FOLDERS.contentPlanner;
+export function folderForMedia(scope: UploadScope, ownerId: {toString(): string}): string {
+  const base = scope.cardId
+    ? CLOUDINARY_FOLDERS.tasks
+    : scope.boardId
+      ? CLOUDINARY_FOLDERS.boards
+      : CLOUDINARY_FOLDERS.contentPlanner;
+  // Per uploader, so `register` can tell whose asset a public id is.
+  return `${base}/${ownerId}`;
 }
 
 /**

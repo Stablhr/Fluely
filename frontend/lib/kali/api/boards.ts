@@ -12,11 +12,8 @@ import type {
 /**
  * Board and collaboration calls.
  *
- * Goes through `httpClient` rather than the hand-rolled fetch in
- * `lib/kali/api/client.ts`: that one sends no cookies, never refreshes a token,
- * and expects an `{ok, data, error}` envelope the backend never sends. Going
- * through the shared client means CSRF, the refresh-on-401 interceptor, and
- * error normalization all keep working.
+ * Goes through the shared `httpClient`, so CSRF, the refresh-on-401
+ * interceptor, and error normalization all keep working.
  *
  * The response types below are the server's own serializers, restated here as
  * interfaces so a change on either side fails at compile time instead of

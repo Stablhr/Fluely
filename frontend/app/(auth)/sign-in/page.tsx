@@ -10,7 +10,7 @@ import {useRouter} from 'next/navigation';
 import {useQueryClient} from '@tanstack/react-query';
 import {login} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
-import {getDashboardPath} from '@/lib/auth/redirects';
+import {getPostAuthPath, withRedirect} from '@/lib/auth/redirects';
 import {holdForMinimum} from '@/lib/auth/loadingCurtain';
 import {meQueryKey} from '@/lib/hooks/auth/useMeQuery';
 import {useLoadingScreen} from '@/lib/provider/LoadingScreenProvider';
@@ -60,7 +60,7 @@ export default function SignInPage() {
       // success: the curtain stays up across the navigation so the dashboard
       // never flashes in behind it.
       await holdForMinimum(startedAt);
-      router.replace(getDashboardPath(user.type));
+      router.replace(getPostAuthPath(user.type));
     } catch (error) {
       hide();
       setErrorMessage(getFriendlyErrorMessage(error, 'Failed to sign in'));
@@ -79,13 +79,16 @@ export default function SignInPage() {
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="email" className={authLabelClass}>
-            Email or Phone Number
+            Email
           </Label>
           <Input
             id="email"
+            // Text, not email: admin accounts sign in with a username.
             type="text"
+            autoComplete="username"
+            spellCheck={false}
             className={authInputClass}
-            placeholder="you@example.com or 09xxxxxxxxx"
+            placeholder="you@example.com"
             value={email}
             onChange={e => setEmail(e.target.value)}
             disabled={isSubmitting}
@@ -106,6 +109,7 @@ export default function SignInPage() {
             <Input
               id="password"
               type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
               className={`${authInputClass} pr-12`}
               placeholder="••••••••"
               value={password}
@@ -118,6 +122,7 @@ export default function SignInPage() {
               onClick={() => setShowPassword(!showPassword)}
               disabled={isSubmitting}
               aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
               className={authPasswordToggleClass}
             >
               {showPassword ? (
@@ -136,15 +141,23 @@ export default function SignInPage() {
           disabled={isSubmitting}
         >
           <LogIn className="size-[18px]" />
-          {isSubmitting ? 'Signing in...' : 'Sign In'}
+          {isSubmitting ? 'Signing in…' : 'Sign In'}
         </Button>
 
-        {errorMessage && <div className={authErrorClass}>{errorMessage}</div>}
+        {errorMessage && <div role="alert" className={authErrorClass}>{errorMessage}</div>}
       </form>
 
       <p className={authFooterClass}>
         Don&apos;t have an account?{' '}
-        <Link href="/sign-up" className={authInlineLinkClass}>
+        <Link
+          href="/sign-up"
+          className={authInlineLinkClass}
+          // Keep an invite's `redirect` when the invitee signs up instead.
+          onClick={e => {
+            e.preventDefault();
+            router.push(withRedirect('/sign-up'));
+          }}
+        >
           Sign up
         </Link>
       </p>

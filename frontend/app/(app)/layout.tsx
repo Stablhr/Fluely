@@ -49,7 +49,7 @@ function AuthGate({
   children: (user: AuthUser) => React.ReactNode;
 }) {
   const router = useRouter();
-  const { data, isLoading, isFetching, isError, isSuccess } = useMeQuery();
+  const { data, isLoading, isError, isSuccess } = useMeQuery();
 
   const isRedirecting = isError || (isSuccess && data.user.type !== "user");
 
@@ -66,7 +66,7 @@ function AuthGate({
     }
   }, [data, isError, isSuccess, router]);
 
-  if (isLoading || isFetching || isRedirecting || !data) return <Loading />;
+  if (isLoading || isRedirecting || !data) return <Loading />;
 
   return <>{children(data.user)}</>;
 }

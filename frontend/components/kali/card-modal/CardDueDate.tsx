@@ -65,7 +65,9 @@ export default function CardDueDate({ card, readOnly = false }: { card: Card; re
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onBlur={() => setDue(value)}
-            autoFocus
+            // Only when the person chose to edit, not every time the card opens.
+            autoFocus={editing}
+            aria-label="Due date"
             className="rounded-md border border-border-strong bg-surface px-2 py-1 font-mono text-[11px] text-text-primary outline-none transition-colors duration-150 focus:border-primary focus:ring-2 focus:ring-primary/20"
           />
           {card.dueDate && (

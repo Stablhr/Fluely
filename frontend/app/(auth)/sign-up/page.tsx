@@ -9,6 +9,7 @@ import {Label} from '@/components/ui/label';
 import {useRouter} from 'next/navigation';
 import {registerCustomer} from '@/lib/api/authApi';
 import {getFriendlyErrorMessage} from '@/lib/api/getFriendlyErrorMessage';
+import {withRedirect} from '@/lib/auth/redirects';
 import {
   authErrorClass,
   authFooterClass,
@@ -57,7 +58,7 @@ export default function SignUpPage() {
         email,
         password,
       });
-      router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+      router.push(withRedirect(`/verify-email?email=${encodeURIComponent(email)}`));
     } catch (error) {
       setErrorMessage(
         getFriendlyErrorMessage(
@@ -77,7 +78,7 @@ export default function SignUpPage() {
           Create an account
         </h2>
         <p className={authSubtitleClass}>
-          Your app highlights 
+          Plan your boards and social posts in one place.
         </p>
       </div>
 
@@ -88,6 +89,7 @@ export default function SignUpPage() {
             className={authInputClass}
             id="firstName"
             type="text"
+            autoComplete="given-name"
             placeholder="Juan"
             value={firstName}
             onChange={e => setFirstName(e.target.value)}
@@ -102,6 +104,7 @@ export default function SignUpPage() {
             className={authInputClass}
             id="lastName"
             type="text"
+            autoComplete="family-name"
             placeholder="Dela Cruz"
             value={lastName}
             onChange={e => setLastName(e.target.value)}
@@ -116,7 +119,9 @@ export default function SignUpPage() {
             className={authInputClass}
             id="username"
             type="text"
-            placeholder="user@123"
+            autoComplete="username"
+            spellCheck={false}
+            placeholder="juandelacruz"
             value={username}
             onChange={e => setUsername(e.target.value)}
             disabled={isSubmitting}
@@ -130,6 +135,8 @@ export default function SignUpPage() {
             id="email"
             className={authInputClass}
             type="email"
+            autoComplete="email"
+            spellCheck={false}
             placeholder="you@example.com"
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -145,6 +152,8 @@ export default function SignUpPage() {
               className={`${authInputClass} pr-12`}
               id="password"
               type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              aria-describedby="password-rules"
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -155,12 +164,14 @@ export default function SignUpPage() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               disabled={isSubmitting}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
               className={authPasswordToggleClass}
             >
               {showPassword ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
             </button>
           </div>
-          <ul className="space-y-1 text-xs">
+          <ul id="password-rules" className="space-y-1 text-xs">
             {[
               { label: 'At least 8 characters', ok: password.length >= 8 },
               { label: 'At least one uppercase letter', ok: /[A-Z]/.test(password) },
@@ -169,7 +180,8 @@ export default function SignUpPage() {
               { label: 'At least one special character', ok: /[^A-Za-z0-9]/.test(password) },
             ].map((req) => (
               <li key={req.label} className={req.ok ? 'text-success-text' : 'text-text-muted'}>
-                {req.ok ? '✓' : '○'} {req.label}
+                <span aria-hidden="true">{req.ok ? '✓' : '○'}</span> {req.label}
+                <span className="sr-only">{req.ok ? ' (met)' : ' (not met)'}</span>
               </li>
             ))}
           </ul>
@@ -180,6 +192,7 @@ export default function SignUpPage() {
           <Input
             className={authInputClass}
             id="confirmPassword"
+            autoComplete="new-password"
             placeholder="••••••••"
             type="password"
             value={confirmPassword}
@@ -196,11 +209,11 @@ export default function SignUpPage() {
           disabled={isSubmitting}
         >
           <UserPlus className="size-[18px]" />
-          {isSubmitting ? 'Creating account...' : 'Create Account'}
+          {isSubmitting ? 'Creating account…' : 'Create Account'}
         </Button>
 
         {errorMessage && (
-          <div className={authErrorClass}>
+          <div role="alert" className={authErrorClass}>
             {errorMessage}
           </div>
         )}

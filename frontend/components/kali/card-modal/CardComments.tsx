@@ -95,12 +95,14 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
 
   // Make sure the board roster (with avatar URLs) is loaded so comment authors
   // resolve to their real name + photo instead of the generic fallback.
+  // Not `store` as a dependency: loading collaborators updates the store, which
+  // would rerun this effect forever.
+  const { loadCollaborators } = store
+  const boardReady = Boolean(store.data.boards[card.boardId]?.ownerId) &&
+    store.data.boards[card.boardId]?.revision !== null
   useEffect(() => {
-    const board = store.data.boards[card.boardId]
-    if (board?.ownerId && board.revision !== null) {
-      void store.loadCollaborators(card.boardId)
-    }
-  }, [card.boardId, store])
+    if (boardReady) void loadCollaborators(card.boardId)
+  }, [card.boardId, boardReady, loadCollaborators])
 
   // Convert composer text (which uses `@Name` for mentions) into the structured
   // `@[id|Name]` form the store/backend expect, so ids never appear in the UI.
@@ -498,6 +500,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
             onChange={handleChange}
             onKeyDown={(e) => handleKeyDown(e, 'main', null)}
             placeholder="Write a comment…"
+            aria-label="Write a comment, press Enter to post"
             className="w-full rounded-2xl border border-border-strong bg-surface px-4 py-3 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:border-primary/20"
           />
           {mentionOpen && filteredMembers.length > 0 && (
@@ -560,6 +563,7 @@ export default function CardComments({ card, readOnly = false, highlightCommentI
                       onChange={handleReplyChange}
                       onKeyDown={(e) => handleKeyDown(e, 'reply', comment.id)}
                       placeholder="Write a reply…"
+                      aria-label="Write a reply, press Enter to post"
                       className="w-full rounded-2xl border border-border-strong bg-surface px-4 py-2.5 text-sm text-text-primary outline-none transition-colors duration-150 placeholder:text-text-muted focus:border-primary focus:ring-2 focus:border-primary/20"
                     />
                     {mentionOpen && filteredMembers.length > 0 && (

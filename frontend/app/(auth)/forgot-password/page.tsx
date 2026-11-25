@@ -82,11 +82,11 @@ export default function ForgotPasswordPage() {
           disabled={isSubmitting}
         >
           <Send className="size-[18px]" />
-          {isSubmitting ? 'Sending...' : 'Send Code'}
+          {isSubmitting ? 'Sending…' : 'Send Code'}
         </Button>
 
         {errorMessage && (
-          <div className={authErrorClass}>
+          <div role="alert" className={authErrorClass}>
             {errorMessage}
           </div>
         )}

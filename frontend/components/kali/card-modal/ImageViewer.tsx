@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft, ChevronRight, ExternalLink, Download, Trash2, ImageIcon } from 'lucide-react'
-import type { FileAttachment } from '@/lib/kali/store/schema'
 
 export interface ViewerImage {
   url: string

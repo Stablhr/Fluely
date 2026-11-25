@@ -12,6 +12,9 @@ import {assertBoardRevision} from './boardRevision';
 import {listRepository} from '../repositories/list.repository';
 import {cardRepository} from '../repositories/card.repository';
 import {mediaRepository} from '../repositories/media.repository';
+import {mentionRepository} from '../repositories/mention.repository';
+import {notificationRepository} from '../repositories/notification.repository';
+import {destroyMediaAssets} from './media.service';
 import {activityLogRepository} from '../repositories/activityLog.repository';
 import {listService} from './list.service';
 import {cardService} from './card.service';
@@ -339,7 +342,7 @@ export const boardService = {
       lists: [...ordered, ...orphans].map(list =>
         listService.serialize(list, derivedOrder.get(list._id.toString()))
       ),
-      cards: await Promise.all(cards.map(card => cardService.serialize(card))),
+      cards: await cardService.serializeMany(cards),
       revision: board.revision
     };
   },
@@ -466,11 +469,12 @@ export const boardService = {
       throw new ApiError(403, ErrorCodes.FORBIDDEN, 'Only the board owner can do that');
     }
 
+    const files = await mediaRepository.listForBoards([board._id]);
     const result = await withProductTransaction(async session => {
       await boardCollaboratorRepository.deleteForBoard(board._id, session);
       await listRepository.deleteForBoard(board._id, session);
       await cardRepository.deleteForBoard(board._id, session);
-      await mediaRepository.deleteForBoard(board._id);
+      await mediaRepository.deleteForBoard(board._id, session);
       await activityLogRepository.deleteForBoard(board._id, session);
       await boardRepository.delete(board._id.toString(), session);
 
@@ -487,6 +491,9 @@ export const boardService = {
       return {activity};
     });
 
+    await mentionRepository.deleteForBoard(board._id);
+    await notificationRepository.deleteForBoard(board._id);
+    await destroyMediaAssets(files);
     logger.info({boardId: board._id.toString()}, 'Board deleted');
     return {message: 'Board deleted'};
   },

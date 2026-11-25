@@ -123,8 +123,33 @@ export function clearData(userId?: string | null): void {
 
 /* ── Social Posts persistence ─────────────────────────────── */
 
-const SOCIAL_POSTS_KEY = "kali-social-posts";
 const SOCIAL_POSTS_VERSION = 1;
+
+// Per-user keys, like `storageKey`, so a shared browser never shows or imports
+// another account's posts or media.
+export const socialPostsKey = (userId: string) => `kali-social-posts:${userId}`;
+export const socialPostsImportedKey = (userId: string) => `kali_social_posts_imported:${userId}`;
+export const mediaLibraryKey = (userId: string) => `kali-media-library:${userId}`;
+
+// The old un-keyed caches. Posts never imported to the server, and the media
+// library (browser-only), go to the first account that opens them rather than
+// being lost -- what the shared keys did before. Everything else is dropped.
+const LEGACY_POSTS_KEY = "kali-social-posts";
+const LEGACY_IMPORTED_KEY = "kali_social_posts_imported";
+const LEGACY_SOCIAL_KEYS = [LEGACY_POSTS_KEY, LEGACY_IMPORTED_KEY];
+export const LEGACY_MEDIA_LIBRARY_KEY = "kali-media-library";
+
+/** Removes the signed-in user's cached posts/media and any legacy global caches. */
+export function clearSocialCache(userId?: string | null): void {
+  try {
+    const keys = userId
+      ? [socialPostsKey(userId), socialPostsImportedKey(userId), mediaLibraryKey(userId)]
+      : [];
+    [...keys, ...LEGACY_SOCIAL_KEYS, LEGACY_MEDIA_LIBRARY_KEY].forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // ignore
+  }
+}
 
 function migrateSocialPostPlatform(
   p: Record<string, unknown>,
@@ -181,9 +206,16 @@ function migrateSocialPosts(data: unknown): SocialPost[] {
   });
 }
 
-export function loadSocialPosts(): SocialPost[] {
+export function loadSocialPosts(userId: string | null): SocialPost[] {
+  if (!userId) return [];
   try {
-    const raw = localStorage.getItem(SOCIAL_POSTS_KEY);
+    const legacy = localStorage.getItem(LEGACY_POSTS_KEY);
+    const neverImported = localStorage.getItem(LEGACY_IMPORTED_KEY) !== "1";
+    if (legacy !== null && neverImported && localStorage.getItem(socialPostsKey(userId)) === null) {
+      localStorage.setItem(socialPostsKey(userId), legacy);
+    }
+    LEGACY_SOCIAL_KEYS.forEach((k) => localStorage.removeItem(k));
+    const raw = localStorage.getItem(socialPostsKey(userId));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as { version?: number; data?: unknown };
     if (!parsed || typeof parsed !== "object") return [];
@@ -196,10 +228,11 @@ export function loadSocialPosts(): SocialPost[] {
   }
 }
 
-export function saveSocialPosts(posts: SocialPost[]): void {
+export function saveSocialPosts(posts: SocialPost[], userId: string | null): void {
+  if (!userId) return;
   try {
     const payload = { version: SOCIAL_POSTS_VERSION, data: posts };
-    localStorage.setItem(SOCIAL_POSTS_KEY, JSON.stringify(payload));
+    localStorage.setItem(socialPostsKey(userId), JSON.stringify(payload));
   } catch {
     throw new Error(
       "Could not save social posts — browser storage is full. Remove large media attachments to continue.",

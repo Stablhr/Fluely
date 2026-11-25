@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { SocialMediaAttachment } from '@/lib/kali/store/schema'
-
-const STORAGE_KEY = 'kali-media-library'
+import { LEGACY_MEDIA_LIBRARY_KEY, mediaLibraryKey } from '@/lib/kali/store/storage'
+import { useCurrentUserId } from '@/lib/hooks/auth/useMeQuery'
 
 export interface MediaLibraryItem {
   id: string
@@ -19,9 +19,19 @@ export interface MediaLibraryItem {
 type Listener = (items: MediaLibraryItem[]) => void
 const listeners = new Set<Listener>()
 
-function readStore(): MediaLibraryItem[] {
+function readStore(userId: string | null): MediaLibraryItem[] {
+  if (!userId) return []
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    // The old shared library lived only in this browser; hand it to the first
+    // account that opens it rather than lose it.
+    const legacy = localStorage.getItem(LEGACY_MEDIA_LIBRARY_KEY)
+    if (legacy !== null) {
+      if (localStorage.getItem(mediaLibraryKey(userId)) === null) {
+        localStorage.setItem(mediaLibraryKey(userId), legacy)
+      }
+      localStorage.removeItem(LEGACY_MEDIA_LIBRARY_KEY)
+    }
+    const raw = localStorage.getItem(mediaLibraryKey(userId))
     if (!raw) return []
     return JSON.parse(raw) as MediaLibraryItem[]
   } catch {
@@ -29,11 +39,12 @@ function readStore(): MediaLibraryItem[] {
   }
 }
 
-function writeStore(items: MediaLibraryItem[]) {
+function writeStore(items: MediaLibraryItem[], userId: string | null) {
+  if (!userId) return
   try {
     // Cap the number of library entries to avoid localStorage overflow.
     const trimmed = items.slice(0, 60)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed))
+    localStorage.setItem(mediaLibraryKey(userId), JSON.stringify(trimmed))
     listeners.forEach((l) => l(trimmed))
   } catch {
     // Storage may be full — drop silently
@@ -41,7 +52,8 @@ function writeStore(items: MediaLibraryItem[]) {
 }
 
 export function useMediaLibrary() {
-  const [items, setItems] = useState<MediaLibraryItem[]>(readStore)
+  const userId = useCurrentUserId()
+  const [items, setItems] = useState<MediaLibraryItem[]>(() => readStore(userId))
 
   useEffect(() => {
     const listener = (next: MediaLibraryItem[]) => setItems(next)
@@ -62,14 +74,14 @@ export function useMediaLibrary() {
       platformCompat: media.platformCompat ?? [],
       addedAt: new Date().toISOString(),
     }
-    const next = [entry, ...readStore().filter((i) => i.id !== entry.id)]
-    writeStore(next)
+    const next = [entry, ...readStore(userId).filter((i) => i.id !== entry.id)]
+    writeStore(next, userId)
     return entry
-  }, [])
+  }, [userId])
 
   const removeFromLibrary = useCallback((id: string) => {
-    writeStore(readStore().filter((i) => i.id !== id))
-  }, [])
+    writeStore(readStore(userId).filter((i) => i.id !== id), userId)
+  }, [userId])
 
   return { items, addToLibrary, removeFromLibrary }
 }

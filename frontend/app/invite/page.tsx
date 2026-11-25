@@ -52,7 +52,7 @@ export default function InvitePage() {
     if (isLoading) return
     if (!isSuccess) {
       // Not signed in: send to sign-in, preserving the token.
-      router.replace(`/sign-in?redirect=${encodeURIComponent(`/invite?token=${token}`)}`)
+      router.replace(`/sign-in?redirect=${encodeURIComponent(`/invite?token=${encodeURIComponent(token)}`)}`)
       return
     }
     // `loading` starts true and `error` null, and this runs once per token, so

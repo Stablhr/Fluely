@@ -41,6 +41,17 @@ jest.mock('../api/utils/transaction', () => ({
     work(undefined)
 }));
 
+// What a deleted card leaves behind (files, mentions, notifications).
+jest.mock('../api/repositories/media.repository', () => ({
+  mediaRepository: {findByIds: jest.fn(), listByCard: jest.fn(), deleteByCard: jest.fn()}
+}));
+jest.mock('../api/repositories/mention.repository', () => ({
+  mentionRepository: {deleteByCard: jest.fn()}
+}));
+jest.mock('../api/repositories/notification.repository', () => ({
+  notificationRepository: {deleteMentionsForCard: jest.fn()}
+}));
+
 jest.mock('../api/services/activity.service', () => ({
   activityService: {
     // The implementation is re-installed in `beforeEach` — `resetAllMocks`
@@ -56,6 +67,7 @@ import {boardRepository} from '../api/repositories/board.repository';
 import {listService} from '../api/services/list.service';
 import {cardService} from '../api/services/card.service';
 import {activityService} from '../api/services/activity.service';
+import {mediaRepository} from '../api/repositories/media.repository';
 
 const BOARD = new Types.ObjectId('ccccccccccccccccccccccc1');
 const OTHER_BOARD = new Types.ObjectId('ccccccccccccccccccccccc2');
@@ -152,6 +164,8 @@ beforeEach(() => {
   // `mockResolvedValueOnce` queue, and a leftover value from a previous test
   // would make a call that should return null succeed instead.
   jest.resetAllMocks();
+  (mediaRepository.findByIds as jest.Mock).mockImplementation(async () => []);
+  (mediaRepository.listByCard as jest.Mock).mockImplementation(async () => []);
   allowBump();
   mockedBoards.update.mockResolvedValue({matchedCount: 1} as never);
   installActivityLog();

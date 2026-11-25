@@ -23,7 +23,7 @@ const BoardPresenceSchema = new Schema<BoardPresenceDocument>(
       required: true
     },
     name: {type: String, required: true},
-    lastSeenAt: {type: Date, required: true, index: true}
+    lastSeenAt: {type: Date, required: true}
   },
   {timestamps: true}
 );

@@ -77,13 +77,22 @@ async function findRowOrThrow(
 }
 
 export const boardCollaboratorService = {
-  /** Owner-only, enforced by the route. */
-  async list(board: BoardDocument) {
-    const rows = await boardCollaboratorRepository.listForBoard(board._id);
+  /**
+   * Anyone who can read the board. Only the owner sees invitations and email
+   * addresses: a public board is readable by every signed-in user.
+   */
+  async list(board: BoardDocument, actor: Actor) {
+    const isOwner = board.ownerId.equals(actor.actorId);
+    const rows = (await boardCollaboratorRepository.listForBoard(board._id)).filter(
+      row => isOwner || row.status === 'accepted'
+    );
     const people = await Promise.all(
       rows.map(row => userRepository.findById(row.userId.toString()))
     );
-    return rows.map((row, index) => serializeCollaborator(row, people[index]));
+    return rows.map((row, index) => {
+      const collaborator = serializeCollaborator(row, people[index]);
+      return isOwner ? collaborator : {...collaborator, email: ''};
+    });
   },
 
   /**
@@ -114,7 +123,8 @@ export const boardCollaboratorService = {
         'That person already has access to this board'
       );
     }
-    if (existing && existing.status === 'pending') {
+    const stillPending = existing?.status === 'pending' && !(existing.expiresAt && existing.expiresAt < new Date());
+    if (stillPending) {
       throw new ApiError(
         409,
         ErrorCodes.COLLABORATOR_EXISTS,
@@ -127,18 +137,29 @@ export const boardCollaboratorService = {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     const result = await withProductTransaction(async session => {
-      const row = await boardCollaboratorRepository.create(
-        {
-          boardId: board._id,
-          userId: invitee._id,
-          role,
-          status: 'pending',
-          invitedBy: actor.actorId,
-          inviteTokenHash: tokenHash,
-          expiresAt
-        },
-        session
-      );
+      const fields = {
+        role,
+        status: 'pending' as const,
+        invitedBy: actor.actorId,
+        inviteTokenHash: tokenHash,
+        expiresAt
+      };
+      // One row per board and person (unique index): a declined or expired
+      // invitation is reopened rather than duplicated.
+      let row;
+      if (existing) {
+        await boardCollaboratorRepository.update(
+          existing._id.toString(),
+          {...fields, invitedAt: new Date(), respondedAt: null},
+          session
+        );
+        row = Object.assign(existing, fields);
+      } else {
+        row = await boardCollaboratorRepository.create(
+          {boardId: board._id, userId: invitee._id, ...fields},
+          session
+        );
+      }
 
       const activity = await activityService.log(session, {
         boardId: board._id,
@@ -284,6 +305,10 @@ export const boardCollaboratorService = {
           `This invitation was already ${row.status}`
         );
       }
+      if (row.expiresAt && row.expiresAt.getTime() < Date.now()) {
+        await boardCollaboratorRepository.setStatus(row._id.toString(), 'expired', new Date(), session);
+        return {row, activity: null, expired: true};
+      }
 
       await boardCollaboratorRepository.setStatus(
         row._id.toString(),
@@ -312,8 +337,12 @@ export const boardCollaboratorService = {
         });
       }
 
-      return {row, activity};
+      return {row, activity, expired: false};
     });
+    // After the transaction, so the row stays marked expired.
+    if (result.expired) {
+      throw new ApiError(410, ErrorCodes.INVITATION_EXPIRED, 'This invitation has expired');
+    }
 
     const board = await boardRepository.findById(result.row.boardId.toString());
     logger.info(

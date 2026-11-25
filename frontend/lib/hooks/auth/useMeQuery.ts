@@ -1,4 +1,4 @@
-import {useQuery} from '@tanstack/react-query';
+import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {getMe} from '@/lib/api/authApi';
 import type {NormalizedApiError} from '@/lib/api/types';
 
@@ -16,6 +16,11 @@ function shouldRetry(failureCount: number, error: unknown): boolean {
   const status = (error as Partial<NormalizedApiError> | null)?.status;
   if (status === 401 || status === 403) return false;
   return failureCount < 2;
+}
+
+/** The signed-in user's id from the cached session, without subscribing to refetches. */
+export function useCurrentUserId(): string | null {
+  return useQueryClient().getQueryData<Awaited<ReturnType<typeof getMe>>>(meQueryKey)?.user.id ?? null;
 }
 
 export function useMeQuery() {

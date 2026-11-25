@@ -1,4 +1,5 @@
 import path from 'path';
+import {logger} from '../logging/logger';
 import {Types} from 'mongoose';
 import {mediaRepository} from '../repositories/media.repository';
 import {boardRepository} from '../repositories/board.repository';
@@ -93,6 +94,22 @@ async function resolveUploadScope(
   return {boardId, cardId};
 }
 
+/**
+ * Deletes files from Cloudinary after their rows are gone. Best-effort: a
+ * failure is logged, never thrown, since the delete it follows has committed.
+ */
+export async function destroyMediaAssets(rows: {publicId?: string | null; resourceType?: string | null}[]) {
+  await Promise.all(
+    rows
+      .filter(row => row.publicId)
+      .map(row =>
+        deleteFromCloudinary(row.publicId!, toResourceType(row.resourceType ?? 'image')).catch(err =>
+          logger.warn({err, publicId: row.publicId}, 'Could not delete a file from Cloudinary')
+        )
+      )
+  );
+}
+
 export const mediaService = {
   /**
    * Streams every uploaded buffer to Cloudinary, then records one row per file.
@@ -124,7 +141,7 @@ export const mediaService = {
       );
     }
 
-    const folder = folderForMedia({boardId: scope.boardId, cardId: scope.cardId});
+    const folder = folderForMedia({boardId: scope.boardId, cardId: scope.cardId}, ownerId);
 
     const uploaded: {file: UploadedFile; result: Awaited<ReturnType<typeof uploadToCloudinary>>}[] =
       [];
@@ -234,7 +251,7 @@ export const mediaService = {
         'Media storage is not configured'
       );
     }
-    const folder = folderForMedia(scope);
+    const folder = folderForMedia(scope, ownerId);
     const timestamp = Math.round(Date.now() / 1000);
     // Every parameter the browser sends to Cloudinary must appear here, or the
     // signature will not match and Cloudinary rejects the upload. The resource
@@ -304,10 +321,15 @@ export const mediaService = {
     if (!asset || !isOwnCloudinaryUrl(asset.secureUrl)) {
       throw new ApiError(400, ErrorCodes.VALIDATION_ERROR, 'That upload could not be found');
     }
-    // The signature only allowed uploads into the scope's folder, so an asset
-    // anywhere else was not uploaded through it (or not for this scope).
-    if (asset.folder !== folderForMedia(scope)) {
+    // The signature only allowed uploads into this uploader's folder for the
+    // scope, so an asset anywhere else -- including someone else's -- was not
+    // uploaded through it.
+    if (asset.folder !== folderForMedia(scope, ownerId)) {
       throw new ApiError(400, ErrorCodes.VALIDATION_ERROR, 'That upload does not belong here');
+    }
+    // A second row for one asset would delete the file out from under the first.
+    if (await mediaRepository.existsByPublicId(data.publicId)) {
+      throw new ApiError(409, ErrorCodes.VALIDATION_ERROR, 'That upload is already registered');
     }
     if (asset.bytes > mediaConfig.maxFileSizeBytes) {
       throw new ApiError(

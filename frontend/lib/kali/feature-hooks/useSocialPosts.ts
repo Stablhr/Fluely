@@ -11,7 +11,8 @@ import {
   type ReminderDueEventDetail,
   type ScheduleResultEventDetail,
 } from '@/lib/kali/api/social-posts'
-import { loadSocialPosts, saveSocialPosts } from '@/lib/kali/store/storage'
+import { loadSocialPosts, saveSocialPosts, socialPostsImportedKey } from '@/lib/kali/store/storage'
+import { useCurrentUserId } from '@/lib/hooks/auth/useMeQuery'
 import { localToUTC } from '@/lib/kali/utils/timezones'
 import type { SocialPost, SocialPostPlatform, SocialMediaAttachment, SocialAnalytics, PublishingJob, Platform } from '@/lib/kali/store/schema'
 
@@ -37,11 +38,9 @@ function toSocialPost(raw: AnyRecord): SocialPost {
  * copy the server is the source of truth and localStorage is just a cache, so
  * the copy must not repeat (it would bring back posts a teammate deleted).
  */
-const IMPORTED_KEY = 'kali_social_posts_imported'
-
-function alreadyImported(): boolean {
+function alreadyImported(userId: string): boolean {
   try {
-    return window.localStorage.getItem(IMPORTED_KEY) === '1'
+    return window.localStorage.getItem(socialPostsImportedKey(userId)) === '1'
   } catch {
     return true
   }
@@ -55,7 +54,8 @@ const SYNC_DELAY_MS = 400
  * Provides the same interface as the store methods so StoreProvider can delegate to it.
  */
 export function useSocialPosts() {
-  const [posts, setPosts] = useState<SocialPost[]>(() => loadSocialPosts())
+  const userId = useCurrentUserId()
+  const [posts, setPosts] = useState<SocialPost[]>(() => loadSocialPosts(userId))
   const [loading, setLoading] = useState(true)
   const [isOnline, setIsOnline] = useState(true)
   const [jobs, setJobs] = useState<PublishingJob[]>([])
@@ -70,11 +70,11 @@ export function useSocialPosts() {
     let cancelled = false
     async function load() {
       try {
-        if (!alreadyImported()) {
-          const local = loadSocialPosts()
+        if (userId && !alreadyImported(userId)) {
+          const local = loadSocialPosts(userId)
           if (local.length > 0) await socialPostsApi.importLocal(local)
           try {
-            window.localStorage.setItem(IMPORTED_KEY, '1')
+            window.localStorage.setItem(socialPostsImportedKey(userId), '1')
           } catch {
             // ignore
           }
@@ -82,7 +82,7 @@ export function useSocialPosts() {
         const data = await socialPostsApi.list()
         if (!cancelled) {
           setPosts(data.map((p) => toSocialPost(p as unknown as AnyRecord)))
-          saveSocialPosts(data)
+          saveSocialPosts(data, userId)
           setIsOnline(true)
         }
       } catch {
@@ -93,19 +93,19 @@ export function useSocialPosts() {
     }
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [userId])
 
   // Debounced localStorage sync
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
-        saveSocialPosts(postsRef.current)
+        saveSocialPosts(postsRef.current, userId)
       } catch {
         // ignore
       }
     }, 400)
     return () => window.clearTimeout(timer)
-  }, [posts])
+  }, [posts, userId])
 
   const mutate = useCallback((fn: (prev: SocialPost[]) => SocialPost[]) => {
     setPosts(fn)

@@ -84,6 +84,7 @@ export default function ResetPasswordPage() {
               className={`${authInputClass} pr-12`}
               id="password"
               type={showPassword ? 'text' : 'password'}
+              autoComplete="new-password"
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -94,6 +95,8 @@ export default function ResetPasswordPage() {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               disabled={isSubmitting}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword}
               className={authPasswordToggleClass}
             >
               {showPassword ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
@@ -122,11 +125,11 @@ export default function ResetPasswordPage() {
           disabled={isSubmitting}
         >
           <KeyRound className="size-[18px]" />
-          {isSubmitting ? 'Resetting...' : 'Reset Password'}
+          {isSubmitting ? 'Resetting…' : 'Reset Password'}
         </Button>
 
         {errorMessage && (
-          <div className={authErrorClass}>
+          <div role="alert" className={authErrorClass}>
             {errorMessage}
           </div>
         )}

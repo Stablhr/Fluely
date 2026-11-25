@@ -1,6 +1,6 @@
 import {Request, Response, NextFunction} from 'express';
 import {CookieOptions} from 'express';
-import {authService, toPublicAccount} from '../services/auth.service';
+import {REFRESH_TOKEN_REUSED, authService, toPublicAccount} from '../services/auth.service';
 import {ApiError} from '../utils/error';
 import {ErrorCodes} from '../constants/errorCodes';
 import {env} from '../config/env';
@@ -122,9 +122,11 @@ export const authController = {
 
       res.status(200).json({message: 'Refreshed'});
     } catch (error) {
-      const opts = COOKIE_OPTIONS;
-      res.clearCookie(ACCESS_TOKEN_COOKIE, opts);
-      res.clearCookie(REFRESH_TOKEN_COOKIE, opts);
+      if (!(error instanceof ApiError && error.message === REFRESH_TOKEN_REUSED)) {
+        const opts = COOKIE_OPTIONS;
+        res.clearCookie(ACCESS_TOKEN_COOKIE, opts);
+        res.clearCookie(REFRESH_TOKEN_COOKIE, opts);
+      }
       next(error);
     }
   },
@@ -186,12 +188,14 @@ export const authController = {
         throw new ApiError(401, ErrorCodes.UNAUTHORIZED, 'Not authenticated');
       }
 
-      await authService.changePassword(
+      const tokens = await authService.changePassword(
         req.auth.userId,
         req.auth.type ?? 'user',
         req.body.currentPassword,
         req.body.newPassword
       );
+      res.cookie(ACCESS_TOKEN_COOKIE, tokens.accessToken, {...COOKIE_OPTIONS, maxAge: ACCESS_TOKEN_MAX_AGE_MS});
+      res.cookie(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {...COOKIE_OPTIONS, maxAge: REFRESH_TOKEN_MAX_AGE_MS});
 
       res.status(200).json({message: 'Password changed successfully'});
     } catch (error) {

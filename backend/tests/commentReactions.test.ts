@@ -25,6 +25,7 @@ import {BoardModel} from '../api/models/Board.model';
 import {BoardCollaboratorModel} from '../api/models/BoardCollaborator.model';
 import {ListModel} from '../api/models/List.model';
 import {CardModel} from '../api/models/Card.model';
+import {MediaAttachmentModel} from '../api/models/MediaAttachment.model';
 
 jest.setTimeout(30_000);
 
@@ -310,6 +311,140 @@ describe('the card PATCH no longer writes reactions', () => {
     const stored = await CardModel.findById(card._id).lean();
     expect(stored?.comments[0].reactions).toEqual({[THUMBS]: {userIds: [owner._id]}});
     expect(stored?.comments[1].reactions ?? {}).toEqual({});
+  });
+});
+
+describe('what an editor may write on a card', () => {
+  function patchCard(userId: Types.ObjectId, boardId: Types.ObjectId, cardId: Types.ObjectId, body: object) {
+    const session = sessionFor(userId);
+    return request(app)
+      .patch(`/api/boards/${boardId.toString()}/cards/${cardId.toString()}`)
+      .set('Cookie', session.cookie)
+      .set('X-CSRF-Token', session.csrf)
+      .send(body);
+  }
+
+  it("cannot rewrite, delete or forge someone else's comment", async () => {
+    const {owner, board, card} = await setup();
+    const editor = await createUser();
+    await addCollaborator(board._id, editor._id, owner._id, 'editor');
+
+    const res = await patchCard(editor._id, board._id, card._id, {
+      comments: [{id: 'comment-2', authorId: owner._id.toString(), text: 'Owner says ship it'}]
+    });
+
+    expect(res.status).toBe(200);
+    const stored = await CardModel.findById(card._id).lean();
+    expect(stored?.comments.map(c => [c.id, c.text, String(c.authorId)])).toEqual([
+      ['comment-2', 'Owner says ship it', editor._id.toString()],
+      ['comment-1', 'Looks good', owner._id.toString()]
+    ]);
+
+    const edit = await patchCard(editor._id, board._id, card._id, {
+      comments: [{id: 'comment-1', text: 'Changed'}]
+    });
+    expect(edit.status).toBe(200);
+    const after = await CardModel.findById(card._id).lean();
+    expect(after?.comments.find(c => c.id === 'comment-1')?.text).toBe('Looks good');
+  });
+
+  it("cannot attach another user's private file", async () => {
+    const {owner, board, card} = await setup();
+    const editor = await createUser();
+    const stranger = await createUser();
+    await addCollaborator(board._id, editor._id, owner._id, 'editor');
+    const privateFile = await MediaAttachmentModel.create({
+      ownerId: stranger._id,
+      kind: 'image',
+      resourceType: 'image',
+      originalName: 'secret.png',
+      url: 'https://res.cloudinary.com/demo/image/upload/secret.png',
+      publicId: 'fluely/content-planner/secret',
+      mimeType: 'image/png',
+      sizeBytes: 10
+    });
+
+    const res = await patchCard(editor._id, board._id, card._id, {mediaIds: [privateFile._id.toString()]});
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).not.toContain('secret.png');
+
+    const own = await MediaAttachmentModel.create({
+      ownerId: editor._id,
+      kind: 'image',
+      resourceType: 'image',
+      originalName: 'mine.png',
+      url: 'https://res.cloudinary.com/demo/image/upload/mine.png',
+      publicId: 'fluely/content-planner/mine',
+      mimeType: 'image/png',
+      sizeBytes: 10
+    });
+    expect((await patchCard(editor._id, board._id, card._id, {mediaIds: [own._id.toString()]})).status).toBe(200);
+  });
+});
+
+describe('invitations and the people list', () => {
+  function call(userId: Types.ObjectId, method: 'get' | 'post', path: string, body: object = {}) {
+    const session = sessionFor(userId);
+    const req = request(app)[method](path).set('Cookie', session.cookie).set('X-CSRF-Token', session.csrf);
+    return method === 'post' ? req.send(body) : req;
+  }
+
+  it('invites someone again after they declined', async () => {
+    const {owner, board} = await setup();
+    const invitee = await createUser();
+    const invite = () =>
+      call(owner._id, 'post', `/api/boards/${board._id}/collaborators`, {email: invitee.email, role: 'editor'});
+
+    const first = await invite();
+    expect(first.status).toBe(201);
+    const row = await BoardCollaboratorModel.findOne({boardId: board._id, userId: invitee._id});
+    expect((await call(invitee._id, 'post', `/api/boards/invitations/${row!._id}`, {decision: 'declined'})).status).toBe(200);
+
+    const again = await invite();
+    expect(again.status).toBe(201);
+    const rows = await BoardCollaboratorModel.find({boardId: board._id, userId: invitee._id});
+    expect(rows.map(r => r.status)).toEqual(['pending']);
+  });
+
+  it('refuses to accept an expired invitation by id', async () => {
+    const {owner, board} = await setup();
+    const invitee = await createUser();
+    const row = await BoardCollaboratorModel.create({
+      boardId: board._id,
+      userId: invitee._id,
+      role: 'editor',
+      status: 'pending',
+      invitedBy: owner._id,
+      expiresAt: new Date(Date.now() - 1000)
+    });
+    const res = await call(invitee._id, 'post', `/api/boards/invitations/${row._id}`, {decision: 'accepted'});
+    expect(res.status).toBe(410);
+    expect((await BoardCollaboratorModel.findById(row._id))?.status).toBe('expired');
+  });
+
+  it('shows emails and invitations only to the owner', async () => {
+    const {owner, board} = await setup();
+    const editor = await createUser();
+    const invited = await createUser();
+    await addCollaborator(board._id, editor._id, owner._id, 'editor');
+    await BoardCollaboratorModel.create({
+      boardId: board._id,
+      userId: invited._id,
+      role: 'viewer',
+      status: 'pending',
+      invitedBy: owner._id,
+      expiresAt: new Date(Date.now() + 60_000)
+    });
+
+    const forOwner = (await call(owner._id, 'get', `/api/boards/${board._id}/collaborators`)).body.collaborators;
+    expect(forOwner.map((c: {email: string}) => c.email).sort()).toEqual([editor.email, invited.email].sort());
+
+    const forEditor = (await call(editor._id, 'get', `/api/boards/${board._id}/collaborators`)).body.collaborators;
+    expect(forEditor.map((c: {userId: string; email: string}) => [c.userId, c.email])).toEqual([
+      [editor._id.toString(), '']
+    ]);
+    const members = (await call(editor._id, 'get', `/api/boards/${board._id}/members`)).body.members;
+    expect(members.every((m: {email: string}) => m.email === '')).toBe(true);
   });
 });
 

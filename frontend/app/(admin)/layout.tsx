@@ -12,7 +12,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const {data, isLoading, isFetching, isError, isSuccess} = useMeQuery();
+  const {data, isLoading, isError, isSuccess} = useMeQuery();
 
   const isRedirecting = isError || (isSuccess && data.user.type !== 'admin');
 
@@ -29,7 +29,7 @@ export default function AdminLayout({
     }
   }, [data, isError, isSuccess, router]);
 
-  if (isLoading || isFetching || isRedirecting) return <Loading />;
+  if (isLoading || isRedirecting) return <Loading />;
 
   return <>{children}</>;
 }
