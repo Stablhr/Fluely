@@ -47,6 +47,9 @@ export interface BaseUserDocument extends mongoose.Document {
   verificationExpiry?: Date | null;
   resetCode?: string | null;
   resetExpiry?: Date | null;
+  /** Wrong guesses at the current code; the code stops working after a few. */
+  verificationAttempts?: number;
+  resetAttempts?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,7 +90,9 @@ export function createBaseUserSchema<T extends BaseUserDocument>() {
       verificationCode: {type: String, default: null},
       verificationExpiry: {type: Date, default: null},
       resetCode: {type: String, default: null},
-      resetExpiry: {type: Date, default: null}
+      resetExpiry: {type: Date, default: null},
+      verificationAttempts: {type: Number, default: 0},
+      resetAttempts: {type: Number, default: 0}
     },
     {timestamps: true}
   );

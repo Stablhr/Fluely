@@ -68,6 +68,12 @@ const PublishingJobSchema = new Schema<PublishingJobDocument>(
 PublishingJobSchema.index({workspaceId: 1, socialPostId: 1});
 PublishingJobSchema.index({status: 1, runAt: 1});
 PublishingJobSchema.index({idempotencyKey: 1}, {unique: true});
+// At most one live job per post and platform, so racing schedules cannot publish twice.
+// `$in` in a partial index needs MongoDB 6.0+.
+PublishingJobSchema.index(
+  {workspaceId: 1, socialPostId: 1, platform: 1},
+  {unique: true, partialFilterExpression: {status: {$in: ['queued', 'publishing']}}, name: 'one_live_job_per_target'}
+);
 
 export const PublishingJobModel = mongoose.model<PublishingJobDocument>(
   'PublishingJob',

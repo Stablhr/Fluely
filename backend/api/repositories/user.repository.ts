@@ -57,8 +57,28 @@ export const userRepository = {
   setVerificationCode: (email: string, code: string, expiry: Date) =>
     UserModel.updateOne(
       {email: email.toLowerCase()},
-      {verificationCode: code, verificationExpiry: expiry}
+      {verificationCode: code, verificationExpiry: expiry, verificationAttempts: 0}
     ).exec(),
+
+  /**
+   * Spends one guess at the current code, atomically, so parallel guesses
+   * cannot exceed the limit. Null when there is no code or no guesses left.
+   */
+  useCodeAttempt: (email: string, kind: 'verification' | 'reset', max: number) =>
+    UserModel.findOneAndUpdate(
+      {
+        email: email.toLowerCase(),
+        [`${kind}Code`]: {$ne: null},
+        // `$not` also matches accounts created before the counter existed.
+        [`${kind}Attempts`]: {$not: {$gte: max}}
+      },
+      {$inc: {[`${kind}Attempts`]: 1}},
+      {new: true}
+    ).exec(),
+
+  /** Gives back the guess a correct code spent, so the next step can check it again. */
+  refundCodeAttempt: (email: string, kind: 'verification' | 'reset') =>
+    UserModel.updateOne({email: email.toLowerCase()}, {$inc: {[`${kind}Attempts`]: -1}}).exec(),
 
   clearVerificationCode: (email: string) =>
     UserModel.updateOne(
@@ -69,7 +89,7 @@ export const userRepository = {
   setResetCode: (email: string, code: string, expiry: Date) =>
     UserModel.updateOne(
       {email: email.toLowerCase()},
-      {resetCode: code, resetExpiry: expiry}
+      {resetCode: code, resetExpiry: expiry, resetAttempts: 0}
     ).exec(),
 
   clearResetCode: (email: string) =>

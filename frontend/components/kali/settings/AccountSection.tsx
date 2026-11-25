@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Circle, LogOut, Mail } from 'lucide-react'
+import { Check, Circle, Eye, EyeOff, LogOut, Mail } from 'lucide-react'
 import { changePassword } from '@/lib/api/authApi'
 import { getFriendlyErrorMessage } from '@/lib/api/getFriendlyErrorMessage'
 import { useMeQuery } from '@/lib/hooks/auth/useMeQuery'
@@ -13,6 +13,45 @@ import {
   settingsPrimaryButtonClass,
   settingsSecondaryButtonClass,
 } from './controls'
+
+/** A password input with an eye button that shows or hides what was typed. */
+function PasswordField({
+  id,
+  autoComplete,
+  value,
+  onChange,
+  describedBy,
+}: {
+  id: string
+  autoComplete: string
+  value: string
+  onChange: (value: string) => void
+  describedBy?: string
+}) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        type={visible ? 'text' : 'password'}
+        autoComplete={autoComplete}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${settingsInputClass} pr-10`}
+        aria-describedby={describedBy}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? 'Hide password' : 'Show password'}
+        aria-pressed={visible}
+        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-md text-text-muted transition-colors hover:text-text-primary focus-visible:text-text-primary focus-visible:outline-none"
+      >
+        {visible ? <EyeOff size={16} /> : <Eye size={16} />}
+      </button>
+    </div>
+  )
+}
 
 const RULES = [
   { label: 'At least 8 characters', test: (p: string) => p.length >= 8 },
@@ -76,27 +115,23 @@ function ChangePasswordCard() {
             <label htmlFor="pw-current" className="mb-1 block text-[12px] font-medium text-text-secondary">
               Current password
             </label>
-            <input
+            <PasswordField
               id="pw-current"
-              type="password"
               autoComplete="current-password"
               value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-              className={settingsInputClass}
+              onChange={setCurrent}
             />
           </div>
           <div>
             <label htmlFor="pw-new" className="mb-1 block text-[12px] font-medium text-text-secondary">
               New password
             </label>
-            <input
+            <PasswordField
               id="pw-new"
-              type="password"
               autoComplete="new-password"
               value={next}
-              onChange={(e) => setNext(e.target.value)}
-              className={settingsInputClass}
-              aria-describedby="pw-rules"
+              onChange={setNext}
+              describedBy="pw-rules"
             />
             <ul id="pw-rules" className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
               {RULES.map((rule) => {
@@ -119,13 +154,11 @@ function ChangePasswordCard() {
             <label htmlFor="pw-confirm" className="mb-1 block text-[12px] font-medium text-text-secondary">
               Confirm new password
             </label>
-            <input
+            <PasswordField
               id="pw-confirm"
-              type="password"
               autoComplete="new-password"
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              className={settingsInputClass}
+              onChange={setConfirm}
             />
             {confirm.length > 0 && !matches && (
               <p className="mt-1 text-[12px] text-danger-text">Passwords don&apos;t match.</p>

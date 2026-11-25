@@ -139,24 +139,48 @@ async function resolveAccount(workspaceId: Types.ObjectId, target: PlatformTarge
     .exec();
 }
 
+function newIdempotencyKey(postId: string, platform: SchedulablePlatform) {
+  return `${postId}:${platform}:${createSecureToken(8)}`;
+}
+
+function alreadyPublishing(platform: SchedulablePlatform) {
+  return new ApiError(
+    409,
+    ErrorCodes.VALIDATION_ERROR,
+    `${PLATFORM_LABELS[platform]} is publishing this post right now. Try again in a minute.`
+  );
+}
+
+/**
+ * Creates and enqueues a job. The post must already be saved with the target
+ * marked scheduled: a "post now" job can finish before this returns.
+ */
 async function createJob(
   workspaceId: Types.ObjectId,
   post: SocialPostDocument,
   platform: SchedulablePlatform,
   accountId: Types.ObjectId,
-  runAt: Date
+  runAt: Date,
+  idempotencyKey: string
 ) {
-  const job = await PublishingJobModel.create({
-    workspaceId,
-    socialPostId: post.id,
-    platform,
-    accountId,
-    runAt,
-    status: 'queued',
-    maxRetries: DEFAULT_MAX_RETRIES,
-    dryRun: platformMode(platform) !== 'live',
-    idempotencyKey: `${post.id}:${platform}:${createSecureToken(8)}`
-  });
+  let job: PublishingJobDocument;
+  try {
+    job = await PublishingJobModel.create({
+      workspaceId,
+      socialPostId: post.id,
+      platform,
+      accountId,
+      runAt,
+      status: 'queued',
+      maxRetries: DEFAULT_MAX_RETRIES,
+      dryRun: platformMode(platform) !== 'live',
+      idempotencyKey
+    });
+  } catch (error) {
+    // `one_live_job_per_target`: another request queued this platform first.
+    if ((error as {code?: number}).code === 11000) throw alreadyPublishing(platform);
+    throw error;
+  }
   const messageId = await enqueuePublish(job._id.toString(), runAt);
   if (messageId) {
     job.messageId = messageId;
@@ -290,12 +314,16 @@ export const socialPostService = {
     const scheduledAt = zonedToUtc(input.scheduledDate, input.scheduledTime, input.timezone);
     const runAt = new Date(Math.max(Date.now(), scheduledAt.getTime()));
 
+    const running = await PublishingJobModel.findOne({workspaceId, socialPostId: id, status: 'publishing'}).exec();
+    if (running) throw alreadyPublishing(running.platform);
+
     await cancelJobs(workspaceId, id);
 
     const validation: {platform: SchedulablePlatform; valid: boolean; errors: string[]}[] = [];
     const jobsCreated: string[] = [];
     const jobsSkipped: string[] = [];
     const targets: PlatformTarget[] = [];
+    const toQueue: {platform: SchedulablePlatform; accountId: Types.ObjectId; idempotencyKey: string}[] = [];
 
     for (const target of post.platforms) {
       if (!target.enabled) {
@@ -318,15 +346,15 @@ export const socialPostService = {
         targets.push({...target, status: 'pending', error: errors.join('. '), errorCode: 'NOT_SCHEDULED'});
         continue;
       }
-      const job = await createJob(workspaceId, post, target.platform, account._id as Types.ObjectId, runAt);
-      jobsCreated.push(job._id.toString());
+      const idempotencyKey = newIdempotencyKey(post.id, target.platform);
+      toQueue.push({platform: target.platform, accountId: account._id as Types.ObjectId, idempotencyKey});
       targets.push({
         ...target,
         status: 'scheduled',
         accountId: account._id.toString(),
         retryCount: 0,
         maxRetries: DEFAULT_MAX_RETRIES,
-        idempotencyKey: job.idempotencyKey,
+        idempotencyKey,
         error: undefined,
         errorCode: undefined,
         nextRetryAt: undefined
@@ -340,8 +368,13 @@ export const socialPostService = {
     post.scheduledAt = scheduledAt;
     if (input.repeat) post.repeat = input.repeat;
     if (input.repeatUntil !== undefined) post.repeatUntil = input.repeatUntil;
-    post.status = jobsCreated.length ? 'scheduled' : PLANNING.includes(post.status) ? post.status : 'draft';
+    post.status = toQueue.length ? 'scheduled' : PLANNING.includes(post.status) ? post.status : 'draft';
+    // Saved before the jobs exist, so a job that runs at once is not overwritten by this save.
     await post.save();
+    for (const item of toQueue) {
+      const job = await createJob(workspaceId, post, item.platform, item.accountId, runAt, item.idempotencyKey);
+      jobsCreated.push(job._id.toString());
+    }
 
     return {
       post: serializePost(post),
@@ -375,6 +408,7 @@ export const socialPostService = {
     const jobsCreated: string[] = [];
     const jobsSkipped: string[] = [];
     const targets: PlatformTarget[] = [];
+    const toQueue: {platform: SchedulablePlatform; accountId: Types.ObjectId; idempotencyKey: string}[] = [];
     for (const target of post.platforms) {
       const wanted = platform ? target.platform === platform : target.status === 'failed';
       if (!wanted || !target.enabled || target.status === 'posted' || target.status === 'publishing') {
@@ -388,14 +422,15 @@ export const socialPostService = {
         continue;
       }
       await cancelJobs(workspaceId, id, target.platform);
-      const job = await createJob(workspaceId, post, target.platform, account._id as Types.ObjectId, new Date());
-      jobsCreated.push(job._id.toString());
+      const idempotencyKey = newIdempotencyKey(post.id, target.platform);
+      toQueue.push({platform: target.platform, accountId: account._id as Types.ObjectId, idempotencyKey});
       retried.push(target.platform);
       targets.push({
         ...target,
         status: 'scheduled',
         accountId: account._id.toString(),
         retryCount: 0,
+        idempotencyKey,
         error: undefined,
         errorCode: undefined,
         nextRetryAt: undefined
@@ -403,7 +438,12 @@ export const socialPostService = {
     }
     post.platforms = targets;
     post.status = aggregateStatus(post);
+    // Saved before the jobs exist, so a job that runs at once is not overwritten by this save.
     await post.save();
+    for (const item of toQueue) {
+      const job = await createJob(workspaceId, post, item.platform, item.accountId, new Date(), item.idempotencyKey);
+      jobsCreated.push(job._id.toString());
+    }
     await refreshPostStatus(post._id as Types.ObjectId);
     const fresh = await findPost(workspaceId, id);
     return {post: serializePost(fresh), retried, jobsCreated, jobsSkipped};

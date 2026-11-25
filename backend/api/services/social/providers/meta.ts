@@ -91,7 +91,9 @@ async function post(path: string, label: string, values: Record<string, string |
   return json<Record<string, string>>(graph(path), label, {
     method: 'POST',
     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    body: form(values)
+    body: form(values),
+    // Every call here makes a post, except a photo uploaded unpublished.
+    createsPost: values.published !== 'false'
   });
 }
 
