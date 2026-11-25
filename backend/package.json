@@ -32,7 +32,6 @@
     "multer": "^2.4.0",
     "nodemailer": "^9.0.5",
     "pino": "^10.3.1",
-    "pusher": "^5.3.4",
     "zod": "^3.24.1"
   },
   "devDependencies": {
