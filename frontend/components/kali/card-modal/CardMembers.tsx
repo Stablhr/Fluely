@@ -21,13 +21,14 @@ export default function CardMembers({
   const board = store.data.boards[card.boardId]
   const hasServerBoard = Boolean(board?.ownerId && board.revision !== null)
 
+  const { loadCollaborators } = store
   useEffect(() => {
     if (!hasServerBoard) return
     // The roster is board-scoped: owner plus accepted collaborators. Loading it
     // here makes a card opened directly render and assign the right people even
     // if the board view's own load has not finished.
-    void store.loadCollaborators(card.boardId)
-  }, [card.boardId, hasServerBoard, store.loadCollaborators])
+    void loadCollaborators(card.boardId)
+  }, [card.boardId, hasServerBoard, loadCollaborators])
 
   const canAssign = store.canManage(card.boardId) && !readOnly
   const boardMembers = store.getBoardMembers(card.boardId)
