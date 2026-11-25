@@ -47,7 +47,6 @@ const TRIGGER_MAX_NAME = 18
  * trigger, flipping upward when there is not enough room underneath.
  */
 export default function MoveToListMenu({
-  cardId,
   currentListId,
   lists,
   canEdit,

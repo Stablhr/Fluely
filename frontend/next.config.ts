@@ -26,8 +26,8 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      { source: '/inbox', destination: '/dashboard', permanent: false },
-      { source: '/inbox/:path*', destination: '/dashboard', permanent: false },
+      { source: '/inbox', destination: '/', permanent: false },
+      { source: '/inbox/:path*', destination: '/', permanent: false },
     ];
   },
 };

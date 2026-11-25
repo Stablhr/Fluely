@@ -37,7 +37,6 @@ import type {
   StoreUser,
 } from "./useStore";
 import { uid } from "@/lib/kali/utils/id";
-import { formatDate } from "@/lib/kali/utils/dates";
 import { useSocialPosts } from "@/lib/kali/feature-hooks/useSocialPosts";
 import type { BoardActivityDto, BoardDto, BoardPollResponse } from "@/lib/kali/api/boards";
 import {
@@ -61,7 +60,6 @@ import {
   deleteCardOnServer,
   fetchStructure,
   moveCardOnServer,
-  reorderCardsOnServer,
   reorderListsOnServer,
   setCardMemberOnServer,
   toggleCommentReactionOnServer,
@@ -71,7 +69,7 @@ import {
   updateCardOnServer,
   updateListOnServer,
 } from "@/lib/kali/api/boardChildren";
-import type { CreateCardInput, CardDto, ListDto, StructureDto } from "@/lib/kali/api/boardChildren";
+import type { CreateCardInput, ListDto, StructureDto } from "@/lib/kali/api/boardChildren";
 import {
   fetchNotifications,
   markAllNotificationsRead as markAllNotificationsReadOnServer,
@@ -119,33 +117,6 @@ function isServerBoard(board: Board | undefined): board is Board {
  * are checked before use — anything else falls back to a structure re-pull
  * rather than writing a half-formed record into the store.
  */
-function isListDto(value: unknown): value is ListDto {
-  const rec = value as Record<string, unknown> | null;
-  return Boolean(
-    rec && typeof rec.id === "string" && typeof rec.boardId === "string",
-  );
-}
-
-function isCardDto(value: unknown): value is CardDto {
-  const rec = value as Record<string, unknown> | null;
-  return Boolean(
-    rec &&
-      typeof rec.id === "string" &&
-      typeof rec.boardId === "string" &&
-      typeof rec.listId === "string",
-  );
-}
-
-function isBoardDto(value: unknown): value is BoardDto {
-  const rec = value as Record<string, unknown> | null;
-  return Boolean(
-    rec &&
-      typeof rec.id === "string" &&
-      typeof rec.name === "string" &&
-      typeof rec.visibility === "string",
-  );
-}
-
 /**
  * Translates a store card patch into the server's vocabulary.
  *

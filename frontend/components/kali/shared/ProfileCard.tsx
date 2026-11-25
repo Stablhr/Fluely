@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { User, Briefcase, Mail, Phone, Clock } from 'lucide-react'
 import { getPublicProfile, type PublicProfile } from '@/lib/api/profileApi'

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FolderInput, ArrowRight } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import type { Card } from '@/lib/kali/store/schema'
 import { useStore } from '@/lib/kali/store/useStore'
 import Modal from '../shared/Modal'

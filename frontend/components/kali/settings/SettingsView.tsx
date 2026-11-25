@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useRef, useState, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { AlertTriangle, Trash2, Upload, User, Briefcase, Clock, Globe, Lock, Palette, Bell, Shield, Link2 } from 'lucide-react'
+import { AlertTriangle, Trash2, Upload, User, Lock, Palette, Bell, Shield, Link2 } from 'lucide-react'
 import AvatarCropModal from './AvatarCropModal'
 import AccountSection from './AccountSection'
 import AppearanceSection from './AppearanceSection'
@@ -29,16 +29,6 @@ import { useToast } from '@/components/kali/shared/useToastState'
 import { avatarDisplayUrl, colorFromId } from '@/components/kali/shared/Avatar'
 import { useStore } from '@/lib/kali/store/useStore'
 import { YOU_ID } from '@/lib/kali/store/schema'
-
-function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-card border border-border bg-surface p-4 shadow-card sm:p-5">
-      <h2 className="text-[15px] font-semibold text-text-primary">{title}</h2>
-      <p className="mt-0.5 text-[13px] text-text-secondary">{description}</p>
-      <div className="mt-4">{children}</div>
-    </section>
-  )
-}
 
 const buttonClass =
   'inline-flex items-center gap-1.5 rounded-md bg-surface-alt px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition-colors duration-150 hover:bg-primary-subtle hover:text-primary-hover active:scale-[0.98] disabled:opacity-40'
@@ -79,7 +69,6 @@ export default function SettingsView() {
   const store = useStore()
   const { toast } = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cropFile, setCropFile] = useState<File | null>(null)
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'preparing' | 'uploading' | 'processing' | 'done' | 'error'>('idle')
@@ -109,7 +98,7 @@ export default function SettingsView() {
     }
   }
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const { data: profile } = useQuery({
     queryKey: ['myProfile'],
     queryFn: getMyProfile,
     staleTime: 30_000,
