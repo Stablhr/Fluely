@@ -149,7 +149,7 @@ export default function VerifyEmailClient() {
           disabled={isSubmitting || !canSubmit}
         >
           {isSubmitting
-            ? 'Verifying...'
+            ? 'Verifying…'
             : isResetMode
               ? 'Verify & Continue'
               : 'Verify Email'}
@@ -163,11 +163,11 @@ export default function VerifyEmailClient() {
           onClick={handleResend}
           disabled={isResending || emailFromQuery.trim().length === 0}
         >
-          {isResending ? 'Resending...' : 'Resend code'}
+          {isResending ? 'Resending…' : 'Resend code'}
         </Button>
 
         {errorMessage && (
-          <div className={authErrorClass}>
+          <div role="alert" className={authErrorClass}>
             {errorMessage}
           </div>
         )}
