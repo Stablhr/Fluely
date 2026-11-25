@@ -20,6 +20,19 @@ export function qstashEnabled(): boolean {
   return Boolean(env.QSTASH_TOKEN);
 }
 
+/**
+ * What stops QStash from delivering on time, or null when it is set up.
+ * Without it, scheduled posts wait for the daily `/api/cron/publish-due` sweep.
+ */
+export function qstashConfigProblem(): string | null {
+  if (!env.QSTASH_TOKEN) return 'QSTASH_TOKEN is not set';
+  if (!env.QSTASH_CURRENT_SIGNING_KEY && !env.QSTASH_NEXT_SIGNING_KEY) {
+    return 'no QStash signing key is set, so every delivery is refused';
+  }
+  if (/^http:\/\/localhost/.test(env.API_PUBLIC_URL)) return 'API_PUBLIC_URL is not set';
+  return null;
+}
+
 export function webhookUrl(): string {
   return `${env.API_PUBLIC_URL}${WEBHOOK_PATH}`;
 }

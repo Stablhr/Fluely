@@ -18,7 +18,10 @@ import {enqueuePublish} from './qstash';
 
 /** A delivery up to this early still runs; earlier ones re-enqueue. */
 const EARLY_TOLERANCE_MS = 30_000;
-/** A job stuck in `publishing` this long is assumed crashed and re-queued. */
+/**
+ * A job stuck in `publishing` this long is assumed crashed and marked failed.
+ * It is never re-queued: the platform may already have the post.
+ */
 const STALE_LOCK_MS = 15 * 60 * 1000;
 
 const PLANNING: PostStatus[] = ['idea', 'draft', 'in_review'];
@@ -278,23 +281,55 @@ export async function runPublishingJob(jobId: string): Promise<{status: string}>
   }
 }
 
-/** Publishes everything due. The safety net behind QStash, and the scheduler in local development. */
-export async function publishDueJobs(limit = 20): Promise<{processed: number}> {
-  await PublishingJobModel.updateMany(
-    {status: 'publishing', lockedAt: {$lt: new Date(Date.now() - STALE_LOCK_MS)}},
-    {$set: {status: 'queued', lockedAt: null}}
-  ).exec();
-  const due = await PublishingJobModel.find({status: 'queued', runAt: {$lte: new Date()}})
-    .sort({runAt: 1})
-    .limit(limit)
-    .select('_id')
-    .exec();
-  for (const job of due) {
-    try {
-      await runPublishingJob(job._id.toString());
-    } catch (error) {
-      logger.error({err: error, jobId: job._id.toString()}, 'Publishing job crashed');
+/** Fails jobs whose run was cut off mid-publish, so a person checks the platform before retrying. */
+async function failStaleJobs(): Promise<void> {
+  const cutoff = new Date(Date.now() - STALE_LOCK_MS);
+  const stale = await PublishingJobModel.find({status: 'publishing', lockedAt: {$lt: cutoff}}).exec();
+  for (const job of stale) {
+    const label = PLATFORM_LABELS[job.platform];
+    const error = `Publishing to ${label} was interrupted. Check ${label} before retrying: the post may already be live.`;
+    const claimed = await PublishingJobModel.updateOne(
+      {_id: job._id, status: 'publishing', lockedAt: {$lt: cutoff}},
+      {$set: {status: 'failed', completedAt: new Date(), lockedAt: null, error, errorCode: 'INTERRUPTED'}}
+    ).exec();
+    if (!claimed.modifiedCount) continue;
+    const post = await SocialPostModel.findOne({workspaceId: job.workspaceId, id: job.socialPostId}).exec();
+    if (!post) continue;
+    await setTarget(post, job.platform, {status: 'failed', error, errorCode: 'INTERRUPTED'}, ['nextRetryAt']);
+    await refreshPostStatus(post._id as Types.ObjectId);
+    logger.warn({jobId: job._id.toString(), platform: job.platform}, 'Publishing job interrupted; marked failed');
+  }
+}
+
+/** One sweep stops starting new jobs after this long, to finish inside the function's time limit. */
+const SWEEP_BUDGET_MS = 45_000;
+
+/**
+ * Publishes everything due, in batches, until nothing is due or the time
+ * budget runs out. The safety net behind QStash, and the scheduler in local
+ * development.
+ */
+export async function publishDueJobs(batchSize = 20, budgetMs = SWEEP_BUDGET_MS): Promise<{processed: number}> {
+  const deadline = Date.now() + budgetMs;
+  await failStaleJobs();
+  // A job that crashes before it is claimed stays due; skip it for the rest of this sweep.
+  const seen: Types.ObjectId[] = [];
+  while (Date.now() < deadline) {
+    const due = await PublishingJobModel.find({status: 'queued', runAt: {$lte: new Date()}, _id: {$nin: seen}})
+      .sort({runAt: 1})
+      .limit(batchSize)
+      .select('_id')
+      .exec();
+    if (due.length === 0) break;
+    for (const job of due) {
+      if (Date.now() >= deadline) break;
+      seen.push(job._id as Types.ObjectId);
+      try {
+        await runPublishingJob(job._id.toString());
+      } catch (error) {
+        logger.error({err: error, jobId: job._id.toString()}, 'Publishing job crashed');
+      }
     }
   }
-  return {processed: due.length};
+  return {processed: seen.length};
 }

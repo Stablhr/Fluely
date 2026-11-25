@@ -18,7 +18,9 @@ import {WorkspaceMemberModel} from '../api/models/WorkspaceMember.model';
 import {SocialAccountModel} from '../api/models/SocialAccount.model';
 import {PublishingJobModel} from '../api/models/PublishingJob.model';
 import {SocialPostModel} from '../api/models/SocialPost.model';
-import {publishDueJobs} from '../api/services/social/publisher.service';
+import {publishDueJobs, runPublishingJob} from '../api/services/social/publisher.service';
+import * as qstash from '../api/services/social/qstash';
+import {http} from '../api/services/social/providers/http';
 import {composeText} from '../api/services/social/publisher.service';
 import {webhookUrl} from '../api/services/social/qstash';
 import {zonedToUtc} from '../api/services/social/time';
@@ -400,6 +402,103 @@ describe('scheduling and publishing (dry run)', () => {
     expect(retried.body.retried).toEqual(['linkedin']);
     await publishDueJobs();
     expect((await api.get('/api/social-posts/p5')).body.post.status).toBe('posted');
+  });
+
+  it('keeps one live job per platform when two schedules race, and refuses to reschedule mid-publish', async () => {
+    await PublishingJobModel.createIndexes();
+    const owner = await member();
+    const api = as(owner.userId);
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
+    await api.post('/api/social-posts', draft('race', ['linkedin']));
+
+    const body = {scheduledDate: '2030-03-01', scheduledTime: '10:00'};
+    const results = await Promise.all([
+      api.post('/api/social-posts/race/schedule', body),
+      api.post('/api/social-posts/race/schedule', body)
+    ]);
+    for (const res of results) expect([200, 409]).toContain(res.status);
+    expect(await PublishingJobModel.countDocuments({socialPostId: 'race', status: 'queued'})).toBe(1);
+
+    await PublishingJobModel.updateOne({socialPostId: 'race', status: 'queued'}, {$set: {status: 'publishing'}});
+    const again = await api.post('/api/social-posts/race/schedule', body);
+    expect(again.status).toBe(409);
+    expect(await PublishingJobModel.countDocuments({socialPostId: 'race', status: {$in: ['queued', 'publishing']}})).toBe(1);
+  });
+
+  it('marks a job cut off mid-publish as failed instead of publishing it again', async () => {
+    const owner = await member();
+    const api = as(owner.userId);
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
+    await api.post('/api/social-posts', draft('cut', ['linkedin']));
+    await api.post('/api/social-posts/cut/schedule', {scheduledDate: '2020-01-01'});
+    // The function died after the platform call: the job is still "publishing" 20 minutes later.
+    await PublishingJobModel.updateOne(
+      {socialPostId: 'cut'},
+      {$set: {status: 'publishing', lockedAt: new Date(Date.now() - 20 * 60_000)}}
+    );
+
+    await publishDueJobs();
+
+    const job = await PublishingJobModel.findOne({socialPostId: 'cut'});
+    expect(job?.status).toBe('failed');
+    expect(job?.errorCode).toBe('INTERRUPTED');
+    const post = (await api.get('/api/social-posts/cut')).body.post;
+    expect(post.status).toBe('failed');
+    expect(post.platforms[0].error).toMatch(/may already be live/);
+    expect(post.platforms[0].externalPostId).toBeUndefined();
+  });
+
+  it('keeps the published result when a "post now" job finishes before scheduling returns', async () => {
+    const owner = await member();
+    const api = as(owner.userId);
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
+    await api.post('/api/social-posts', draft('now', ['linkedin']));
+    // QStash delivering instantly: the job runs inside the enqueue call.
+    const spy = jest.spyOn(qstash, 'enqueuePublish').mockImplementation(async jobId => {
+      await runPublishingJob(jobId);
+      return null;
+    });
+    try {
+      await api.post('/api/social-posts/now/schedule', {scheduledDate: '2020-01-01'});
+    } finally {
+      spy.mockRestore();
+    }
+    const post = (await api.get('/api/social-posts/now')).body.post;
+    expect(post.status).toBe('posted');
+    expect(post.platforms[0].status).toBe('posted');
+  });
+
+  it('keeps sweeping until nothing is due', async () => {
+    const owner = await member();
+    const api = as(owner.userId);
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
+    for (let i = 0; i < 3; i += 1) {
+      await api.post('/api/social-posts', draft(`many-${i}`, ['linkedin']));
+      await api.post(`/api/social-posts/many-${i}/schedule`, {scheduledDate: '2020-01-01'});
+    }
+    // A batch of 2 used to leave the third job for the next day's run.
+    const result = await publishDueJobs(2);
+    expect(result.processed).toBe(3);
+    expect(await PublishingJobModel.countDocuments({status: 'completed'})).toBe(3);
+  });
+});
+
+describe('platform requests', () => {
+  it('does not retry a post-creating request that timed out', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
+      await new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('This operation was aborted')));
+      });
+      return new Response();
+    });
+    try {
+      const create = http('https://api.example.test/posts', {method: 'POST', createsPost: true, timeoutMs: 10});
+      await expect(create).rejects.toMatchObject({code: 'OUTCOME_UNKNOWN', retryable: false});
+      const refresh = http('https://api.example.test/token', {method: 'POST', timeoutMs: 10});
+      await expect(refresh).rejects.toMatchObject({code: 'NETWORK_ERROR', retryable: true});
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });
 

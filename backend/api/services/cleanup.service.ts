@@ -32,6 +32,7 @@ export async function cleanupDoneCards(retentionDays?: number): Promise<CleanupR
   if (cards.length === 0) return {deleted: 0, boards: []};
 
   const affectedBoards = new Set<string>();
+  let deleted = 0;
 
   for (const card of cards) {
     const boardId = card.boardId;
@@ -68,8 +69,11 @@ export async function cleanupDoneCards(retentionDays?: number): Promise<CleanupR
 
       affectedBoards.add(boardId.toString());
       await bumpBoardRevision(boardId, undefined, session);
+      // withProductTransaction treats an undefined result as a failure.
+      return true;
     });
+    deleted += 1;
   }
 
-  return {deleted: cards.length, boards: Array.from(affectedBoards)};
+  return {deleted, boards: Array.from(affectedBoards)};
 }

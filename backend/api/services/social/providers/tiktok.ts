@@ -194,7 +194,9 @@ export const tiktokProvider: SocialProvider = {
           'Content-Range': `bytes ${start}-${end - 1}/${size}`
         },
         body: bytes.subarray(start, end),
-        timeoutMs: 180_000
+        timeoutMs: 180_000,
+        // The last chunk completes the upload, and TikTok then posts it.
+        createsPost: index === chunks - 1
       });
       await assertOk(res, NAME);
     }

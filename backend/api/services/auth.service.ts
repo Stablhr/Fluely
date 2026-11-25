@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import {randomInt} from 'crypto';
 import jwt from 'jsonwebtoken';
 import {env} from '../config/env';
 import {ACCESS_TOKEN_TTL_SECONDS, REFRESH_TOKEN_TTL_SECONDS} from '../config/session';
@@ -8,14 +9,37 @@ import {ApiError} from '../utils/error';
 import {emailService} from './email.service';
 import {blocklistService} from './blocklist.service';
 import {ErrorCodes} from '../constants/errorCodes';
-import {createSecureToken} from '../utils/crypto';
+import {constantTimeEqual, createSecureToken} from '../utils/crypto';
 import {verificationCodeEmailTemplate} from '../templates/verificationCodeEmail';
 import {resetPasswordEmailTemplate} from '../templates/resetPasswordEmail';
 import {workspaceService} from './workspace.service';
 import {logger} from '../logging/logger';
 
 function generateVerificationCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1000000).toString();
+}
+
+/** Wrong guesses allowed per code before it stops working and a new one is needed. */
+const MAX_CODE_ATTEMPTS = 5;
+
+const CODE_ERRORS = {
+  verification: {missing: 'Invalid verification code', wrong: 'Verification code expired or invalid'},
+  reset: {missing: 'Invalid or expired reset code', wrong: 'Reset code expired or invalid'}
+};
+
+/** Checks an emailed code, spending one of its few guesses unless it is right. */
+async function checkCode(email: string, code: string, kind: 'verification' | 'reset') {
+  const user = await userRepository.useCodeAttempt(email, kind, MAX_CODE_ATTEMPTS);
+  const stored = kind === 'reset' ? user?.resetCode : user?.verificationCode;
+  const expiry = kind === 'reset' ? user?.resetExpiry : user?.verificationExpiry;
+  if (!user || !stored || !expiry) {
+    throw new ApiError(400, ErrorCodes.INVALID_CODE, CODE_ERRORS[kind].missing);
+  }
+  if (!constantTimeEqual(stored, code) || expiry <= new Date()) {
+    throw new ApiError(400, ErrorCodes.EXPIRED_CODE, CODE_ERRORS[kind].wrong);
+  }
+  await userRepository.refundCodeAttempt(email, kind);
+  return user;
 }
 
 function getVerificationExpiry(minutes: number) {
@@ -200,23 +224,7 @@ export const authService = {
   },
 
   async verify(email: string, code: string) {
-    const user = await userRepository.findByEmail(email);
-
-    if (!user || !user.verificationCode || !user.verificationExpiry) {
-      throw new ApiError(400, ErrorCodes.INVALID_CODE, 'Invalid verification code');
-    }
-
-    const codeMatches = user.verificationCode === code;
-    const notExpired = user.verificationExpiry > new Date();
-
-    if (!codeMatches || !notExpired) {
-      throw new ApiError(
-        400,
-        ErrorCodes.EXPIRED_CODE,
-        'Verification code expired or invalid'
-      );
-    }
-
+    await checkCode(email, code, 'verification');
     await userRepository.markVerified(email);
   },
 
@@ -286,33 +294,11 @@ export const authService = {
   },
 
   async verifyResetCode(email: string, code: string) {
-    const user = await userRepository.findByEmail(email);
-
-    if (!user || !user.resetCode || !user.resetExpiry) {
-      throw new ApiError(400, ErrorCodes.INVALID_CODE, 'Invalid or expired reset code');
-    }
-
-    const codeMatches = user.resetCode === code;
-    const notExpired = user.resetExpiry > new Date();
-
-    if (!codeMatches || !notExpired) {
-      throw new ApiError(400, ErrorCodes.EXPIRED_CODE, 'Reset code expired or invalid');
-    }
+    await checkCode(email, code, 'reset');
   },
 
   async resetPassword(email: string, code: string, newPassword: string) {
-    const user = await userRepository.findByEmail(email);
-
-    if (!user || !user.resetCode || !user.resetExpiry) {
-      throw new ApiError(400, ErrorCodes.INVALID_CODE, 'Invalid or expired reset code');
-    }
-
-    const codeMatches = user.resetCode === code;
-    const notExpired = user.resetExpiry > new Date();
-
-    if (!codeMatches || !notExpired) {
-      throw new ApiError(400, ErrorCodes.EXPIRED_CODE, 'Reset code expired or invalid');
-    }
+    const user = await checkCode(email, code, 'reset');
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
 

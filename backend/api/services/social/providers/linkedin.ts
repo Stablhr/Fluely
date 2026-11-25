@@ -212,6 +212,7 @@ export const linkedinProvider: SocialProvider = {
 
     const res = await http('https://api.linkedin.com/rest/posts', {
       method: 'POST',
+      createsPost: true,
       headers: restHeaders(token),
       body: JSON.stringify(body)
     });

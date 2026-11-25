@@ -1,7 +1,16 @@
 import app from './app';
 import {connectDb} from './api/config/db';
 import {env} from './api/config/env';
+import {logger} from './api/logging/logger';
 import {publishDueJobs} from './api/services/social/publisher.service';
+import {qstashConfigProblem} from './api/services/social/qstash';
+
+const qstashProblem = env.NODE_ENV === 'production' ? qstashConfigProblem() : null;
+if (qstashProblem) {
+  logger.error(
+    `Scheduled posts will be late: ${qstashProblem}. Only the daily publish-due cron will publish them.`
+  );
+}
 
 let dbInitPromise: Promise<unknown> | null = null;
 const ensureDb = () => {

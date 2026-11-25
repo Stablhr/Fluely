@@ -23,15 +23,31 @@ function describe(body: unknown): string {
   ).slice(0, 300);
 }
 
-export async function http(
-  url: string,
-  init: RequestInit & {timeoutMs?: number} = {}
-): Promise<Response> {
+type HttpInit = RequestInit & {
+  timeoutMs?: number;
+  /**
+   * The request that makes the post itself. If it times out or drops
+   * mid-flight the platform may already have the post, so it is not retried.
+   */
+  createsPost?: boolean;
+};
+
+export async function http(url: string, init: HttpInit = {}): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? TIMEOUT_MS);
   try {
     return await fetch(url, {...init, signal: controller.signal});
   } catch (error) {
+    const cause = (error as {cause?: {code?: string}}).cause?.code ?? '';
+    // Only a connection that never opened is certain not to have reached the platform.
+    const neverSent = ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN'].includes(cause);
+    if (init.createsPost && !neverSent) {
+      throw new ProviderError(
+        `The platform did not confirm the request (${(error as Error).message}). Check it before retrying: the post may already be live.`,
+        'OUTCOME_UNKNOWN',
+        false
+      );
+    }
     throw new ProviderError(
       `Could not reach the platform: ${(error as Error).message}`,
       'NETWORK_ERROR',
@@ -67,7 +83,7 @@ export async function assertOk(res: Response, platform: string): Promise<void> {
 export async function json<T = Record<string, unknown>>(
   url: string,
   platform: string,
-  init: RequestInit & {timeoutMs?: number} = {}
+  init: HttpInit = {}
 ): Promise<T> {
   const res = await http(url, init);
   await assertOk(res, platform);

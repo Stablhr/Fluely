@@ -116,7 +116,8 @@ export const youtubeProvider: SocialProvider = {
       method: 'PUT',
       headers: {Authorization: `Bearer ${account.accessToken}`, 'Content-Type': type},
       body: bytes,
-      timeoutMs: 300_000
+      timeoutMs: 300_000,
+      createsPost: true
     });
     await assertOk(upload, NAME);
     const result = (await upload.json()) as {id: string};
