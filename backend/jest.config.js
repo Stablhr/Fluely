@@ -20,6 +20,7 @@ module.exports = {
   // instances failed to start and runs took minutes. Two at a time keeps runs
   // short and reliable, locally and on CI's two-core runners.
   maxWorkers: 2,
+  globalSetup: "<rootDir>/tests/globalSetup.js",
   // On GitHub Actions, failing tests also become annotations on the run,
   // readable without opening the (sign-in only) job log.
   reporters: process.env.GITHUB_ACTIONS ? ["default", "github-actions"] : ["default"],
