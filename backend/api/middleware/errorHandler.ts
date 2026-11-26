@@ -28,6 +28,16 @@ export function errorHandler(
     });
   }
 
+  // The model refused a value the request schema let through, e.g. a length
+  // limit (zod counts characters, the model counts UTF-16 units like 👍 = 2).
+  if (err instanceof mongoose.Error.ValidationError) {
+    return res.status(400).json({
+      success: false,
+      code: ErrorCodes.VALIDATION_ERROR,
+      message: Object.values(err.errors)[0]?.message ?? 'Invalid data'
+    });
+  }
+
   logger.error({err}, 'Unhandled error');
   res.status(500).json({
     success: false,

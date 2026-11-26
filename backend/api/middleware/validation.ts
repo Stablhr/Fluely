@@ -10,7 +10,7 @@ type RequestSchemas = {
 };
 
 function validationError(error: z.ZodError): ApiError {
-  const flattened = error.flatten();
+  const flattened = z.flattenError(error) as {formErrors: string[]; fieldErrors: Record<string, string[] | undefined>};
   const firstFieldError = Object.values(flattened.fieldErrors)
     .flat()
     .filter(Boolean)[0];
@@ -35,14 +35,14 @@ export const validateRequest =
         if (!result.success) {
           return next(validationError(result.error));
         }
-        req.params = result.data;
+        req.params = result.data as Request['params'];
       }
       if (schemas.query) {
         const result = schemas.query.safeParse(req.query);
         if (!result.success) {
           return next(validationError(result.error));
         }
-        req.query = result.data;
+        req.query = result.data as Request['query'];
       }
       return next();
     } catch (error) {

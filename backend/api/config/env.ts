@@ -91,7 +91,7 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  const message = parsed.error.errors
+  const message = parsed.error.issues
     .map(e => `${e.path.join('.')}: ${e.message}`)
     .join(', ');
   throw new Error(`Invalid environment configuration: ${message}`);
