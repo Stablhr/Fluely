@@ -317,8 +317,6 @@ export const socialPostService = {
     const running = await PublishingJobModel.findOne({workspaceId, socialPostId: id, status: 'publishing'}).exec();
     if (running) throw alreadyPublishing(running.platform);
 
-    await cancelJobs(workspaceId, id);
-
     const validation: {platform: SchedulablePlatform; valid: boolean; errors: string[]}[] = [];
     const jobsCreated: string[] = [];
     const jobsSkipped: string[] = [];
@@ -370,7 +368,11 @@ export const socialPostService = {
     if (input.repeatUntil !== undefined) post.repeatUntil = input.repeatUntil;
     post.status = toQueue.length ? 'scheduled' : PLANNING.includes(post.status) ? post.status : 'draft';
     // Saved before the jobs exist, so a job that runs at once is not overwritten by this save.
+    // A request that loses a concurrent save (409) stops here, before touching any job.
     await post.save();
+    // Only now replace the old jobs: cancelling first let a request that then lost the
+    // save cancel the winner's new job and leave the post scheduled with none.
+    await cancelJobs(workspaceId, id);
     for (const item of toQueue) {
       const job = await createJob(workspaceId, post, item.platform, item.accountId, runAt, item.idempotencyKey);
       jobsCreated.push(job._id.toString());
@@ -421,7 +423,6 @@ export const socialPostService = {
         targets.push(target);
         continue;
       }
-      await cancelJobs(workspaceId, id, target.platform);
       const idempotencyKey = newIdempotencyKey(post.id, target.platform);
       toQueue.push({platform: target.platform, accountId: account._id as Types.ObjectId, idempotencyKey});
       retried.push(target.platform);
@@ -441,6 +442,7 @@ export const socialPostService = {
     // Saved before the jobs exist, so a job that runs at once is not overwritten by this save.
     await post.save();
     for (const item of toQueue) {
+      await cancelJobs(workspaceId, id, item.platform);
       const job = await createJob(workspaceId, post, item.platform, item.accountId, new Date(), item.idempotencyKey);
       jobsCreated.push(job._id.toString());
     }
