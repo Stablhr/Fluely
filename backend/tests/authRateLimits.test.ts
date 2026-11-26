@@ -11,6 +11,7 @@ import app from '../app';
 import {CSRF_COOKIE, REFRESH_TOKEN_COOKIE} from '../api/constants/cookies';
 import {UserModel} from '../api/models/User.model';
 import {authService} from '../api/services/auth.service';
+import {emailService} from '../api/services/email.service';
 
 /*
  * The pre-auth endpoints used to share one budget of 5 requests per 15
@@ -191,5 +192,18 @@ describe('sessions', () => {
 
     expect((await refresh(other)).status).toBe(401);
     expect((await refresh(refreshCookie(changed))).status).toBe(200);
+  });
+});
+
+describe('signing up when the email cannot be sent', () => {
+  it('leaves no account behind, so trying again works', async () => {
+    const data = {firstName: 'New', lastName: 'Person', username: 'newperson', email: 'new@example.test', password: PASSWORD};
+    (emailService.sendEmail as jest.Mock).mockRejectedValueOnce(new Error('SMTP down'));
+
+    await expect(authService.register(data)).rejects.toThrow('SMTP down');
+    expect(await UserModel.countDocuments({email: data.email})).toBe(0);
+
+    await expect(authService.register(data)).resolves.toMatchObject({email: data.email});
+    expect(await UserModel.countDocuments({email: data.email})).toBe(1);
   });
 });

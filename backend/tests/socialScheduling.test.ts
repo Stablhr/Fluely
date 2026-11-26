@@ -19,6 +19,8 @@ import {SocialAccountModel} from '../api/models/SocialAccount.model';
 import {PublishingJobModel} from '../api/models/PublishingJob.model';
 import {SocialPostModel} from '../api/models/SocialPost.model';
 import {publishDueJobs, runPublishingJob} from '../api/services/social/publisher.service';
+import {nextOccurrenceDate} from '../api/services/social/posts.service';
+import {NotificationModel} from '../api/models/Notification.model';
 import * as qstash from '../api/services/social/qstash';
 import {http} from '../api/services/social/providers/http';
 import {composeText} from '../api/services/social/publisher.service';
@@ -499,6 +501,72 @@ describe('platform requests', () => {
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+});
+
+describe('repeating posts', () => {
+  it('works out the next date for each repeat setting', () => {
+    expect(nextOccurrenceDate('2030-01-15', 'daily')).toBe('2030-01-16');
+    expect(nextOccurrenceDate('2030-01-18', 'weekdays')).toBe('2030-01-21'); // Friday -> Monday
+    expect(nextOccurrenceDate('2030-01-15', 'weekly')).toBe('2030-01-22');
+    expect(nextOccurrenceDate('2030-01-15', 'biweekly')).toBe('2030-01-29');
+    expect(nextOccurrenceDate('2030-01-31', 'monthly')).toBe('2030-02-28');
+    // Keeps the series' first day of the month instead of drifting to the 28th.
+    expect(nextOccurrenceDate('2030-02-28', 'monthly', 31)).toBe('2030-03-31');
+    expect(nextOccurrenceDate('2030-12-15', 'monthly')).toBe('2031-01-15');
+    expect(nextOccurrenceDate('2030-01-15', 'none')).toBeNull();
+  });
+
+  it('schedules the next post on the first upcoming date, without a burst of catch-up posts', async () => {
+    const owner = await member();
+    const api = as(owner.userId);
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
+    await api.post('/api/social-posts', draft('series', ['linkedin']));
+    // Started years ago: the dates in between are skipped, not all posted now.
+    await api.post('/api/social-posts/series/schedule', {scheduledDate: '2020-01-01', scheduledTime: '09:00', repeat: 'daily'});
+
+    await publishDueJobs();
+
+    expect((await api.get('/api/social-posts/series')).body.post.status).toBe('posted');
+    const posts = await SocialPostModel.find({workspaceId: owner.workspaceId, id: {$ne: 'series'}});
+    expect(posts).toHaveLength(1);
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    expect([today, tomorrow]).toContain(posts[0].scheduledDate);
+    expect(posts[0]).toMatchObject({id: `series~${posts[0].scheduledDate}`, status: 'scheduled', repeat: 'daily'});
+    expect(posts[0].platforms[0].externalPostId).toBeUndefined();
+    expect(await PublishingJobModel.countDocuments({socialPostId: posts[0].id, status: 'queued'})).toBe(1);
+  });
+
+  it('stops the series after its end date', async () => {
+    const owner = await member();
+    const api = as(owner.userId);
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
+    await api.post('/api/social-posts', draft('ending', ['linkedin']));
+    await api.post('/api/social-posts/ending/schedule', {scheduledDate: '2020-01-01', repeat: 'weekly', repeatUntil: '2020-02-01'});
+
+    await publishDueJobs();
+
+    expect((await api.get('/api/social-posts/ending')).body.post.status).toBe('posted');
+    expect(await SocialPostModel.countDocuments({workspaceId: owner.workspaceId})).toBe(1);
+  });
+});
+
+describe('failed posts', () => {
+  it('tells the author in their notifications', async () => {
+    const owner = await member();
+    const api = as(owner.userId);
+    await api.post('/api/social-accounts/connect/linkedin', {demo: true});
+    await api.post('/api/social-posts', draft('doomed', ['linkedin']));
+    await api.post('/api/social-posts/doomed/schedule', {scheduledDate: '2020-01-01'});
+    // Invalid content fails for good, with no retries.
+    await SocialPostModel.updateOne({id: 'doomed'}, {$set: {caption: 'x'.repeat(3001)}});
+    await publishDueJobs();
+
+    expect(await NotificationModel.countDocuments({userId: owner.userId, type: 'post_failed'})).toBe(1);
+    const list = (await api.get('/api/notifications')).body.notifications;
+    expect(list[0]).toMatchObject({type: 'post_failed', postId: 'doomed', boardId: null});
+    expect(list[0].snippet).toMatch(/could not be published to LinkedIn/);
   });
 });
 

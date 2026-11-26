@@ -7,7 +7,10 @@ export interface NotificationDocument extends mongoose.Document {
   type: NotificationType;
   /** Who caused it: the inviter, or the invitee who answered. */
   actorId: Types.ObjectId;
-  boardId: Types.ObjectId;
+  /** Null for notifications about social posts, which belong to no board. */
+  boardId: Types.ObjectId | null;
+  /** The social post a `post_failed` notification is about. */
+  postId: string | null;
   /** The invitation row this is about; lets the UI wire Accept/Decline directly. */
   collaboratorId: Types.ObjectId | null;
   /** Where a mention happened (nullable for non-mention notifications). */
@@ -25,7 +28,8 @@ const NotificationSchema = new Schema<NotificationDocument>(
     userId: {type: Schema.Types.ObjectId, ref: 'User', required: true, index: true},
     type: {type: String, enum: NotificationTypes, required: true},
     actorId: {type: Schema.Types.ObjectId, ref: 'User', required: true},
-    boardId: {type: Schema.Types.ObjectId, ref: 'Board', required: true, index: true},
+    boardId: {type: Schema.Types.ObjectId, ref: 'Board', default: null, index: true},
+    postId: {type: String, default: null},
     collaboratorId: {type: Schema.Types.ObjectId, ref: 'BoardCollaborator', default: null},
     cardId: {type: Schema.Types.ObjectId, ref: 'Card', default: null},
     commentId: {type: String, default: null},

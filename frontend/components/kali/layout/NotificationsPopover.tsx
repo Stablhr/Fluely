@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AtSign, Bell, Check, Clock, Handshake, Trash2, X } from 'lucide-react'
+import { AlertTriangle, AtSign, Bell, Check, Clock, Handshake, Trash2, X } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import { useToast } from '@/components/kali/shared/useToastState'
 import type { AppNotification, AppNotificationType } from '@/lib/kali/store/useStore'
@@ -12,6 +12,7 @@ const ICONS: Record<AppNotificationType, typeof Bell> = {
   board_invitation_accepted: Check,
   board_invitation_declined: X,
   mention: AtSign,
+  post_failed: AlertTriangle,
 }
 
 function relativeTime(iso: string): string {
@@ -44,6 +45,9 @@ function headline(notification: AppNotification): string {
         : (notification.boardName || board)
       return `${who} mentioned you in ${where}`
     }
+    case 'post_failed':
+      return notification.snippet || 'A post could not be published'
+
   }
 }
 
@@ -251,9 +255,11 @@ export default function NotificationsPopover() {
                     {!isInvitation && (
                       <Link
                         href={
-                          notification.type === 'mention' && notification.cardId
-                            ? `/boards/${notification.boardId}?card=${notification.cardId}&comment=${notification.commentId ?? ''}`
-                            : `/boards/${notification.boardId}`
+                          notification.type === 'post_failed'
+                            ? '/content-planner'
+                            : notification.type === 'mention' && notification.cardId
+                              ? `/boards/${notification.boardId}?card=${notification.cardId}&comment=${notification.commentId ?? ''}`
+                              : `/boards/${notification.boardId}`
                         }
                         onClick={() => {
                           void markNotificationRead(notification.id)
@@ -261,7 +267,11 @@ export default function NotificationsPopover() {
                         }}
                         className="mt-2 inline-block text-[12px] font-semibold text-primary transition-colors hover:text-primary/80"
                       >
-                        {notification.type === 'mention' ? 'Open card' : 'Open board'}
+                        {notification.type === 'post_failed'
+                          ? 'Open Social Posting'
+                          : notification.type === 'mention'
+                            ? 'Open card'
+                            : 'Open board'}
                       </Link>
                     )}
                   </div>

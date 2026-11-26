@@ -398,11 +398,11 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
               <button
                 type="button"
                 onClick={() => setAiOpen(true)}
-                aria-label="Generate caption with AI"
+                aria-label="Get caption ideas"
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary-subtle"
               >
                 <Sparkles size={12} />
-                AI Generate
+                Caption ideas
               </button>
             </div>
             <Textarea

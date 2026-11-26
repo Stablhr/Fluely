@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, X, Coins } from 'lucide-react'
-import { generateMockCaption, MOCK_MODELS, getTokenUsage, MOCK_MONTHLY_TOKEN_LIMIT } from '@/lib/kali/utils/aiCaptions'
+import { Sparkles, X } from 'lucide-react'
+import { suggestCaption } from '@/lib/kali/utils/aiCaptions'
 import Button from '../shared/Button'
 import { Textarea } from '../shared/Input'
 
@@ -13,22 +13,11 @@ interface AIGenerateModalProps {
 
 export default function AIGenerateModal({ onUse, onClose }: AIGenerateModalProps) {
   const [prompt, setPrompt] = useState('')
-  const [selectedModel, setSelectedModel] = useState<string>(MOCK_MODELS[0])
   const [result, setResult] = useState<string | null>(null)
-  const [generating, setGenerating] = useState(false)
-  const [tokenUsage, setTokenUsage] = useState(getTokenUsage())
 
   const handleGenerate = () => {
     if (!prompt.trim()) return
-    setGenerating(true)
-    // Simulate API delay
-    setTimeout(() => {
-      const res = generateMockCaption(prompt)
-      setResult(res.caption)
-      const newUsage = getTokenUsage() + res.tokensUsed
-      setTokenUsage(newUsage)
-      setGenerating(false)
-    }, 800)
+    setResult(suggestCaption(prompt))
   }
 
   const handleUse = () => {
@@ -43,12 +32,12 @@ export default function AIGenerateModal({ onUse, onClose }: AIGenerateModalProps
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-primary" />
-            <h2 id="ai-modal-title" className="text-sm font-semibold text-text-primary">AI Caption Generator</h2>
+            <h2 id="ai-modal-title" className="text-sm font-semibold text-text-primary">Caption ideas</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close AI generator"
+            aria-label="Close caption ideas"
             className="rounded p-1 text-text-muted hover:text-text-primary"
           >
             <X size={16} />
@@ -57,6 +46,9 @@ export default function AIGenerateModal({ onUse, onClose }: AIGenerateModalProps
 
         {/* Body */}
         <div className="space-y-4 p-4">
+          <p className="rounded-md bg-surface-alt px-3 py-2 text-[11px] leading-snug text-text-secondary">
+            These are example captions picked to match your topic, not written by AI. AI writing is coming later.
+          </p>
           <div>
             <label htmlFor="ai-prompt" className="text-[11px] font-semibold text-text-secondary">Prompt</label>
             <Textarea
@@ -69,66 +61,33 @@ export default function AIGenerateModal({ onUse, onClose }: AIGenerateModalProps
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex-1">
-              <label htmlFor="ai-model" className="text-[11px] font-semibold text-text-secondary">Model</label>
-              <select
-                id="ai-model"
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                aria-label="Select AI model"
-                className="mt-1 w-full rounded-md border border-border-strong bg-surface px-2.5 py-1.5 text-sm text-text-primary outline-none focus:border-primary"
-              >
-                {MOCK_MODELS.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-md bg-surface-alt px-2.5 py-1.5" aria-label="Token usage">
-              <Coins size={13} className="text-text-muted" />
-              <span className="text-[11px] font-mono text-text-secondary">
-                {tokenUsage.toLocaleString()} / {MOCK_MONTHLY_TOKEN_LIMIT.toLocaleString()}
-              </span>
-            </div>
-          </div>
-
           <Button
             variant="primary"
             onClick={handleGenerate}
-            disabled={!prompt.trim() || generating}
+            disabled={!prompt.trim()}
             className="w-full"
           >
-            {generating ? (
-              <span className="flex items-center gap-2">
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                Generating...
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <Sparkles size={14} />
-                Generate Caption
-              </span>
-            )}
+            <span className="flex items-center gap-2">
+              <Sparkles size={14} />
+              Suggest a caption
+            </span>
           </Button>
 
           {result !== null && (
-            <div className="rounded-lg border border-primary/30 bg-primary-subtle p-3" role="region" aria-live="polite" aria-label="Generated caption result">
-              <p className="text-[11px] font-semibold text-primary-text mb-1.5">Generated Caption</p>
+            <div className="rounded-lg border border-primary/30 bg-primary-subtle p-3" role="region" aria-live="polite" aria-label="Suggested caption">
+              <p className="text-[11px] font-semibold text-primary-text mb-1.5">Suggested caption</p>
               <p className="text-sm leading-relaxed text-text-primary whitespace-pre-wrap">{result}</p>
               <div className="mt-3 flex gap-2">
                 <Button variant="primary" size="sm" onClick={handleUse}>
                   Use This Caption
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setResult(null)}>
-                  Regenerate
+                  Another idea
                 </Button>
               </div>
             </div>
           )}
 
-          <p className="text-[10px] text-text-muted text-center">
-            This is a mock AI generator. In production, this would connect to OpenAI/Anthropic via a backend proxy.
-          </p>
         </div>
       </div>
     </div>

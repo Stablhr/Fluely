@@ -10,12 +10,16 @@ export type AppNotificationType =
   | "board_invitation"
   | "board_invitation_accepted"
   | "board_invitation_declined"
-  | "mention";
+  | "mention"
+  | "post_failed";
 
 export interface AppNotificationDto {
   id: string;
   type: AppNotificationType;
-  boardId: string;
+  /** Null on `post_failed`, which is about a social post rather than a board. */
+  boardId: string | null;
+  /** The social post a `post_failed` notification is about. */
+  postId: string | null;
   /** The invitation row, present on `board_invitation` so the bell can wire Accept/Decline. */
   collaboratorId: string | null;
   /** Present on `mention` notifications so the client can open the card/comment. */

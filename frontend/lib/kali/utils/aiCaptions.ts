@@ -44,37 +44,9 @@ function detectCategory(prompt: string): string {
   return 'default'
 }
 
-export interface AIGenerateResult {
-  caption: string
-  model: string
-  tokensUsed: number
-  generatedAt: string
-}
-
-export function generateMockCaption(prompt: string): AIGenerateResult {
+/** An example caption for the prompt's topic. Picked from templates; no AI is involved. */
+export function suggestCaption(prompt: string): string {
   const captions = getCaptions()
-  const category = detectCategory(prompt)
-  const pool = captions[category] ?? captions.default
-  const caption = pool[Math.floor(Math.random() * pool.length)]
-
-  return {
-    caption,
-    model: 'mock-local',
-    tokensUsed: 0,
-    generatedAt: new Date().toISOString(),
-  }
-}
-
-export const MOCK_MODELS = ['mock-local'] as const
-
-const MOCK_TOKEN_USAGE_KEY = 'kali-ai-tokens'
-export const MOCK_MONTHLY_TOKEN_LIMIT = 100000
-
-export function getTokenUsage(): number {
-  try {
-    const raw = localStorage.getItem(MOCK_TOKEN_USAGE_KEY)
-    return raw ? Number(raw) : 0
-  } catch {
-    return 0
-  }
+  const pool = captions[detectCategory(prompt)] ?? captions.default
+  return pool[Math.floor(Math.random() * pool.length)]
 }

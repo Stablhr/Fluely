@@ -11,7 +11,8 @@ export const notificationRepository = {
     userId: Types.ObjectId;
     type: NotificationType;
     actorId: Types.ObjectId;
-    boardId: Types.ObjectId;
+    boardId?: Types.ObjectId | null;
+    postId?: string | null;
     collaboratorId?: Types.ObjectId | null;
     cardId?: Types.ObjectId | null;
     commentId?: string | null;
@@ -19,6 +20,8 @@ export const notificationRepository = {
   }) =>
     NotificationModel.create({
       ...data,
+      boardId: data.boardId ?? null,
+      postId: data.postId ?? null,
       collaboratorId: data.collaboratorId ?? null,
       cardId: data.cardId ?? null,
       commentId: data.commentId ?? null,

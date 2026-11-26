@@ -201,12 +201,19 @@ export const authService = {
         recipientName: data.firstName
       });
 
-      await emailService.sendEmail({
-        to: data.email,
-        subject: emailTpl.subject,
-        text: emailTpl.text,
-        html: emailTpl.html
-      });
+      try {
+        await emailService.sendEmail({
+          to: data.email,
+          subject: emailTpl.subject,
+          text: emailTpl.text,
+          html: emailTpl.html
+        });
+      } catch (emailError) {
+        // Without the code the account could never be verified, and a retry would
+        // hit "Email already exists". Undo it so the person can simply try again.
+        await userRepository.deleteById(user._id);
+        throw emailError;
+      }
 
       // Every new account gets a workspace of its own so that
       // `visibility: 'workspace'` means something from the first board. This

@@ -6,6 +6,7 @@ import {logger} from '../../logging/logger';
 import {PublishingJobDocument, PublishingJobModel} from '../../models/PublishingJob.model';
 import {SocialAccountModel} from '../../models/SocialAccount.model';
 import {PlatformTarget, SocialPostDocument, SocialPostModel} from '../../models/SocialPost.model';
+import {notificationService} from '../notification.service';
 import {socialAccountService} from './accounts.service';
 import {getProvider, platformMode, validateContent} from './providers/registry';
 import {ProviderError, PublishContent, PublishResult} from './providers/types';
@@ -15,6 +16,26 @@ import {enqueuePublish} from './qstash';
  * Runs publishing jobs: claim → publish (or simulate) → record the outcome on
  * the job and on the post's platform target → recompute the post's status.
  */
+
+/**
+ * Runs once a platform is finished for good with a post: tells the author when
+ * it failed, and schedules the next post of a repeating series. Never throws,
+ * since the publish it follows has already been recorded.
+ */
+async function afterFinalOutcome(post: SocialPostDocument, platform: SchedulablePlatform, failed: boolean) {
+  if (failed) {
+    await notificationService
+      .notifyPostFailed({userId: post.createdBy, postId: post.id, title: post.title, platformLabel: PLATFORM_LABELS[platform]})
+      .catch(err => logger.error({err, postId: post.id}, 'Could not send the failed-post notification'));
+  }
+  try {
+    // Imported here: posts.service imports this module.
+    const {scheduleNextOccurrence} = await import('./posts.service');
+    await scheduleNextOccurrence(post._id as Types.ObjectId);
+  } catch (err) {
+    logger.error({err, postId: post.id}, 'Could not schedule the next post of a repeating series');
+  }
+}
 
 /** A delivery up to this early still runs; earlier ones re-enqueue. */
 const EARLY_TOLERANCE_MS = 30_000;
@@ -176,6 +197,7 @@ export async function runPublishingJob(jobId: string): Promise<{status: string}>
     await setTarget(post, job.platform, {status: 'reminder'}, ['error', 'errorCode', 'nextRetryAt']);
     await refreshPostStatus(post._id as Types.ObjectId);
     logger.info({jobId: job._id.toString(), platform: job.platform}, 'Reminder due for a hand-posted post');
+    await afterFinalOutcome(post, job.platform, false);
     return {status: 'reminder'};
   }
 
@@ -219,6 +241,7 @@ export async function runPublishingJob(jobId: string): Promise<{status: string}>
     );
     await refreshPostStatus(post._id as Types.ObjectId);
     logger.info({jobId: job._id.toString(), platform: job.platform, dryRun}, 'Social post published');
+    await afterFinalOutcome(post, job.platform, false);
     return {status: 'completed'};
   } catch (error) {
     const providerError =
@@ -277,6 +300,7 @@ export async function runPublishingJob(jobId: string): Promise<{status: string}>
       {jobId: job._id.toString(), platform: job.platform, code: providerError.code, retry: canRetry},
       'Social post publish failed'
     );
+    if (!canRetry) await afterFinalOutcome(post, job.platform, true);
     return {status: canRetry ? 'retrying' : 'failed'};
   }
 }
@@ -298,6 +322,7 @@ async function failStaleJobs(): Promise<void> {
     await setTarget(post, job.platform, {status: 'failed', error, errorCode: 'INTERRUPTED'}, ['nextRetryAt']);
     await refreshPostStatus(post._id as Types.ObjectId);
     logger.warn({jobId: job._id.toString(), platform: job.platform}, 'Publishing job interrupted; marked failed');
+    await afterFinalOutcome(post, job.platform, true);
   }
 }
 
