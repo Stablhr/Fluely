@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { useDialogFocus } from '../shared/Modal'
 import { Share2, Plus, X, Clock, CheckCircle2, XCircle, AlertCircle, FileText, Lightbulb, Eye } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import type { SocialPost, SocialPostStatus } from '@/lib/kali/store/schema'
@@ -73,6 +74,8 @@ function LinkedPostRow({ post, onUnlink }: { post: SocialPost; onUnlink: () => v
 export default function CardSocialPosts({ cardId }: { cardId: string }) {
   const { socialPosts, updateSocialPost } = useStore()
   const [linkModalOpen, setLinkModalOpen] = useState(false)
+  const linkDialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(linkDialogRef, linkModalOpen, () => setLinkModalOpen(false))
   const [composeOpen, setComposeOpen] = useState(false)
 
   const linkedPosts = socialPosts.filter((p) => p.cardId === cardId)
@@ -133,7 +136,7 @@ export default function CardSocialPosts({ cardId }: { cardId: string }) {
       )}
 
       {linkModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3" role="dialog" aria-modal="true" aria-labelledby="link-social-post-title">
+        <div ref={linkDialogRef} tabIndex={-1} className="fixed inset-0 z-[60] flex items-center justify-center p-3 outline-none" role="dialog" aria-modal="true" aria-labelledby="link-social-post-title">
           <div className="animate-overlay absolute inset-0 bg-black/50" onClick={() => setLinkModalOpen(false)} />
           <div className="animate-in relative z-10 w-full max-w-sm rounded-[14px] border border-border bg-surface shadow-modal">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">

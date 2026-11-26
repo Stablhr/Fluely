@@ -132,7 +132,16 @@ export default function ListColumn({ list, dragHandleProps, search, filter, onOp
                 setName(list.name)
                 setEditing(true)
               }}
-              title={mayWrite ? "Click to rename" : list.name}
+              role={mayWrite ? 'button' : undefined}
+                    tabIndex={mayWrite ? 0 : undefined}
+                    aria-label={mayWrite ? `Rename list: ${list.name}` : undefined}
+                    onKeyDown={(e) => {
+                      if (!mayWrite || (e.key !== 'Enter' && e.key !== ' ')) return
+                      e.preventDefault()
+                      setName(list.name)
+                      setEditing(true)
+                    }}
+                    title={mayWrite ? "Click to rename" : list.name}
               className={`flex-1 truncate text-sm font-semibold ${mayWrite ? 'cursor-text' : ''}`}
               style={{ color: 'var(--surface-text)' }}
             >

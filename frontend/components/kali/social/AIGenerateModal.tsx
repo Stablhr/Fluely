@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { useDialogFocus } from '../shared/Modal'
 import { Sparkles, X } from 'lucide-react'
 import { suggestCaption } from '@/lib/kali/utils/aiCaptions'
 import Button from '../shared/Button'
@@ -13,6 +14,8 @@ interface AIGenerateModalProps {
 
 export default function AIGenerateModal({ onUse, onClose }: AIGenerateModalProps) {
   const [prompt, setPrompt] = useState('')
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(dialogRef, true, onClose)
   const [result, setResult] = useState<string | null>(null)
 
   const handleGenerate = () => {
@@ -25,7 +28,7 @@ export default function AIGenerateModal({ onUse, onClose }: AIGenerateModalProps
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-3" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title">
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-[60] flex items-center justify-center p-3 outline-none" role="dialog" aria-modal="true" aria-labelledby="ai-modal-title">
       <div className="animate-overlay absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="animate-in relative z-10 flex w-full max-w-lg flex-col rounded-[14px] border border-border bg-surface shadow-modal">
         {/* Header */}
