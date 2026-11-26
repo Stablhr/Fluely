@@ -260,6 +260,15 @@ const { data, updateCard, addActivity, deleteCard, archiveCard, toggleDone, canW
                       setTitle(card.title)
                       setEditingTitle(true)
                     }}
+                    role={mayWrite ? 'button' : undefined}
+                    tabIndex={mayWrite ? 0 : undefined}
+                    aria-label={mayWrite ? `Rename card: ${card.title}` : undefined}
+                    onKeyDown={(e) => {
+                      if (!mayWrite || (e.key !== 'Enter' && e.key !== ' ')) return
+                      e.preventDefault()
+                      setTitle(card.title)
+                      setEditingTitle(true)
+                    }}
                     title={mayWrite ? 'Click to rename' : card.title}
                     className={`break-words rounded-md px-2 py-1 text-[20px] font-semibold leading-snug text-text-primary transition-colors duration-150 ${
                       mayWrite ? 'cursor-text hover:bg-surface-alt' : ''

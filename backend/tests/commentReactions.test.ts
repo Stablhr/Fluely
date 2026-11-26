@@ -324,6 +324,19 @@ describe('what an editor may write on a card', () => {
       .send(body);
   }
 
+  it('answers 400, not 500, when a title is over the stored length limit', async () => {
+    const {owner, board, card} = await setup();
+    // 200 emoji pass the 300-character request limit but are 400 UTF-16 units.
+    // Creating runs the model's checks (an update does not), which used to answer 500.
+    const session = sessionFor(owner._id);
+    const res = await request(app)
+      .post(`/api/boards/${board._id.toString()}/cards`)
+      .set('Cookie', session.cookie)
+      .set('X-CSRF-Token', session.csrf)
+      .send({listId: card.listId.toString(), title: THUMBS.repeat(200)});
+    expectError(res, 400, ErrorCodes.VALIDATION_ERROR);
+  });
+
   it("cannot rewrite, delete or forge someone else's comment", async () => {
     const {owner, board, card} = await setup();
     const editor = await createUser();

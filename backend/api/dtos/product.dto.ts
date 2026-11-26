@@ -270,7 +270,8 @@ export const reactionEmoji = z
   .string()
   .trim()
   .min(1)
-  .max(16)
+  // UTF-16 code units, not characters (zod 4's .max counts characters): 👍 is 2.
+  .refine(value => value.length <= 16, 'Too long')
   .refine(value => !/[\u0000-\u007f]|\s/.test(value), 'Must be an emoji');
 
 export const commentIdParamsSchema = z.object({
@@ -359,7 +360,7 @@ export const profilePatchSchema = z.object({
   accentColor: z.string().trim().max(30).optional().nullable(),
   avatarColor: z.string().trim().max(30).optional().nullable(),
   phone: z.string().trim().max(40).optional().nullable(),
-  profileVisibility: z.record(z.enum(['me', 'boards'])).optional().nullable(),
+  profileVisibility: z.record(z.string(), z.enum(['me', 'boards'])).optional().nullable(),
   preferences: accountPreferencesPatchSchema.optional()
 });
 
@@ -370,9 +371,7 @@ export const profilePatchSchema = z.object({
 export const accountDeleteSchema = z
   .object({
     password: z.string().min(1, 'Password is required').max(200),
-    confirmation: z.literal('DELETE', {
-      errorMap: () => ({message: 'Type DELETE to confirm'})
-    })
+    confirmation: z.literal('DELETE', {error: 'Type DELETE to confirm'})
   })
   .strict();
 

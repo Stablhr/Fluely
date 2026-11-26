@@ -13,6 +13,7 @@ npm run build        # Build for production
 npm run start        # Start production server
 npm run lint         # ESLint
 npx tsc --noEmit     # Type check (no script; run it directly)
+npm test             # Vitest unit tests (*.test.ts next to the code, no browser needed)
 ```
 
 ## Architecture

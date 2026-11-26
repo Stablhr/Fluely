@@ -82,8 +82,8 @@ const postFields = {
   status: z.enum(PostStatuses).optional(),
   repeat: z.enum(['none', 'daily', 'weekdays', 'weekly', 'biweekly', 'monthly']).default('none'),
   repeatUntil: blank(isoDate.nullish()).transform(v => v ?? undefined),
-  analytics: z.array(z.record(z.unknown())).max(10).optional(),
-  aiGeneration: z.record(z.unknown()).optional(),
+  analytics: z.array(z.record(z.string(), z.unknown())).max(10).optional(),
+  aiGeneration: z.record(z.string(), z.unknown()).optional(),
   tags: z.array(z.string().max(60)).max(30).default([]),
   notes: z.string().max(10000).nullish().transform(v => v ?? undefined)
 };

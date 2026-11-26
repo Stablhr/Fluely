@@ -112,7 +112,8 @@ export const NotificationTypes = [
   'board_invitation',
   'board_invitation_accepted',
   'board_invitation_declined',
-  'mention'
+  'mention',
+  'post_failed'
 ] as const;
 export type NotificationType = (typeof NotificationTypes)[number];
 

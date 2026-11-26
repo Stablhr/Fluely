@@ -197,6 +197,193 @@ type ScheduleInput = {
   repeatUntil?: string;
 };
 
+/**
+ * Queues each enabled platform at the chosen time. Platforms that fail a
+ * check (no connected account, content the platform would refuse) are
+ * reported and left unscheduled; the rest go ahead.
+ */
+async function scheduleInWorkspace(workspaceId: Types.ObjectId, post: SocialPostDocument, input: ScheduleInput) {
+  const scheduledAt = zonedToUtc(input.scheduledDate, input.scheduledTime, input.timezone);
+  const runAt = new Date(Math.max(Date.now(), scheduledAt.getTime()));
+
+  const running = await PublishingJobModel.findOne({workspaceId, socialPostId: post.id, status: 'publishing'}).exec();
+  if (running) throw alreadyPublishing(running.platform);
+
+  const validation: {platform: SchedulablePlatform; valid: boolean; errors: string[]}[] = [];
+  const jobsCreated: string[] = [];
+  const jobsSkipped: string[] = [];
+  const targets: PlatformTarget[] = [];
+  const toQueue: {platform: SchedulablePlatform; accountId: Types.ObjectId; idempotencyKey: string}[] = [];
+
+  for (const target of post.platforms) {
+    if (!target.enabled) {
+      targets.push(target);
+      continue;
+    }
+    const errors: string[] = [];
+    const label = PLATFORM_LABELS[target.platform];
+    if (platformMode(target.platform) === 'disabled') errors.push(`${label} is turned off`);
+    const account = await resolveAccount(workspaceId, target);
+    if (!account) errors.push(`Connect ${/^[AEIOU]/i.test(label) ? 'an' : 'a'} ${label} account first`);
+    else if (account.status !== 'active') errors.push(`Reconnect ${account.accountName} (${label})`);
+    if (account?.accountType !== REMINDER_ACCOUNT_TYPE) {
+      errors.push(...validateContent(target.platform, contentFor(post, target)));
+    }
+
+    validation.push({platform: target.platform, valid: errors.length === 0, errors});
+    if (errors.length || !account) {
+      jobsSkipped.push(target.platform);
+      targets.push({...target, status: 'pending', error: errors.join('. '), errorCode: 'NOT_SCHEDULED'});
+      continue;
+    }
+    const idempotencyKey = newIdempotencyKey(post.id, target.platform);
+    toQueue.push({platform: target.platform, accountId: account._id as Types.ObjectId, idempotencyKey});
+    targets.push({
+      ...target,
+      status: 'scheduled',
+      accountId: account._id.toString(),
+      retryCount: 0,
+      maxRetries: DEFAULT_MAX_RETRIES,
+      idempotencyKey,
+      error: undefined,
+      errorCode: undefined,
+      nextRetryAt: undefined
+    });
+  }
+
+  post.platforms = targets;
+  post.scheduledDate = input.scheduledDate;
+  post.scheduledTime = input.scheduledTime;
+  post.timezone = input.timezone;
+  post.scheduledAt = scheduledAt;
+  if (input.repeat) post.repeat = input.repeat;
+  if (input.repeatUntil !== undefined) post.repeatUntil = input.repeatUntil;
+  post.status = toQueue.length ? 'scheduled' : PLANNING.includes(post.status) ? post.status : 'draft';
+  // Saved before the jobs exist, so a job that runs at once is not overwritten by this save.
+  // A request that loses a concurrent save (409) stops here, before touching any job.
+  await post.save();
+  // Only now replace the old jobs: cancelling first let a request that then lost the
+  // save cancel the winner's new job and leave the post scheduled with none.
+  await cancelJobs(workspaceId, post.id);
+  for (const item of toQueue) {
+    const job = await createJob(workspaceId, post, item.platform, item.accountId, runAt, item.idempotencyKey);
+    jobsCreated.push(job._id.toString());
+  }
+
+  return {
+    post: serializePost(post),
+    scheduledAt: scheduledAt.toISOString(),
+    timezone: input.timezone ?? 'UTC',
+    jobsCreated,
+    jobsSkipped,
+    validation
+  };
+}
+
+/**
+ * The calendar date of a series' next post, or null when it does not repeat.
+ * `anchorDay` is the first post's day of the month, so a monthly series that
+ * starts on the 31st stays on month ends instead of drifting to the 28th.
+ */
+export function nextOccurrenceDate(date: string, repeat: string, anchorDay = Number(date.slice(8, 10))): string | null {
+  const d = new Date(`${date}T00:00:00Z`);
+  const addDays = (n: number) => d.setUTCDate(d.getUTCDate() + n);
+  switch (repeat) {
+    case 'daily':
+      addDays(1);
+      break;
+    case 'weekdays':
+      do addDays(1);
+      while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+      break;
+    case 'weekly':
+      addDays(7);
+      break;
+    case 'biweekly':
+      addDays(14);
+      break;
+    case 'monthly': {
+      const year = d.getUTCFullYear();
+      const month = d.getUTCMonth() + 1;
+      const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+      return new Date(Date.UTC(year, month, Math.min(anchorDay, lastDay))).toISOString().slice(0, 10);
+    }
+    default:
+      return null;
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Once every platform of a repeating post is done (posted, failed, or handed
+ * back as a reminder), creates and schedules the series' next post. Each post
+ * in a series is its own record, so its outcome stays on it. The id
+ * `<first post id>~<date>` makes this safe to call more than once.
+ */
+export async function scheduleNextOccurrence(postId: Types.ObjectId) {
+  const post = await SocialPostModel.findById(postId).exec();
+  if (!post || !post.repeat || post.repeat === 'none' || !post.scheduledDate) return null;
+  const live = await PublishingJobModel.exists({
+    workspaceId: post.workspaceId,
+    socialPostId: post.id,
+    status: {$in: ['queued', 'publishing']}
+  });
+  if (live) return null;
+
+  const firstId = post.id.split('~')[0];
+  const first = firstId === post.id ? post : await SocialPostModel.findOne({workspaceId: post.workspaceId, id: firstId}).exec();
+  const anchorDay = Number((first?.scheduledDate ?? post.scheduledDate).slice(8, 10));
+  let nextDate = nextOccurrenceDate(post.scheduledDate, post.repeat, anchorDay);
+  // Skip dates already gone (late sweep, outage): publishing each of them now
+  // would post a burst of catch-up copies.
+  const isPast = (date: string) => zonedToUtc(date, post.scheduledTime, post.timezone).getTime() < Date.now();
+  for (let i = 0; nextDate && i < 20_000 && isPast(nextDate); i += 1) {
+    nextDate = nextOccurrenceDate(nextDate, post.repeat, anchorDay);
+  }
+  // Still past after the cap (~55 years of days): stop rather than post late.
+  if (!nextDate || isPast(nextDate) || (post.repeatUntil && nextDate > post.repeatUntil)) return null;
+
+  let next: SocialPostDocument;
+  try {
+    next = await SocialPostModel.create({
+      id: `${firstId}~${nextDate}`,
+      workspaceId: post.workspaceId,
+      createdBy: post.createdBy,
+      title: post.title,
+      caption: post.caption,
+      media: post.media,
+      cardId: post.cardId,
+      tags: post.tags,
+      notes: post.notes,
+      status: 'draft',
+      // Settings carry over; outcomes (status, links, errors) start fresh.
+      platforms: post.platforms.map(t => ({
+        platform: t.platform,
+        enabled: t.enabled,
+        accountId: t.accountId,
+        caption: t.caption,
+        hashtags: t.hashtags,
+        mentions: t.mentions,
+        location: t.location,
+        altText: t.altText,
+        visibility: t.visibility,
+        deepLink: t.deepLink,
+        status: 'pending'
+      }))
+    });
+  } catch (error) {
+    if ((error as {code?: number}).code === 11000) return null; // already created
+    throw error;
+  }
+  return scheduleInWorkspace(post.workspaceId, next, {
+    scheduledDate: nextDate,
+    scheduledTime: post.scheduledTime,
+    timezone: post.timezone,
+    repeat: post.repeat,
+    repeatUntil: post.repeatUntil
+  });
+}
+
 export const socialPostService = {
   async list(actor: Actor, filter: {status?: string; platform?: string; date?: string}) {
     const {workspaceId} = await socialWorkspace(actor);
@@ -310,82 +497,7 @@ export const socialPostService = {
    */
   async schedule(actor: Actor, id: string, input: ScheduleInput) {
     const {workspaceId} = await socialWorkspace(actor);
-    const post = await findPost(workspaceId, id);
-    const scheduledAt = zonedToUtc(input.scheduledDate, input.scheduledTime, input.timezone);
-    const runAt = new Date(Math.max(Date.now(), scheduledAt.getTime()));
-
-    const running = await PublishingJobModel.findOne({workspaceId, socialPostId: id, status: 'publishing'}).exec();
-    if (running) throw alreadyPublishing(running.platform);
-
-    const validation: {platform: SchedulablePlatform; valid: boolean; errors: string[]}[] = [];
-    const jobsCreated: string[] = [];
-    const jobsSkipped: string[] = [];
-    const targets: PlatformTarget[] = [];
-    const toQueue: {platform: SchedulablePlatform; accountId: Types.ObjectId; idempotencyKey: string}[] = [];
-
-    for (const target of post.platforms) {
-      if (!target.enabled) {
-        targets.push(target);
-        continue;
-      }
-      const errors: string[] = [];
-      const label = PLATFORM_LABELS[target.platform];
-      if (platformMode(target.platform) === 'disabled') errors.push(`${label} is turned off`);
-      const account = await resolveAccount(workspaceId, target);
-      if (!account) errors.push(`Connect ${/^[AEIOU]/i.test(label) ? 'an' : 'a'} ${label} account first`);
-      else if (account.status !== 'active') errors.push(`Reconnect ${account.accountName} (${label})`);
-      if (account?.accountType !== REMINDER_ACCOUNT_TYPE) {
-        errors.push(...validateContent(target.platform, contentFor(post, target)));
-      }
-
-      validation.push({platform: target.platform, valid: errors.length === 0, errors});
-      if (errors.length || !account) {
-        jobsSkipped.push(target.platform);
-        targets.push({...target, status: 'pending', error: errors.join('. '), errorCode: 'NOT_SCHEDULED'});
-        continue;
-      }
-      const idempotencyKey = newIdempotencyKey(post.id, target.platform);
-      toQueue.push({platform: target.platform, accountId: account._id as Types.ObjectId, idempotencyKey});
-      targets.push({
-        ...target,
-        status: 'scheduled',
-        accountId: account._id.toString(),
-        retryCount: 0,
-        maxRetries: DEFAULT_MAX_RETRIES,
-        idempotencyKey,
-        error: undefined,
-        errorCode: undefined,
-        nextRetryAt: undefined
-      });
-    }
-
-    post.platforms = targets;
-    post.scheduledDate = input.scheduledDate;
-    post.scheduledTime = input.scheduledTime;
-    post.timezone = input.timezone;
-    post.scheduledAt = scheduledAt;
-    if (input.repeat) post.repeat = input.repeat;
-    if (input.repeatUntil !== undefined) post.repeatUntil = input.repeatUntil;
-    post.status = toQueue.length ? 'scheduled' : PLANNING.includes(post.status) ? post.status : 'draft';
-    // Saved before the jobs exist, so a job that runs at once is not overwritten by this save.
-    // A request that loses a concurrent save (409) stops here, before touching any job.
-    await post.save();
-    // Only now replace the old jobs: cancelling first let a request that then lost the
-    // save cancel the winner's new job and leave the post scheduled with none.
-    await cancelJobs(workspaceId, id);
-    for (const item of toQueue) {
-      const job = await createJob(workspaceId, post, item.platform, item.accountId, runAt, item.idempotencyKey);
-      jobsCreated.push(job._id.toString());
-    }
-
-    return {
-      post: serializePost(post),
-      scheduledAt: scheduledAt.toISOString(),
-      timezone: input.timezone ?? 'UTC',
-      jobsCreated,
-      jobsSkipped,
-      validation
-    };
+    return scheduleInWorkspace(workspaceId, await findPost(workspaceId, id), input);
   },
 
   async cancel(actor: Actor, id: string, platform?: SchedulablePlatform) {

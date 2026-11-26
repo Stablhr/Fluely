@@ -55,7 +55,7 @@ export const notificationService = {
     // Keyed lookups rather than index arithmetic: $in queries come back in
     // Mongo's order, so positional zipping could credit one board's name to
     // another notification.
-    const boardIds = [...new Set(rows.map(row => row.boardId.toString()))];
+    const boardIds = [...new Set(rows.flatMap(row => (row.boardId ? [row.boardId.toString()] : [])))];
     const actorIds = [...new Set(rows.map(row => row.actorId.toString()))];
     const cardIds = [...new Set(rows.map(row => row.cardId?.toString()).filter(Boolean))] as string[];
     const [boards, actors] = await Promise.all([
@@ -74,11 +74,13 @@ export const notificationService = {
         const row = rows.find(r => r.cardId?.toString() === cardId);
         if (!row) return;
         try {
-          const card = await cardRepository.findByIdForBoard(cardId, row.boardId);
+          if (!row.boardId) return;
+          const boardId = row.boardId;
+          const card = await cardRepository.findByIdForBoard(cardId, boardId);
           if (!card) return;
           let listName = '';
           try {
-            const list = await listRepository.findByIdForBoard(card.listId.toString(), row.boardId);
+            const list = await listRepository.findByIdForBoard(card.listId.toString(), boardId);
             listName = list?.name ?? '';
           } catch {
             listName = '';
@@ -97,14 +99,15 @@ export const notificationService = {
         return {
           id: row._id.toString(),
           type: row.type,
-          boardId: row.boardId.toString(),
+          boardId: row.boardId?.toString() ?? null,
+          postId: row.postId ?? null,
           collaboratorId: row.collaboratorId?.toString() ?? null,
           cardId: row.cardId?.toString() ?? null,
           commentId: row.commentId ?? null,
           snippet: row.snippet ?? null,
           listName: card?.listName ?? '',
           cardTitle: card?.title ?? '',
-          boardName: boardById.get(row.boardId.toString())?.name ?? '',
+          boardName: row.boardId ? boardById.get(row.boardId.toString())?.name ?? '' : '',
           actorName: actorById.get(row.actorId.toString()) ?? '',
           read: row.read,
           readAt: row.readAt,
@@ -142,6 +145,23 @@ export const notificationService = {
    * Invitee-side: the "you were invited" card. A re-invite retires the stale
    * card first so repeats never stack.
    */
+  /** Tells the post's author that a platform gave up on it for good. In-app only. */
+  async notifyPostFailed(params: {
+    userId: Types.ObjectId;
+    postId: string;
+    title: string;
+    platformLabel: string;
+  }) {
+    const title = params.title.trim() || 'A post';
+    await notificationRepository.create({
+      userId: params.userId,
+      type: 'post_failed',
+      actorId: params.userId,
+      postId: params.postId,
+      snippet: `"${title}" could not be published to ${params.platformLabel}`.slice(0, 200)
+    });
+  },
+
   async notifyInvitationSent(params: {
     inviteeId: Types.ObjectId;
     invitee: {firstName: string; lastName: string; email: string};

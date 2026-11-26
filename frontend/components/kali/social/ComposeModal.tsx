@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useDialogFocus } from '../shared/Modal'
 import { X, Plus, Calendar, Tag, Sparkles, AlertTriangle, CheckCircle2, Clock, Loader2, Library, Link2 } from 'lucide-react'
 import { useStore } from '@/lib/kali/store/useStore'
 import type { SocialPost, SocialPostPlatform, SocialMediaAttachment, Platform } from '@/lib/kali/store/schema'
@@ -115,6 +116,9 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
   onClose: () => void
 }) {
   const { addSocialPost, updateSocialPost, removeMediaFromPost, scheduleSocialPost } = useStore()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  // Escape is handled below (it asks before discarding edits).
+  useDialogFocus(dialogRef, true)
 
   const [title, setTitle] = useState(post?.title ?? '')
   const [caption, setCaption] = useState(post?.caption ?? '')
@@ -344,7 +348,7 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
   }
 
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-labelledby="compose-modal-title">
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-50 outline-none" role="dialog" aria-modal="true" aria-labelledby="compose-modal-title">
       <div className="animate-overlay absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
       <div className="relative z-10 flex h-full items-start justify-center overflow-y-auto p-3 pt-8 sm:pt-16">
       <div className="animate-in flex w-full max-w-2xl flex-col rounded-[14px] border border-border bg-surface shadow-modal">
@@ -398,11 +402,11 @@ export default function ComposeModal({ post, initialDate, initialTime, initialCa
               <button
                 type="button"
                 onClick={() => setAiOpen(true)}
-                aria-label="Generate caption with AI"
+                aria-label="Get caption ideas"
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary transition-colors hover:bg-primary-subtle"
               >
                 <Sparkles size={12} />
-                AI Generate
+                Caption ideas
               </button>
             </div>
             <Textarea

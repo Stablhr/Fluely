@@ -200,7 +200,16 @@ export default function BoardTopBar({
               setName(board.name)
               setEditing(true)
             }}
-            title={mayWrite ? "Click to rename" : board.name}
+            role={mayWrite ? 'button' : undefined}
+                    tabIndex={mayWrite ? 0 : undefined}
+                    aria-label={mayWrite ? `Rename board: ${board.name}` : undefined}
+                    onKeyDown={(e) => {
+                      if (!mayWrite || (e.key !== 'Enter' && e.key !== ' ')) return
+                      e.preventDefault()
+                      setName(board.name)
+                      setEditing(true)
+                    }}
+                    title={mayWrite ? "Click to rename" : board.name}
             className={`ml-0.5 min-w-0 truncate rounded-md px-1.5 py-1 text-sm font-semibold text-text-primary transition-colors duration-150 sm:ml-1 sm:text-base ${
               mayWrite ? 'cursor-text hover:bg-surface-alt' : ''
             }`}

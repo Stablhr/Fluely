@@ -17,7 +17,7 @@ social media library still lives in the browser alone.
 - **Frontend:** Next.js 16 App Router, React 19, TypeScript 5, TailwindCSS v4, shadcn/ui, TanStack Query v5, Axios
 - **App UI:** ported from Kali; its own design system in `frontend/app/kali.css` (scoped to `.kali-app`), `@hello-pangea/dnd`, lucide icons
 - **Backend:** Express.js, Mongoose (MongoDB), jsonwebtoken, bcrypt, Zod, Nodemailer, Pino
-- **Testing:** Jest backend suites in `backend/tests/` (`cd backend && npm test`); no frontend tests yet
+- **Testing:** Jest backend suites in `backend/tests/` (`cd backend && npm test`); Vitest frontend tests next to the code as `*.test.ts` (`cd frontend && npm test`). CI runs both
 - **Runtime:** Node.js 18+
 
 ## Sub-Agents
